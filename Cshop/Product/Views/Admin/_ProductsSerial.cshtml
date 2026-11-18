@@ -1,0 +1,269 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@using System.Text.RegularExpressions
+@model ProductModel
+@{
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var templSerial = (ProductSerialModel)ViewBag.TemplSerial;
+}
+<style type="text/css">
+    #gridserial thead.k-grid-header {display: none;}
+</style>
+
+@{
+    var addTempl = false;
+    if (Model.SerialNumbers.Count == 0) { Model.SerialNumbers.Insert(0, templSerial); addTempl = true; }
+
+    var seialTempl = Html.LocalizeTextBoxFor(m => m.SerialNumbers[0].SerialNumber, new
+    {
+        @id = "serial-#:Key#",
+        @class = "ser-cell ser-serialnumber",
+        @data_bind = "SerialNumber",
+        @readonly = "",
+        @data_id = "#:Id#",
+    }).Replace(new { @name = "_SerialNumbers[#:Iseq#].SerialNumber", @value = "#:ifnull(SerialNumber)#" }).Replace("readonly=\"\"", "#:Id?'readonly':''#")
+    + "<span class='error' data-valmsg-for='_SerialNumbers[#:Iseq#].SerialNumber' data-valmsg-replace='true'></span>";
+
+    if (addTempl) { Model.SerialNumbers.Remove(templSerial); }  
+}
+<div>@("Available serial".ModLocalize())</div>
+<div class="wr_table_all" id="serial-numbers" style="margin-bottom: 10px;">
+    @(Html.LocalizeGridFor<ProductSerialModel>("gridserial", "Product", null, null, null, null, null,
+        null, grid =>
+        {
+            grid.ButtonDelBigClass += "_seri";
+            grid.CheckBoxSelAllCss += "_seri";
+            grid.CheckBoxRowCssClass += "_seri";
+            grid.InputSearchId += "_seri";
+            grid.FormSearchId += "_seri";
+        })
+        .DataSource(m => m.Id, Model.SerialNumbers)
+        .Paging(2, new [] { 10, 20, 30, 50, 100 }, StringTable.SerialNumbers)
+        .Columns(grid => new[]
+        {
+            grid.Col(m => m.SerialNumber)
+                .SetTemplate(seialTempl),
+            grid.Col(m => m.Id, true)
+                .SetDefaultSort(true),
+        })
+        .ColumnCheckBox("Key", "_seri")
+        .Sortable(true)
+        .Config(grid => { grid.CustomScript = "gridSerialCustom"; })
+        .ToMvcHtmlString())
+</div>
+<section class="file-sel" style="width: 100%;@(Model.Id > 0 ? "" : "display:none;")">
+    <div style="display: inline-block;">
+        @Html.LocalizeImageLoading(new { @id = "serialImportLoading" })
+        <span>@StringTable.Import (.csv file):</span>
+        <div style="display:inline-block;">
+            <input name="SerialFile" id="SerialFile"
+                   data-regex="\.(csv)$" data-errmsg="@StringTable.ErrMsgFileExtension"
+                   accept="text/csv"
+                   onchange="importSerialNumbers(this)" type="file" />
+        </div>
+        <a class="form-link" style="font-style: italic;" href="data:text/csv;base64,U2VyaWFsTnINCnZhbHVlMA0KdmFsdWUxDQo=">@("Download template".ModLocalize())</a>
+    </div>
+    <div class="error" style="text-align:left;"><span class="file-ext-error"></span></div>
+</section>
+<div class="controls" style="margin-top: 5px;">
+    <ul class="wr_submit_top set-relative">
+        <li class="mr0 delete_big_seri" style="padding:0">
+            <input class="btn_delete" value="@StringTable.RemoveSerialNumber" type="button">
+        </li>
+    </ul>
+</div>
+
+<script type="text/javascript">
+
+    var gridserial = $('#gridserial');
+
+    $(function () {
+        gridserialInit('#gridserial', true);
+    });
+
+    function gridSerialCustom(grid) {
+        grid.hideColumn('Id');
+
+        $('.delete_big_seri').unbind('click').click(function () {
+            var arrRws = [], rows = grid.tbody.find('input:checked').closest('tr');
+            rows.each(function () { arrRws.push(grid.dataItem($(this))); });
+
+            arrRws.forEach(function (item) {
+                serialFormRemove(item);
+                grid.dataSource.data().remove(item);
+            });
+        });
+
+        $('#serial-form-list > .serial-form[data-valid=1]').each(function () {
+            var serialForm = $(this), row = seriGridGetRow(grid, $(this).attr('data-id'), $(this).attr('data-key'));
+            if (row) {
+                $('tr[data-uid=' + row.uid + '] .ser-cell', grid.element).change(function () {
+                    if ($(this).is('input,textarea,select')) {
+                        if ($(this).valid()) {
+                            var field = $(this).attr('data-bind');
+                            if (field) seriBindInputField(serialForm, row, field, $(this).val());
+                        } else $(this).focus();
+                    }
+                });
+                $(this).attr('data-uid', row.uid);
+                row.SerialForm = serialForm;
+            } else console.log('databound: row is null', $(this).attr('data-key'), serialForm);
+        });
+
+        formUpdateValidRules(grid.element);
+
+        if (grid.dataSource.total() == 0) grid.element.closest(".wr_table_all").hide();
+        else grid.element.closest(".wr_table_all").show();
+
+        var bactionargs = urlToJSON(grid.element.attr('bactionargs'));
+        if (Object.keys(bactionargs).length != 0 && bactionargs['type']) {
+            delete bactionargs['type'];
+            grid.element.attr('bactionargs', Object.keys(bactionargs).length != 0 ? '?' + $.param(bactionargs) : '');
+        }
+        
+        validSerialNumbers(grid);
+    }
+
+    function serialAdd(id, serialNumber) {
+        serialAddRaw({
+            Id: id, Key: kendo.guid(), ProductId: '@Model.Id', SerialNumber: serialNumber
+        });
+
+        if (id == 0) gridserial.data('kendoGrid').dataSource.sort({ field: 'Id', dir: 'asc' });
+    }
+
+    function serialAddRaw(fieldVals) {
+
+        var gridData = gridserial.data('kendoGrid');
+        var newRow = $.extend(true, {}, templSerial);
+
+        for (var prop in fieldVals) {
+            var pval = fieldVals[prop];
+            newRow[prop] = pval;
+        }
+        
+        newRow['Iseq'] = gridData.dataSource.data().length;
+
+        console.log('serialAdd', newRow);
+
+        var newForm = serialFormAdd(fieldVals);
+        newForm.attr('data-key', newRow.Key);
+        gridData.dataSource.data().push(newRow);
+    }
+
+    function serialFormAdd(fieldVals) {
+
+        var lst = $('#serial-form-list'), idx = parseInt(lst.attr('count')), id = fieldVals['Id'];
+
+        lst.attr('count', idx + 1);
+
+        var newForm = $('<div>').html($('#serial-form-template').html()).find('.serial-form');
+
+        newForm.find('input,textarea,select').each(function () {
+            $(this).attr('id', $(this).attr('id').replace('_0_', '_' + idx + '_'));
+            $(this).attr('name', $(this).attr('name').replace('[0]', '[' + idx + ']'));
+
+            if ($(this).attr('binding')) {
+                if ($(this).is('textarea')) $(this).html('');
+                else $(this).val('');
+            }
+        });
+
+        if (fieldVals)
+            for (var field in fieldVals) {
+                var fVal = fieldVals[field];
+
+                var node = newForm.find('.serial-form-field[binding=' + field + ']');
+                if (node.is('textarea')) $(this).html(fVal);
+                else node.val(fVal);
+            }
+
+        newForm.attr({ 'data-id': id, 'data-valid': 1 });
+
+        lst.append(newForm);
+
+        //console.log(newForm.html());
+
+        return newForm;
+    }
+
+    function serialFormRemove(row) {
+        console.log('serialFormRemove', row, row.SerialForm);
+        row.SerialForm.attr('data-valid', 0);
+        row.SerialForm.find('input,textarea,select').val('').attr('datavalid', 0);
+        $('#editform-change-state').val(1).change();
+    }
+
+    function seriBindInputField(serialForm, row, field, newVal) {
+        var inputField;
+
+        if (field == 'SerialNumber' && false) {
+            row[field] = newVal;
+            serialForm.attr('data-key', newVal);
+        }
+
+        row[field] = newVal;
+        inputField = serialForm.find('.serial-form-field[binding=' + field + ']');
+        inputField.val(newVal); console.log(inputField);
+    }
+
+    function seriGridGetRow(grid, id, key) {
+
+        if (id != null && id != 0) return grid.dataSource.get(id);
+        else return grid.dataSource.data().find(function (item) { return item.Key == key; });
+    }
+
+    function importSerialNumbers(node) {
+
+        if (!$(node).val() || !validFileExtension($(node), 'data-regex', '.file-sel', 'data-errmsg')) return;
+
+        doUploadFile('@Claw.Modules.Eshop.Core.ModuleUrl.AdminUrl("Product", "ImportSerialNumbers", Model.Id)',
+            $(node).attr('id'), 'serialImportLoading', { }, function (result) {
+                if(result.Items) {
+                    //var nodeKd = $('#gridserial').data('kendoGrid');
+                    result.Items.forEach(function (itm) { serialAdd(itm.Id, itm.Value); });
+                    //nodeKd.dataSource.page(1);
+                }
+                $('#SerialFile').val('');
+                if (result.Message) {
+                    var errMsg = $('#SerialFile').closest('.file-sel').find('.file-ext-error');
+                    errMsg.show().html(result.Message);
+                    setTimeout(function () { errMsg.hide(); }, 10000);
+                }
+            });
+    }
+    
+    
+    function validSerialNumbers(grid) {
+        var qty = parseInt($('#Quantity').val());
+        var errMsg = $('#SerialFile').closest('.file-sel').find('.file-ext-error');
+
+        if (grid.dataSource.data().length != qty) {
+            errMsg.show().html('@("err_serial_count_not_matched_quantity".ModLocalize("Serial number count is not matched with the product quantity ({0})"))'.replace('{0}', qty));
+        }
+        else errMsg.hide().html('');
+    }
+
+</script>
+
+<div id="serial-form-list" count="@Model.SerialNumbers.Count" style="display: none">
+    @for (int i = 0; i < Model.SerialNumbers.Count; i++)
+    {@RenderSerialForm(i)}
+</div>
+<script id="serial-form-template" type="text/serial-form-template">
+    @{ Model.SerialNumbers.Insert(0, templSerial); }
+    @RenderSerialForm(0)
+</script>
+@Html.Raw("<script type='text/javascript'> var templSerial = " + Json.Encode(templSerial) + ";</script>")
+
+@helper RenderSerialForm(int idx)
+{
+    <div class="serial-form" data-id="@Model.SerialNumbers[idx].Id" data-key="@Model.SerialNumbers[idx].Key" data-valid="1">
+        @Html.SimpleHiddenFor(m => m.SerialNumbers[idx].Id, new { @class = "serial-form-field", @binding = "Id" })
+        @Html.SimpleHiddenFor(m => m.SerialNumbers[idx].SerialNumber, new { @class = "serial-form-field", @binding = "SerialNumber" })
+    </div>
+}

@@ -1,0 +1,559 @@
+﻿@using System.Linq
+@using System.Web.UI.WebControls
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model RecurOrderModel
+
+@{
+    Layout = "Layout/Input.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.OrderEdit;
+
+    ViewBag.Title = StringTable.AddEditRecurOrder(Model.Id);
+    //ViewBag.ShowDeleteBtn = (Model != null && Model.Id > 0 && false);
+
+    //ViewBag.UseCKEditor = true;
+    ViewBag.UseDatePicker = true;
+    ViewBag.UseImgPreview = true;
+    //ViewBag.UseDropZone = true;
+
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/RecurOrder";
+    ViewBag.ParentBreadcrumbTitle = StringTable.RecurOrders;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var langOpt = LanguageMgr.ValidOptLang(Model.Id);
+    var langCode = langOpt.LanguageCode;
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageRecurOrders)
+}
+
+@section CurrentTitleSection {
+    <a href="/admin/modules/eshop/RecurOrder/">@(StringTable.ManageRecurOrders)</a>
+}
+
+@section TabTitleSection {
+    @StringTable.AddEditRecurOrder(Model.Id)
+}
+
+<style type="text/css">
+    #editForm .wr_box_cube{width: 98%;}
+    #editForm .ui-widget-content.wr-box-new{height: auto;}
+    #editForm .ui-widget-content .row_content{min-height: 0;}
+    #editForm .wr_clo1.field-view:empty{display: none}
+    #editForm .bg-order-sum .row_content.field-view-box > div{margin-bottom: 5px;}
+    #gridorderdetail .odetail-view .odetail-sku[data-sku=''] {display: none;}
+    #gridorderdetail .odetail-view .odetail-coupon[data-val='0']{display: none;}
+    #gridorderdetail input.quantity {width: 100% !important;margin: 0;text-align: center;}
+    .btn_update_pickuppoint:disabled{background-color: lightgray;cursor:default;}
+ 
+    .odetail-datajson ul{ list-style:none;}
+    .odetail-datajson li{ display:inline-block;}
+    .odetail-datajson .name{font-style:italic;font-size:smaller;color:blueviolet;}
+    .odetail-datajson .value{font-style:italic;font-size:smaller;color:brown;}
+    .odetail-datajson .value{font-style:italic;font-size:smaller;color:brown;word-wrap:anywhere;word-break:break-all;}
+ 
+</style>
+
+@using (@Html.BeginForm("Input", Html.GetController(), FormMethod.Post, new { @id = "editForm", enctype = "multipart/form-data" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(x => x.Id)
+    @Html.HiddenFor(x => x.OrderId)
+    @Html.HiddenFor(x => x.LastRunMsg)
+    @Html.HiddenFor(x => x.LastRunOk)
+    @Html.HiddenFor(x => x.LastRunTime)
+    @Html.HiddenFor(x => x.LastRunOrderId)
+    @Html.HiddenFor(x => x.RecurData)
+    @Html.HiddenFor(x => x.CreatedDate)
+
+    <section class="row-content-lang-box">
+        <section class="row_content_box">
+            <section class="clo_right col-right-eshop">
+                <section class="clo_left txt_align_r" style="width: 100% !important; text-align: left !important;">
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.FromDate) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeDateTextBoxFor(m => m.FromDate, Model.Id, new { @class = "", @style = "float:left" })
+                            <span class="error" style="display: none; float: left;">*</span>
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.FromDate)</section>
+                    </section>
+                </section>
+                <section class="controls" style="display: none">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.ToDate)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeDateTextBoxFor(m => m.ToDate, Model.Id, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.ToDate)</section>
+                    </section>
+                </section>
+                @{
+                    var disRecurs = (settings.Hidden.RecurringTypesDisabled ?? "").Split(new[] {',', ';'}, StringSplitOptions.RemoveEmptyEntries)
+                        .Select(x => (int)Enum.Parse(typeof(RecurringType), x)).ToList();
+                    var recurEaches = (settings.Hidden.RecurringTypesRecurEach ?? "").Split(new[] { ',', ';' },
+                            StringSplitOptions.RemoveEmptyEntries)
+                            .Select(x =>
+                            {
+                                var arr = x.Split(new[] { ':' });
+                                return new { Type = (int)Enum.Parse(typeof(RecurringType), arr[0]), Each = int.Parse(arr[1]) };
+                            }).ToList();
+                }
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Recurring) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeDropDownListKendoFor(m => m.Recurring, typeof(RecurringType).LocalizeEnumValues<int>(x => !disRecurs.Contains(x) || recurEaches.Any(z => z.Type == x)),
+                                null, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Recurring)</section>
+                    </section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.RecurEach) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.RecurEach, new { @class = "", @style = "float:left;width: 115px;min-width: 0;" })
+                            @Html.LocalizeDropDownListKendo("RecurEachUnit", Model.Recurring, typeof(RecurringType).LocalizeEnumValues<int>(x => !disRecurs.Contains(x) || recurEaches.Any(z => z.Type == x))
+                                .Action(m => m.Text = StringTable.RecurEach((RecurringType)int.Parse(m.Value))),
+                                null, new { @disabled = "disabled", @style = "float:left;" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.RecurEach)</section>
+                    </section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Status) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeDropDownListKendoFor(m => m.Status, typeof(RecurOrderStatus).LocalizeEnumValues<byte>(x => x != (byte)RecurOrderStatus.Pending),
+                            null, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Status)</section>
+                    </section>
+                </section>
+                <section>
+                    <section class="wr_box_cube" style="margin-top: 20px">
+                        <section class="ui-widget">
+                            <section class="ui-widget-content wr-box-new">
+                                <div class="wr-content-ordt">
+                                    <div class="info-section-block">
+                                        <div class="order-view">
+                                            <div class="row_content">
+                                                <div class="wr_clo2">@Html.LocalizeNameFor(x => x.OrderId): <a href="@ModuleUrl.AdminUrl("Order","Input", Model.OrderId)" class="form-link"><b>@Model.OrderId </b></a></div>
+                                                <div class="wr_clo2">@Html.LocalizeNameFor(x => x.CreatedDate): <b>@Model.CreatedDate.TextF</b></div>
+                                            </div>
+                                            <div class="row_content">
+                                                <div class="wr_clo2">@Html.LocalizeNameFor(x => x.LastRunTime): <b>@Model.LastRunTime.SafeProp(m => m.TextF) </b></div>
+                                                @if (Model.LastRunOrderId != null)
+                                                {
+                                                    <div class="wr_clo2">@Html.LocalizeNameFor(x => x.LastRunOrderId): <a href="@ModuleUrl.AdminUrl("Order", "Input", Model.LastRunOrderId)" class="form-link"><b>@Model.LastRunOrderId</b></a></div>
+                                                }
+                                            </div>
+                                            <div class="row_content">
+                                                <div class="wr_clo2">@Html.LocalizeNameFor(x => x.LastRunMsg): <span style="color: #333;font-style: italic;line-height: 1.6em;display: inline-block;">@Model.LastRunMsg</span></div>
+                                                <div class="wr_clo2">@Html.LocalizeNameFor(x => x.NextRunning): @Model.NextRunning.SafeProp(m => m.TextF)</div>
+                                            </div>
+                                            <div class="row_content">
+                                                <div class="wr_clo1">@Html.LocalizeNameFor(x => x.PaymentData): @Model.PaymentData</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        </section>
+                    </section>
+                </section>
+                <section>
+                    <section class="wr_box_cube">
+                        <section class="ui-widget">
+                            <section class="ui-widget-content wr-box-new" style="height: auto;">
+                                <div class="wr-content-ordt">
+                                    <div class="width-50-left info-section-block">
+                                        <div class="wr_clo1 txt-bold size14 txt-underline">@StringTable.BillingAddress:</div>
+                                        <div class="order-view">
+                                            <div class="wr_clo1 field-view">@Model.NextOrder.BillingName</div>
+                                            @if (!string.IsNullOrEmpty(Model.NextOrder.Customer.CompanyName))
+                                            {
+                                                <div class="wr_clo1">@StringTable.CompanyName: @Model.NextOrder.Customer.CompanyName</div>
+                                            }
+                                            @if (!string.IsNullOrEmpty(Model.NextOrder.Customer.OrgNumber))
+                                            {
+                                                <div class="wr_clo1">@StringTable.OrgNumber: @Model.NextOrder.Customer.OrgNumber</div>
+                                            }
+                                            <div class="wr_clo1 field-view">@Model.NextOrder.BillingAddress</div>
+                                            @if (!string.IsNullOrEmpty(Model.NextOrder.BillingMobile))
+                                            {
+                                                <div class="wr_clo1 field-view">@Model.NextOrder.BillingMobile</div>
+                                            }
+                                            <div class="wr_clo1 field-view">@Model.NextOrder.BillingPhone</div>
+                                            <div class="wr_clo1">
+                                                <div class="wr_clo1 field-view" style="float:left; width:auto">@Model.NextOrder.BillingPostnr</div>
+                                                <div style="float:left; width:auto"> - </div>
+                                                <div class="wr_clo1 field-view" style="float:left; width:auto">@Model.NextOrder.BillingPosted</div>
+                                            </div>
+                                            <div class="wr_clo1 field-view">@Model.NextOrder.BillingCountryName</div>
+                                        </div>
+                                        <div class="wr-btn-table">
+                                            <input type="button" onclick="window.location='@ModuleUrl.AdminUrl("Order", "Input", Model.OrderId)?editbilling=true'" class="btn_edit" value="@StringTable.Edit">
+                                        </div>
+                                    </div>
+                                    <div class="info-section-block width-50-left">
+                                        <div class="wr_clo1 txt-bold size14 txt-underline">@StringTable.DeliverAddress:</div>
+                                        <div class="order-view">
+                                            <div class="wr_clo1 field-view">@Model.NextOrder.DeliverName</div>
+                                            @if (!string.IsNullOrEmpty(Model.NextOrder.Customer.CompanyName))
+                                            {
+                                                <div class="wr_clo1">@StringTable.CompanyName: @Model.NextOrder.Customer.CompanyName</div>
+                                            }
+                                            @if (!string.IsNullOrEmpty(Model.NextOrder.Customer.OrgNumber))
+                                            {
+                                                <div class="wr_clo1">@StringTable.OrgNumber: @Model.NextOrder.Customer.OrgNumber</div>
+                                            }
+                                            <div class="wr_clo1 field-view">@Model.NextOrder.DeliverAddress</div>
+
+                                            @if (!string.IsNullOrEmpty(Model.NextOrder.DeliverMobile))
+                                            {
+                                                <div class="wr_clo1 field-view">@Model.NextOrder.DeliverMobile</div>
+                                            }
+                                            <div class="wr_clo1 field-view">@Model.NextOrder.DeliverPhone</div>
+                                            <div class="wr_clo1">
+                                                <div class="wr_clo1 field-view" style="float:left; width:auto">@Model.NextOrder.DeliverPostnr</div>
+                                                <div style="float:left; width:auto"> - </div>
+                                                <div class="wr_clo1 field-view" style="float:left; width:auto">@Model.NextOrder.DeliverPosted</div>
+                                            </div>
+                                            <div class="wr_clo1 field-view">@Model.NextOrder.DeliverCountryName</div>
+                                        </div>
+                                        <div class="wr-btn-table">
+                                            <input type="button" onclick="window.location='@ModuleUrl.AdminUrl("Order", "Input", Model.OrderId)?editdelivery=true'" class="btn_edit" value="@StringTable.Edit">
+                                        </div>
+                                    </div>	
+                                </div>
+                            </section>
+                        </section>
+                    </section>
+                </section>
+                <section>
+                    <section class="wr_box_cube">
+                        <section class="ui-widget">
+                            <section class="ui-widget-content wr-box-new">
+                                <div class="wr-content-ordt">
+                                    <div class="info-section-block">
+                                        <div>
+                                            <div class="wr_clo1 txt-bold size14 txt-underline">@StringTable.PaymentInformation:</div>
+                                            <div class="row_content none-first-pad order-view">
+                                                <div class="wr_clo1">@StringTable.Payment: @Model.PaymentName - @Html.Raw(Model.NextOrder.PaymentCost.Value.ToOMoneyMc(Model.NextOrder))</div>
+                                                <div class="wr_clo1">@StringTable.Shipping: @Model.ShippingName - @Html.Raw(Model.NextOrder.ShippingCost.Value.ToOMoneyMc(Model.NextOrder))</div>
+                                                @if (Model.NextOrder.ExtraService > 0)
+                                                {
+                                                    Array extraBringServiceValue = System.Enum.GetValues(typeof(ExtraBringService));
+                                                    <div class="wr_clo1">
+                                                        @foreach (byte Value in extraBringServiceValue)
+                                                        {
+                                                            if (((ExtraBringService)Model.NextOrder.ExtraService).HasFlag((ExtraBringService)Value))
+                                                            {
+                                                                string textValue = Enum.GetName(typeof(ExtraBringService), Value);
+                                                                <input type="checkbox" checked="checked" disabled="disabled" id="@textValue" />
+                                                                <label for="@textValue">@textValue</label>
+                                                            }
+                                                        }
+                                                    </div>
+                                                }
+                                                @if (!string.IsNullOrEmpty(Model.NextOrder.BringInfo))
+                                                {
+                                                    <div class="wr_clo1">@Model.NextOrder.BringInfo</div>
+                                                }
+                                                @if (!string.IsNullOrEmpty(Model.NextOrder.ShippingPickupPoint))
+                                                {
+                                                    <div class="wr_clo1">
+                                                        <span class="pickup-point-text">@Model.NextOrder.ShippingPickupPointFormated</span>
+                                                        <button class="btn btn_change_pickuppoint" onclick="$(this).toggle();$('.update-pickuppoint-form').toggle();$('#PostalCode').val($('#PostalCode').val() || $('#PostalCode').attr('data-val')).change();" 
+                                                                style="margin: 0 0 4px 10px;" type="button">@StringTable.ChangeValue</button>
+                                                        <div class="update-pickuppoint-form" style="display:none;">
+                                                            <input placeholder="@Html.LocalizeName(new OrderModel(), m => m.DeliverPostnr)" id="PostalCode" name="PostalCode" 
+                                                                   data-val="@Model.GetRaw().Order.DeliverPostnr" style="min-width: 0;width: 50px;" type="text" />
+                                                            <button class="btn" onclick="$('#PickupPointId').attr('data-val', $('#PostalCode').val()).data('kendoDropDownList').dataSource.read();" 
+                                                                    style="margin: 0 4px 0 0;" type="button">@StringTable.Search</button>
+                                                            @(Html.LocalizeDropDownListKendoLang("PickupPointId", null, "ListPickupPointD2", "Order", "PostalCode",
+                                                            StringTable.SelectPickupPoint, new { @style = "min-width:450px;", @onchange = "$('.btn_update_pickuppoint').prop('disabled', !$(this).val())" })
+                                                            .DataSource(m => m.Read(p => p.Data("function(){return {id: " + Model.OrderId + ", PostalCode: $('#PickupPointId').attr('data-val')};}"))))
+
+                                                            <button class="btn btn_update_pickuppoint" disabled="disabled" style="margin: 0 0 0 5px;" onclick="updatePickupPoint()" type="button">@StringTable.Update</button>
+                                                        </div>
+                                                    </div>
+                                                }
+                                                @if (@Model.NextOrder.TotalWeight > 0m)
+                                                {
+                                                    <div class="wr_clo1 field-view-box">
+                                                        @StringTable.Weight: <span class="field-view">@Model.NextOrder.TotalWeight</span> kg
+                                                    </div>
+                                                }
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        </section>
+                    </section>
+                </section>
+                <section>
+                    <section class="wr_box_cube">
+                        <section class="ui-widget">
+                            <section class="ui-widget-content wr-box-new">
+                                <div class="wr-content-ordt">
+                                    @RenderOrdersDetails()
+                                </div>
+                            </section>
+                        </section>
+                    </section>
+                </section> 
+                <section>
+                    <section class="wr_box_cube">
+                        <section class="ui-widget">
+                            <section class="ui-widget-content wr-box-new">
+                                <div class="wr-content-ordt">
+                                    @{ Html.ClawRenderPartial("Admin/_RecurOrdersLog.cshtml", Model, ViewData);}
+                                </div>
+                            </section>
+                        </section>
+                    </section>
+                </section>                                 
+                <section style="width: 50%;float: right;">
+                    <section class="wr_box_cube">
+                        <section class="ui-widget">
+                            <section class="ui-widget-content wr-box-new">
+                                <div class="wr-content-ordt">
+                                    <div class="wr-content-ordt bg-order-sum">
+                                        <div class="order-view" style="display: block">
+                                            <div class="row_content field-view-box">
+                                                <div class="wr-order-left">@StringTable.SubTotalExclVAT: </div>
+                                                <div class="wr-order-right txt_align_r field-view">@Model.NextOrder.OrderTotalExc.Value.ToOMoneyMc(Model.NextOrder)</div>
+                                            </div>
+                                            <div class="row_content field-view-box">
+                                                <div class="wr-order-left">@StringTable.ShippingHangdingExclVAT: </div>
+                                                <div class="wr-order-right txt_align_r field-view">@Model.NextOrder.ShippingCostExc.Value.ToOMoneyMc(Model.NextOrder)</div>
+                                            </div>
+                                            <div class="row_content field-view-box">
+                                                <div class="wr-order-left ">@StringTable.PaymentExclVat: </div>
+                                                <div class="wr-order-right txt_align_r field-view">@Model.NextOrder.PaymentCostExc.Value.ToOMoneyMc(Model.NextOrder)</div>
+                                            </div>
+                                            <div class="row_content field-view-box" style="@(Model.NextOrder.TotalDiscount > 0 ? "" : "display:none")">
+                                                <div class="wr-order-left ">@Html.LocalizeNameFor(m => m.NextOrder.TotalDiscount): </div>
+                                                <div class="wr-order-right txt_align_r field-view">@Html.Raw(Model.NextOrder.TotalDiscountTxt)</div>
+                                            </div>   
+                                            <div class="row_content field-view-box" style="@(Model.NextOrder.TotalCoupon > 0 ? "" : "display:none")">
+                                                <div class="wr-order-left ">@Html.LocalizeNameFor(m => m.NextOrder.TotalCoupon): </div>
+                                                <div class="wr-order-right txt_align_r field-view">@Html.Raw(Model.NextOrder.TotalCouponTxt)</div>
+                                            </div> 
+                                            <div id="tax-stat-list">
+                                                @if (Model.NextOrder.TaxStats != null)
+                                                {
+                                                    foreach (var tax in Model.NextOrder.TaxStats)
+                                                    {
+                                                        <div class="row_content">
+                                                            <div class="wr-order-left">@(tax.Item1.Value == -1 ? "" : tax.Item1.FormatPercent()) @StringTable.Vat: </div>
+                                                            <div class="wr-order-right txt_align_r">@tax.Item2.Value.ToOMoneyMc(Model.NextOrder)</div>
+                                                        </div>
+                                                    }
+                                                }
+                                            </div>
+                                            <div class="row_content tt-total field-view-box">
+                                                <div class="wr-order-left txt-bold">@Html.LocalizeNameFor(m => m.NextOrder.FinalTotal):</div>
+                                                <div class="wr-order-right txt_align_r field-view">@Model.NextOrder.FinalTotal.Value.ToOMoneyMc(Model.NextOrder)</div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+                        </section>
+                    </section>
+                </section>
+
+            </section>
+        </section>
+
+    </section>
+    <section class="wr-line-eshop"></section>
+}
+
+<script type="text/javascript">
+    var form = $('#editForm')[0];
+    var currency = $('#@Html.IdFor(m => m.NextOrder.Currency)');
+
+    form.customValidFields = function () {
+        return true;
+    };
+
+    form.CustomLangFormSwitch = function (langcode, node, senderuid) {
+        var ownerbox = node.closest('.row_content_box');
+    };
+
+    function odetailFormatData(dataExp) {
+
+        var ret = [];
+        if(dataExp)
+            dataExp.forEach(function (itm) {
+                if(itm.Key != 'bundlevariantids' && itm.Value) 
+                    ret.push('<span class="name">' + dataJsonDic[itm.Key] + ':</span> <span class="value">' + itm.Value + ' </span>');
+            });
+
+        return (ret.length == 0 ? '' : '<ul class="data"><li>' + ret.join('</li>, <li>') + '</li></ul>');
+    }
+
+    function updatePickupPoint(){
+        var pickupPointId = $('#PickupPointId');
+
+        if(!pickupPointId.val()) return;
+
+        var row = pickupPointId.data('kendoDropDownList').dataSource.data().find(function(rw){return rw.Value == pickupPointId.val();})
+
+        if(!row || !row.Model) return;
+
+        ajaxCmdStatus('@ModuleUrl.AdminUrl("Order", "UpdatePickupPoint", Model.OrderId)', {data: JSON.stringify(row.Model)},
+            function(){
+                $('.pickup-point-text').html(row.Text);
+                pickupPointId.data('kendoDropDownList').value(null);
+                $('.btn_change_pickuppoint').click();
+            });
+    }
+
+    function gridOrderDetailCustom(grid) {
+
+        $('.odetail-view a.grid-row-edit', grid.element).each(function () {
+            if (parseInt($(this).attr('productid')) < 0) $(this).unbind('mousedown').removeAttr('href').css('cursor', 'default');
+        });
+
+        initImagePreview(false, grid.element);
+
+        $('input.quantity[id]', grid.element).change(function(){
+            var qty = parseInt($(this).val());
+            if(qty >= 0){
+                $(this).attr('data-bak', qty);
+                $('.od-item[data-key=' + $(this).attr('data-key') + '] .orderdetail-form-field[binding=Quantity]', '#odetail-form').val(qty);
+
+                var row = grid.dataItem($(this).closest('tr'));
+                row.Quantity = qty;
+
+                console.log('qty change', row);
+            }
+            else $(this).val($(this).attr('data-bak'));
+        });
+    }
+
+    function odetailCurrencyToString(value) {
+        return localizeCurrencyToString(value, currency.val());
+    }
+
+    function safePropImg(obj, propName) {
+        return safeProp(obj, propName) || '@ImageModel.NoImg';
+    }
+
+    $(function() {
+        $('#@Html.IdFor(m => m.Recurring)').change(function() {
+            $('#RecurEachUnit').data('kendoDropDownList').value($(this).val());
+        });
+
+        gridorderdetailInit('#gridorderdetail', true);
+    });
+
+</script>
+<script type='text/javascript'> var currencies = @Html.Raw(Json.Encode(ViewBag.Currencies)); initCurrencies(currencies); </script>
+
+@helper RenderOrdersDetails()
+{
+    var settings = SettingsBiz.GetSettings();
+    var dataJsonDic = new Dictionary<string, string>();
+
+    if (settings.Hidden.OrderDetailDataJson && Model.NextOrder.OrderDetails.Any(m => m.DataExp != null))
+    {
+        foreach (IDictionary<string, object> itm in Model.NextOrder.OrderDetails.Where(m => m.DataExp != null).Select(m => m.DataExp))
+        {
+            foreach (var k in itm.Keys)
+            {
+                if (!dataJsonDic.ContainsKey(k)) { dataJsonDic.Add(k, ("odetail_datajson_" + k).ModLocalize(k)); }
+            }
+        }
+    }
+    
+    var imgTemplate = "<a href='#:safePropImg(ProductImage,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(ProductImage,\"Thumb\")#'/></a>";
+    var nameTempl = "<div class='odetail-view'><a class='grid-row-edit #:ProductDeleted ? 'deleted': '' # ' productid='#:ProductId#' href='javascript:void(0)' recontroller='Order' title='" + StringTable.Edit 
+        + "' target='_blank'>#:ProductName#</a> <span class='odetail-sku' data-sku='#:(ProductSKU||'')#'>("
+        + Html.LocalizeName(new OrderDetailModel(), m => m.ProductSKU)
+        + "\\: #:(ProductSKU||'')#)</span><div class='odetail-datajson'>#=odetailFormatData(DataExp)#</div><div class='odetail-coupon'>#:ProductShippingTypeText#</div></div>";
+    var priceExcTempl = "<span class='odetail-view'>#:odetailCurrencyToString(safeProp(Price,'Value'))#</span>";
+    var totalExcTempl = "<span class='odetail-view'>#:odetailCurrencyToString(safeProp(Total_Exc,'Value'))#</span>";
+    var totalIncTempl = "<div class='odetail-view'>#:odetailCurrencyToString(safeProp(Total_Inc,'Value'))#<div class='odetail-coupon' data-val='#:safeProp(CouponTotal,'Value')?1:0#'>#:odetailCurrencyToString(safeProp(CouponTotal,'Value'))#</div></div>";
+
+    @Html.HiddenFor(m => m.NextOrder.Currency)
+    <div class="wr_table_all" id="order-details" style="float: left; width: 100%; margin-bottom: 5px;">
+        @(Html.LocalizeGridFor<OrderDetailModel>("gridorderdetail", "Product", "Delete", null, null, null, int.MaxValue, null, grid =>
+        {
+            grid.ButtonDelBigClass += "_odetail";
+            grid.ButtonAddNewClass += "_odetail";
+            grid.CheckBoxSelAllCss += "_odetail";
+            grid.CheckBoxRowCssClass += "_odetail";
+        })
+        .DataSource(m => m.Id, Model.NextOrder.OrderDetails)
+        //.ColumnCheckBox(m => m.Key)
+        .Columns(grid => new[]
+        {
+            grid.Col(m => m.ProductImage, false, 50)
+                .SetTemplate(imgTemplate)
+                .SetCssClass("txt_align_c image"),
+
+            grid.Col(m => m.ProductName, "Edit", m => m.ProductId)
+                .SetTemplate(nameTempl)
+                .SetCssClass("name-pro2"),
+
+            grid.Col(m => m.Vat,false,70)
+                .SetCssClass("td-right")
+                .SetTemplate("<span class='odetail-view'>#:localizeFloatToString(Vat.Value*100,'n2')# %</span>"),
+
+            grid.Col(m => m.Price, false, 120)
+                .SetTemplate(priceExcTempl)
+                .SetCssClass("td-right"),
+
+            grid.Col(m => m.Quantity,false,80)
+                .SetTemplate("<span class='odetail-view'><input name='Quantity' class='quantity' id='quantity-#:Id#' value='#:Quantity#' data-bak='#:Quantity#' data-key='#:ProductId#_#:VariantId||0#' type='number' min='0' max='10000' /></span>"),
+            grid.Col(m => m.Total_Exc,false,140)
+                .SetTemplate(totalExcTempl)
+                .SetCssClass("td-right"),
+            grid.Col(m => m.Total_Inc,false,140)
+                .SetTemplate(totalIncTempl)
+                .SetCssClass("td-right"),
+        }.Where(x => x != null).ToArray())
+        .Sortable(true)
+        .Config(grid => { grid.CustomScript = "gridOrderDetailCustom"; })
+        .ToMvcHtmlString())
+    </div>
+    <div id="odetail-form" style="display:none;">
+        @for (var i = 0; i < Model.NextOrder.OrderDetails.Count; i++)
+        {
+            var idx = i;
+            var itm = Model.NextOrder.OrderDetails[i];
+            <div class="od-item" data-key="@(itm.ProductId)_@(itm.VariantId ?? 0)">
+                @Html.SimpleHiddenFor(m => m.NextOrder.OrderDetails[idx].ProductId, new { @class = "orderdetail-form-field" })
+                @Html.SimpleHiddenFor(m => m.NextOrder.OrderDetails[idx].VariantId, new { @class = "orderdetail-form-field" })
+                @Html.SimpleHiddenFor(m => m.NextOrder.OrderDetails[idx].Quantity, new { @class = "orderdetail-form-field", @binding = "Quantity" })
+            </div>
+        }
+    </div>
+    <script type="text/javascript">var dataJsonDic = @Html.Raw(Json.Encode(dataJsonDic));</script>
+}
+
+@if ((Model.Status ?? 0).InList(RecurOrderStatus.Deleted)) 
+{  
+    <script type="text/javascript">
+        formEnable(false);
+        $(function () {
+            $('.btn_save,.btn_reset', '.wr_submit_top.form-action-menu').closest('li').hide();
+        });
+    </script>
+}

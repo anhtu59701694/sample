@@ -1,0 +1,348 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model IEnumerable<CategoryModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+    ViewBag.Title = StringTable.ManageCategories;
+    ViewBag.AddAction = "Add";
+    //ViewBag.UseImgPreview = true;
+	ViewBag.SearchPlaceHolder = StringTable.SearchByCategoryName;
+    
+    ViewBag.UseInlineEdit = true;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/product";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Product;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var category = (CategoryModel)ViewBag.Category;
+    var cateid = category == null ? -1 : category.Id;
+    var cates = (List<CategoryModel>)ViewBag.Categories;
+    var statuses = (List<StatusModel>)ViewBag.Statuses;
+
+    ViewBag.ShowFilterBox = cateid > 0;
+    ViewBag.ShowSearchBox = !(cateid > 0);
+}
+
+<style type="text/css">
+    .grid-info-stat .num { color: #636262; }
+    .claw-action { width: 135px; }
+    .grid-info-stat { min-width: 250px; }
+    .width250 { width: 250px !important; margin-bottom: 10px; }
+</style>
+
+@if (!ViewBag.PermissionEdit)
+{
+    <style type="text/css">
+        .k-grid-visibleweb a.enable,.k-grid-visibleweb a.disable {cursor: default}
+    </style>
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageCategories)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageCategories)
+}
+
+@if (ViewBag.ShowFilterBox)
+{
+    @section FilterMenuSection
+    {
+        <ul class="filter-box">
+            <li>
+                <span class="filter-title">@Html.LocalizeNameFor(m => m.ParentId):</span>&nbsp;
+                @Html.LocalizeDropDownListKendoLang("categoryid", cateid, cates.Where(x => x.UpPathHasLang)
+                .Select(x => new { x.Id, Deep = x.Deep(), x.Name, Active = true, x.LangVisible, x.HierOrder })
+                //.Union(new[] { new { Id = -1, Deep = 0, Name = StringTable.CategoryTopLevel, Active = true, LangVisible = (bool?)true, HierOrder = "" } })
+                .OrderBy(x => x.HierOrder).Select(x => new DDListItem()
+                {
+                    Value = x.Id.ToString(),
+                    Text = x.Name.DPadLeft(x.Deep * 5, '-'),
+                    Active = x.Active, LangVisible = x.LangVisible
+                }), StringTable.SelectCategory,
+                new { @class = "filter-dropdown", @onchange = "onFilterChange()" })
+            </li>
+        </ul>
+    }
+}
+
+@{
+    var info = new CategoryModel.StatInfo();
+    var infoTempl = string.Format(@"
+    <div class='grid-info-stat'>
+        <span class='num'>#:Information.Children#</span> {0}
+        <a href='#:Information.ProductsLink#' class='k-grid-link'>
+            <span class='num'>#:Information.Products#</span> {1}
+        </a>
+        <a href='#:Information.ProductsBundleLink#' class='k-grid-link'>
+            <span class='num'>#:Information.ProductsBundle#</span> {2}
+        </a>
+
+        <a href='#:Information.ProductsSubLink#' class='k-grid-link'>
+            <span class='num'>#:Information.ProductsSub#</span> {3}
+        </a>
+        <a href='#:Information.ProductsBundleSubLink#' class='k-grid-link'>
+            <span class='num'>#:Information.ProductsBundleSub#</span> {4}
+        </a>", Html.LocalizeName(info, m => m.Children), Html.LocalizeName(info, m => m.Products),
+    Html.LocalizeName(info, m => m.ProductsBundle), Html.LocalizeName(info, m => m.ProductsSub),
+    Html.LocalizeName(info, m => m.ProductsBundleSub));
+
+    foreach (var itm in statuses)
+    {
+        infoTempl += string.Format(@"
+        <a href='#:Information.status_link_{1}#' class='k-grid-link'>{0}:
+            <span class='num'>#:Information.status_count_{1}#</span>
+        </a>
+        <a href='#:Information.status_linkbundle_{1}#' class='k-grid-link'>{0} {2}:
+            <span class='num'>#:Information.status_countbundle_{1}#</span>
+        </a>", itm.Name, itm.Id, Claw.Modules.Eshop.Product.StringTable.Bundle);
+    }
+    infoTempl += "</div>";
+    var ActiveTemplate = "<a href='javascript:void(0);'  class=\"#= LangVisible ? 'enable' : 'disable' #\"></a>";
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<CategoryModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", "Input", null, @"(function(e){gridOnInlineEdit(e,'#DisplayOrder',gridRefreshRow);})", settings.Display.Admin.PageSize, "gridInitDetail")
+    .DataSource(m => m.Id, "List", null, null, "gridGetParams")
+    .Paging(10, new int[] { 10, 20, 30, 50, 100 }, StringTable.Categories)
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetDefaultSort(true)
+            .SetInlineEdit(true)
+            .SetCssClass("k-grid-name")
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+
+        grid.Col(m => m.DisplayOrder,StringTable.SortOrder, true, 110)
+            .SetInlineEdit(true)
+            .SetCssClass("td-center")
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+
+        grid.Col(m => m.Information, false, 280)
+            .SetTemplate(infoTempl),
+
+        grid.Col(m => m.LangVisible, false, 90)
+            .SetTemplate(ActiveTemplate)
+            .SetCssClass("td-center k-grid-visibleweb")
+
+    })
+    .ColumnCommand(grid => new[]
+    {
+        grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr"),
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true) : null,
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "cmdMove", StringTable.Move, "move_fr", false,null,true) : null
+    }.Where(x => x != null).ToArray(), 160)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(ModExtensions.ToJsonEx(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid'), headerRow = grid.find('thead > tr'), permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+
+    headerRow.append('<th class="k-hierarchy-cell k-header" style="display:none"></th>');
+    //gridSwapElements(headerRow, 'th', { 1: 5, 2: 1, 3: 2, 4: 3, 5: 4 }, function (i, node) { if (i == 2) $(node).attr('colspan', '2'); });
+    gridSwapElements(headerRow, 'th', { 1: 6, 2: 1, 3: 2, 4: 3, 5: 4, 6: 5 }, function(i, node) { if (i == 2) $(node).attr('colspan', '2'); });
+    grid.attr('data-deep', '0');
+
+    var gridTempl = grid.clone(), cols = null;
+
+    gridTempl.attr('id', '');
+    gridInit('#grid', true, function(params) {
+        var ret = gridEagerLoadConfig(params, gridEagerItems);
+
+        ret.beforeLoad = function() {
+            var gridColGroup = grid.find('colgroup');
+            gridSwapElements(gridColGroup, 'col', { 0: 1, 1: 0 }, function(i, node) { if (i == 0) $(node).css('width', '56px'); });
+
+            cols = gridColGroup.html();
+            var gridData = grid.data('kendoGrid');
+
+            gridData.rowTemplate = gridGetRowTemplate(gridData, false, { 0: 1, 1: 0 });
+            gridData.altRowTemplate = gridGetRowTemplate(gridData, true, { 0: 1, 1: 0 });
+        };
+
+        return ret;
+    });
+
+
+    function cmdMove(uid, gridId) {
+        var rwtr = $('#' + gridId + ' tr[data-uid=' + uid + ']');
+        var gridOwner = $('#' + gridId).data('kendoGrid');
+        var row = gridOwner.dataItem(rwtr);
+        console.log(uid, gridId, row);
+        doOpenMoveForm(row.Id, row.ParentId, gridOwner);
+    }
+
+    function gridRefreshRow(grid, rowEle) {
+
+        gridHideCell(grid, rowEle.find('.k-grid-Delete'), function(row) { return row.AnyChild; });
+
+        gridDisableCheckBox(grid, function(row) { return row.AnyChild; }, rowEle.find('.row-checkbox'));
+
+        gridHideCell(grid, rowEle.find('.k-hierarchy-cell .k-icon.k-plus'), function(row) { return !row.AnyChild; });
+     
+        initGridStatusAction(grid, rowEle.find('.k-grid-visibleweb'), permEdit ? '@(ModuleUrl.AdminUrl(Html.GetController(), "SetVisibleWeb"))' : '',
+            function(row) { return row.VisibleWeb; }, function(row, status) { row.VisibleWeb = status; },
+            function(row) { return { id: row.Id, value: row.VisibleWeb }; });
+
+        if (permEdit) 
+            rowEle.dblclick(function(e) {
+                if (!grid.editable) grid.editRow($(this));
+            });
+    }
+
+    function gridCustom(grid) {
+
+        var deep = parseInt(grid.element.attr('data-deep'));
+        var hierWidth = 16 + 36 * deep;
+        $('td.k-hierarchy-cell', grid.element).each(function() {
+            $(this).css({ 'width': hierWidth + 'px', 'text-align': 'right' });
+        });
+
+        gridMarkLangDisabled(grid, '.k-grid-name', function(row) { return !row.LangVisible; });
+
+        gridHideCell(grid, '.k-grid-Delete', function(row) { return row.AnyChild; });
+
+        gridDisableCheckBox(grid, function(row) { return row.AnyChild; });
+
+        gridHideCell(grid, '.k-hierarchy-cell .k-icon.k-plus', function(row) { return !row.AnyChild; });
+
+        initGridStatusAction(grid, '.k-grid-visibleweb', permEdit ? '@(ModuleUrl.AdminUrl(Html.GetController(), "SetVisibleWeb"))' : '',
+            function (row) { return row.VisibleWeb; }, function (row, status) { row.VisibleWeb = status; },
+            function (row) { return { id: row.Id, value: row.VisibleWeb }; });
+        
+        if (permEdit)
+            $('tr', grid.element).each(function () {
+                $(this).dblclick(function (e) {
+                    if (!grid.editable) grid.editRow($(this));
+                });
+                var row = grid.dataItem($(this));
+                //if ((row && row.AnyChild) || grid.clawExpandAll) grid.expandRow($(this));
+            });
+
+        if (grid.clawExpandAll) { grid.clawExpandAll = null; console.log('clawExpandAll'); }
+    }
+
+    function gridInitDetail(e) {
+
+        var gridDiv = gridTempl.clone();
+        var selAll = gridDiv.find('#SelectAll');
+
+        gridDiv.attr('id', 'grid-' + e.data.id);
+        gridDiv.attr('data-id', e.data.id);
+        gridDiv.attr('data-parentid', e.data.ParentId ? 'grid' : 'grid');
+        gridDiv.attr('data-deep', parseInt(e.sender.element.attr('data-deep')) + 1);
+
+        selAll.attr('id', 'SelectAll-' + e.data.id);
+        selAll.closest('div').find('label').attr('for', 'SelectAll-' + e.data.id);
+
+        e.detailCell.append(gridDiv);
+        e.detailRow.find('.k-hierarchy-cell').remove();
+        e.detailRow.find('.k-detail-cell').attr('colspan', '7');
+
+        gridInit('#' + gridDiv.attr('id'), false, function(params) { params.dataSource.pageSize = 1000000; return null; });
+
+        var childGrid = gridDiv.data('kendoGrid');
+        childGrid.rowTemplate = e.sender.rowTemplate;
+        childGrid.altRowTemplate = e.sender.altRowTemplate;
+        childGrid.element.find('colgroup').html(cols);
+    }
+
+    function gridGetParams(grid, e) {
+        return { categoryid: grid.element.attr('data-id') || ($('#categoryid').val() || '-1') };
+    }
+
+    function onFilterChange() {
+        grid.data('kendoGrid').dataSource.page(1);
+    }
+
+    function doOpenMoveForm(cateId, parentId, gridOwner) {
+        ajaxCmdHtml('@ModuleUrl.AdminUrl(Html.GetController(), "GetMoveForm")', { id: cateId },
+            function (result, customTag) {
+                openMoveForm(customTag, parentId, gridOwner, result);
+            }, cateId);
+    }
+
+    function openMoveForm(cateId, parentId, gridOwner, formHtml) {
+        var width = 600, height = "auto"; //400;
+        var popTemplate = $("<div>").html($("#move-popup-form-templ").html());
+
+        popTemplate.find('.htmlcontent').html(formHtml);
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@StringTable.MoveCategories', popTemplate.html(),
+            width, height, [], null,
+            function (modal) {
+
+                modal.find(".btn_save").click(function () {
+
+                    var ValueSelect = parseInt($("#listMove").val());
+                    var row = cateTreeGetSelect();
+
+                    if (!row) {
+                        if (ValueSelect == 1 || ValueSelect == 2) row = { Id: parentId || 0, ParentId: 0 };
+                        else {
+                            cateTreeErrMsg.html('@StringTable.SelectAnItem');
+                            return;
+                        }
+                    }
+
+                    console.log(row);
+
+                    valueMove = row.Id;
+
+                    ajaxCmd('@ModuleUrl.AdminUrl(Html.GetController(), "Move")',
+                        { categoryid: cateId, beforeId: valueMove, type: ValueSelect },//$('#cateddbox').val() },
+                        function (result) {
+                            console.log(result);
+                            if (result.Status == 0) {
+                                var befId = (ValueSelect == 1 || ValueSelect == 2) ? row.Id : (row.ParentId || 0);
+                                var gridOId = gridOwner.element.attr('data-id') || '0';
+                                if (befId != gridOId) {
+                                    var rootGrid = $('#grid').data('kendoGrid');
+                                    rootGrid.clawExpandAll = true;
+                                    rootGrid.dataSource.page(1);
+                                } else gridOwner.dataSource.page(1);
+                                console.log('reload', befId, gridOId, row);
+                            } else console.log(result);
+                        });
+
+                    admincommon.hideMessage();
+                    popup.close();
+                });
+                modal.find(".btn_cancel").click(function () {
+                    admincommon.hideMessage();
+                    popup.close();
+                });
+            });
+    }
+
+</script>
+
+<script type="text/x-kendo-template" id="move-popup-form-templ">
+    <div class="popupBody">
+        <section class="row_content_box kpopup-content">
+            <section class="wr_clo1">
+                <div class="wcontent" style="margin: 20px; color: #390F3D;line-height:2em">
+                    <div class="htmlcontent">
+                    </div>
+                </div>
+            </section>
+            <section class="clear"></section>
+            <ul class="wr_submit_top form-action-menu" style="position:relative; padding:5px 10px 15px 0;">
+                <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+            </ul>
+        </section>
+    </div>
+</script>

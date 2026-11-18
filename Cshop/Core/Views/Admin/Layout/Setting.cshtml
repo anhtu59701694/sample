@@ -1,0 +1,508 @@
+﻿@using System.Text
+@using Claw.Core.Constants
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Core
+
+@{
+    Layout = "~/Areas/Admin/Layout/admin.default.cshtml";
+    var isFrontEnd = Claw.Modules.Eshop.Helper.QParam.IsFontEnd;
+    var viewClass = (ClawContext.Current.User.IsSuperAdmin || ClawContext.Current.User.IsAdministrator) ? "" : "SettingVisible";
+}
+
+@section Styles {
+
+    <style type="text/css">
+        .k-colorpicker span.k-picker-wrap.k-state-default, .k-selected-color {
+            min-width: 58px;
+        }
+
+        .dz-preview .dz-preview-menu {
+            position: absolute;
+            visibility: hidden;
+            width: 100%;
+            height: 2em;
+            z-index: 9999;
+            text-align: center;
+            background-color: rgba(100, 100, 100, 0.5);
+        }
+
+        .dz-preview:hover .dz-preview-menu {
+            visibility: visible;
+        }
+
+        .dropzone .dz-preview .dz-details {
+            overflow: hidden !important;
+            padding: 20px 2px !important;
+        }
+
+        .dropzone .dz-preview {
+            min-height: initial !important;
+            width: inherit !important;
+        }
+
+        .hintFieldInput {
+            color: graytext;
+            line-height: 1.5em;
+        }
+
+        .input-col-2 {
+            width: 48% !important;
+        }
+
+        .col-right-eshop span.text-eshop {
+            margin-bottom: 0px !important;
+            margin-top: 10px !important;
+        }
+
+        .k-list-container .k-list li.k-item {
+            min-width: 130px;
+        }
+
+        .wr-line-eshop {
+            margin-top: 20px !important;
+            float: right !important;
+            width: 69% !important;
+        }
+    </style>
+    @Html.CssBundle("~/style/leftmenu.css", MediaDeviceType.Screen, "~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Css/eshop-style.css", "~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Css/eshop-style-custom.css")
+}
+<section class="out_main bg_col_left_eshop">
+    <section class="wr_top_action">
+        @if (!isFrontEnd)
+        {
+            <div class="exshrink click_full full" data-expand-title="@("Expand".Localize("Expand"))" data-shrink-title="@("Shrink".Localize("Shrink"))" title="@("Expand".Localize("Expand"))">&nbsp;</div>
+        }
+    </section>
+    <!--end wr_top_action-->
+    <section class="wr_content_all">
+        <section class="wr_left eshop_Left" style="float: left">
+            @{ Html.RenderPartial("~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Admin/Layout/_MenuLeftControl.cshtml", StringTable.MenuLeftKey); }
+        </section>
+        <section class="wr_right eshop_Right">
+            @*<section class="wr-menu-top-eshop"></section>*@
+            @*Move to _MenuSetting partial
+                    <section class="wr-menu-icon" style="text-align: center">
+                    <ul class="clo-3" style="width: auto">
+                        <li><a href="#" title="" class="active"><img src="@ModuleUrl.IconUrl("icon-general.png")" alt=""><h2>@StringTable.General</h2></a></li>
+                        <li><a href="#" title=""><img src="@ModuleUrl.IconUrl("icon-display.png")" alt=""><h2>@StringTable.SettingsDisplay</h2></a></li>
+                        <li><a href="#" title=""><img src="@ModuleUrl.IconUrl("icon-notification.png")" alt=""><h2>Notification</h2></a></li>
+                    </ul>
+                </section>*@
+            @{ Html.RenderPartial("~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Admin/Layout/_MenuSetting.cshtml"); }
+            <section style="min-width: 600px; float: left; height: 45px;">
+                <h2 class="title_top title_top_tab" style="float: left; margin-top: 5px;">@StringTable.SettingsGeneral</h2>
+                <h2 class="title_top title_top_tab" style="float: left; margin-top: 5px; display:none">@StringTable.SettingsDisplay</h2>
+                <h2 class="title_top title_top_tab" style="float: left; margin-top: 5px; display:none">@StringTable.SettingsAccounting</h2>
+                @RenderButton()
+            </section>
+
+            <section class="wr_breadcrumb">
+                <a href="/" class="home"></a><i class="dot_bre"></i>
+                <a href="/admin/modules/eshop/setting">@(StringTable.Settings)</a>
+                <i class="dot_bre"></i>
+                <a class="current current_tab">@StringTable.SettingsGeneral</a>
+                <a class="current current_tab" style="display:none;">@StringTable.SettingsDisplay</a>
+                <a class="current current_tab" style="display:none;">@StringTable.SettingsAccounting</a>
+                @*<a id="aroles" class="current current_tab" style="display:none;">@StringTable.SMSSetting</a>*@
+            </section>
+
+            <section id="massage" class="show_massage" style="display:none;" data-status="@TempData["ActionStatus"]">
+                <span id="show_error" class="nNote">@Html.Raw(ViewBag.Message)</span>
+            </section>
+
+            <section class="row_content row_content-eshop">
+                <section class="wr_clo1 @Html.Raw(viewClass)">
+                    @RenderBody()
+                    <section class="wr-line-eshop"></section>
+                </section>
+                <section class="wr-top-eshop">
+                    @RenderButton()
+                </section>
+            </section>
+            <section class="clear_fix"></section>
+        </section>
+        <section class="clear_fix"></section>
+    </section>
+    <!--end wr_content-->
+    <section class="clear_fix"></section>
+</section>
+
+@helper RenderButton()
+{
+    if (ClawContext.Current.User.IsSuperAdmin || ClawContext.Current.User.IsAdministrator)
+    {
+        <ul class="wr_submit_top">
+            <li>
+                <input type="button" id="btn_save" value="@Html.Raw("Save".Localize("Save"))" class="btn_save" />
+            </li>
+            <li>
+                <input type="button" id="btn_reset" value="@Html.Raw("Reset".Localize("Reset"))" class="btn_reset" />
+            </li>
+        </ul>
+    }
+}
+
+
+<script type="text/x-kendo-template" id="change-confirmation">
+    <div id="modal">
+        <p class="prompt-mess">@StringTable.ConfirmSave</p>
+        <div class="wr_bottom_popup_s">
+            <section class="wr_btn_pp">
+                <button class="btnYes btn_yes" type="button">@StringTable.Yes</button>
+            </section>
+            <section class="wr_btn_pp">
+                <button class="btnNo btn_no" type="button">@StringTable.No</button>
+            </section>
+        </div>
+    </div>
+</script>
+
+<script type="text/javascript">
+
+    $(document).ready(function () {
+        //set readonly for textbox and select
+        if ($(".wr_clo1").hasClass("SettingVisible")) {
+            $(".SettingVisible").find(":input").attr("readonly", "true");
+            $(".SettingVisible").find("select").attr("disabled", true);
+
+            $('.SettingVisible :radio,.SettingVisible :checkbox').click(function () {
+                return false;
+            });
+        }
+    });
+    //end
+    function showColorPicker(node) {
+        var cpicker = node.parent().find('.color-picker-box');
+        if (node.prop('checked')) cpicker.hide();
+        else {
+            var kendoPicker = cpicker.find('input').data('kendoColorPicker');
+            if (!kendoPicker.value()) kendoPicker.value('#FFFFFF');
+            cpicker.show();
+        }
+    }
+
+    $('.btn_save').click(function () {
+
+        if (!validateSubmit()) return;
+
+        var dialog = new ClawDialog("modal-mask");
+        var kendoWindow = dialog.showDialog('@(StringTable.Confirmation)',
+            $("#change-confirmation").html(), 350, 150);
+
+        kendoWindow.find(".btnYes").click(function () {
+            admincommon.showMask();
+            $('.active #editForm')[0].submit();
+        });
+
+        kendoWindow.find(".btnNo").click(function () {
+            dialog.close();
+        });
+    });
+
+    $('.btn_reset').click(function () {
+        var form = $('#editForm')[0];
+
+        form.reset();
+
+        for (var i = 0; i < form.length; i++) {
+            var element = $(form[i]);
+            if (element.is('input:text,textarea,select')) element.change();
+            if (!element.valid()) element.focus();
+        }
+    });
+
+    function validateSubmit() {
+        var ret = true, errInput = null, form = $('.active #editForm')[0];
+        var arrInputs = $('input:text,textarea', '#editForm');
+
+        arrInputs.each(function () {
+            trimInputVal($(this));
+        });
+
+        for (var i = 0; i < form.length; i++) {
+            var element = $(form[i]);
+            if (!element.is('form') && !element.valid()) {
+                ret = false; errInput = element;
+                console.log(element);
+            }
+        }
+
+        if (!ret && errInput) {
+            showFailedValidMsg();
+            setTimeout(function () { errInput.focus(); }, 2000);
+        }
+
+        return ret;
+    }
+
+    function trimInputVal(node) {
+
+        if (node.is('input:text,textarea')) {
+            node.val($.trim(node.val()));
+        }
+    }
+
+    function showFailedValidMsg() {
+        admincommon.showMessageDefault('@StringTable.ErrValidateFailedMessage', '@(ActionResultStatus.Fail)');
+    }
+
+</script>
+
+<script type="text/javascript">
+
+    var dropzoneDragTimestamp = Date.now();
+
+    function dropzoneInit(dzSelector, fileSelector, addSelector, options, resultHandler, errorHandler) {
+        var optDefs = {
+            url: '@ModuleUrl.AdminUrl(@Html.GetController(), "UploadImage","0" )',
+            clickable: false,
+            addRemoveLinks: false,
+            createImageThumbnails: false,
+            paramName: "imageUpload",
+            previewsContainer: '.dropzone-preview-box',
+            previewTemplate: '<li><div class="dz-preview dz-file-preview"><div class="dz-preview-menu"><div class="center"> <a class="image-edit edit_fr" title="@StringTable.Edit">@StringTable.Edit</a> <a class="delete_fr" data-dz-remove title="@StringTable.Delete">X</a></div></div><img data-dz-thumbnail /><div class="dz-details"><div><span data-dz-size></span></div><div><span data-dz-name></span></div></div><div class="dz-progress"><span class="dz-upload" data-dz-uploadprogress></span></div></div></li>',
+            acceptedFiles: null,
+            dropHandler: null,
+            init: function () {
+                var me = this;
+                this.on("success", function (file, result) {
+                    dropzoneOnSuccess(me, file, result);
+                    if (result.Status == 0) {
+                        if (resultHandler) {
+                            if (result.Images) {
+                                for (var i = 0; i < result.Images.length; i++) {
+                                    resultHandler(result, result.Images[i].file, i);
+                                }
+                            }
+                            else resultHandler(result, file);
+                        }
+                    } else if (errorHandler) errorHandler(file, result);
+                });
+
+                this.on("error", function (file, e) {
+                    if (errorHandler) errorHandler(file, typeof (e) == 'string' ? { Message: e } : e);
+                    else {
+                        console.log('error', e, file);
+                        admincommon.hideMessage();
+                        admincommon.showMessageDefault('@(StringTable.AjaxCommandErrorMessage)', '@(ActionResultStatus.Fail)');
+                    }
+
+                    me.removeFile(file);
+                });
+
+                this.on("drop", function (e) {
+                    dropzoneDragTimestamp = 0; $('.mask-dropzone', me.element).hide();
+                    if ($(me.element).is('.single')) me.removeAllFiles();
+                    if (me.options.dropHandler) me.options.dropHandler(me);
+                });
+
+                this.on("dragenter", function (e) {
+                    dropzoneDragTimestamp = Date.now();
+                    setTimeout(function () { dropzoneTimer(me); }, 500);
+                    $('.mask-dropzone', me.element).show();
+                });
+
+                this.on("dragover", function (e) { dropzoneDragTimestamp = Date.now(); });
+
+                $(addSelector).click(function () { $(fileSelector).click(); });
+
+                $(fileSelector).change(function (e) {
+                    for (var i = 0; i < this.files.length; i++)
+                        me.addFile(this.files[i]);
+
+                    if ($(me.element).is('.single'))
+                        while (me.files.length > 1) me.removeFile(me.files[0]);
+
+                    $(this).val(null);
+                });
+            },
+            dictCancelUpload: 'Cancel upload',
+            dictCancelUploadConfirmation: 'Are you sure you want to cancel this upload?',
+            dictDefaultMessage: 'Drop files here to upload',
+            dictFallbackMessage: "Your browser does not support drag'n'drop file uploads.",
+            dictFallbackText: 'File is too big ({{filesize}}MiB). Max filesize: {{maxFilesize}}MiB.',
+            dictInvalidFileType: '@StringTable.ErrMsgFileExtension',
+            dictMaxFilesExceeded: 'You can not upload any more files.',
+            dictRemoveFile: 'Remove file',
+            dictRemoveFileConfirmation: null,
+            dictResponseError: 'Server responded with {{statusCode}} code.',
+        };
+
+        var opts = $.extend(optDefs, options || {});
+
+        if (opts.enableZipUpload && opts.url)
+            opts.url = urlMergeParams(opts.url, { enableZip: true });
+
+        return $(dzSelector).dropzone(opts);
+    }
+
+    function dropzoneAdd(dropzone, key, name, url, thumbUrl, mimeType, size) {
+        var item = { status: 'success', key: key, name: name, url: url, thumb: thumbUrl, size: size, type: mimeType };
+        dropzone.files.push(item);
+        dropzone.emit("addedfile", item);
+        if (thumbUrl) {
+            dropzone.emit("thumbnail", item, thumbUrl);
+            $(item.previewElement).find('.dz-details').hide();
+        }
+        $(item.previewElement).find('.dz-progress').hide();
+
+        return item;
+    }
+
+    function dropzoneOnSuccess(me, file, result) {
+        //console.log("success", result.Image, file.type, file, result);
+        if (result.Status == 0) {
+            if (result.Images) {
+                for (var i = 0; i < result.Images.length; i++) {
+                    var item = result.Images[i];
+                    item.file = dropzoneAdd(me, item.FilePath, item.FileName, item.FilePath, item.ThumbUrl, item.MimeType, item.Size);
+                }
+                me.removeFile(file);
+            } else {
+                file.key = result.Image.FilePath;
+                file.url = result.Image.FilePath;
+                file.thumb = result.Image.ThumbUrl;
+                me.emit("thumbnail", file, result.Image.ThumbUrl);
+            }
+
+            $(file.previewElement).find('.dz-progress').hide();
+
+            if (file.type.indexOf('image', 0) == 0)
+                $(file.previewElement).find('.dz-details').hide();
+
+        } else {
+            $(file.previewElement)
+                .removeClass('dz-success').addClass('dz-error')
+                .find('.dz-error-message').html(result.Message).show();
+
+            me.removeFile(file);
+
+            if (result.Message) {
+                admincommon.hideMessage(); admincommon.showMessageDefault(result.Message, result.Status);
+            }
+        }
+    }
+
+    function dropzoneTimer(dzone) {
+        if (dzone.maskTimer) clearTimeout(dzone.maskTimer);
+        if (dropzoneDragTimestamp + 500 < Date.now()) {
+            $('.mask-dropzone', dzone.element).hide();
+            Dropzone.instances.forEach(function (dz) {
+                if (dz.options.dropHandler) dz.options.dropHandler(dzone);
+            });
+            dzone.maskTimer = null;
+        } else dzone.maskTimer = setTimeout(function () { dropzoneTimer(dzone); }, 500);
+    }
+
+    $(function () {
+        Dropzone.autoDiscover = false;
+
+        $('body').addClass('dropzone').dropzone({
+            url: '/admin/',
+            clickable: false,
+            init: function () {
+                var me = this;
+                this.on("dragenter", function (e) {
+                    dropzoneDragTimestamp = Date.now();
+                    setTimeout(function () { dropzoneTimer(me); }, 500);
+                    if (!$('.mask-dropzone', me.element).is(':visible')) $('.mask-dropzone', me.element).show();
+                });
+                this.on("dragover", function (e) { dropzoneDragTimestamp = Date.now(); });
+                this.on("drop", function (e) {
+                    e.preventDefault(); dropzoneDragTimestamp = 0; $('.mask-dropzone', me.element).hide();
+                });
+                this.hiddenFileInput = $('<div>')[0];
+                this.addFile = function () { };
+            }
+        }).removeClass('dropzone');
+    });
+
+    function aviaryInit(node, updateSelector, eventHandler) {
+        var aviaryHolder = $('#aviary-holder');
+        if (aviaryHolder.length == 0) {
+            aviaryHolder = $('<div id="aviary-holder" style="display:none"><img/></div>');
+            $('body').append(aviaryHolder);
+        }
+
+        var url = node.is('input') ? node.val() : node.attr('src'), imgId = 'aviary-img-' + node.attr('id');
+
+        if (url && url.indexOf('http://') != 0 && url.indexOf('https://') != 0) url = location.origin + url;
+
+        aviaryHolder.find('img').attr({ id: imgId, src: url });
+
+        var aviary = new AviaryPlugin(imgId, url);
+        aviary.launch(function (targetId, newUrl) {
+            if (node.is('input')) node.val(newUrl);
+            else node.attr('src', newUrl);
+
+            if (updateSelector)
+                $(updateSelector).each(function () {
+                    if ($(this).is('input')) $(this).val(newUrl);
+                    else $(this).attr('src', newUrl);
+                });
+
+            aviary.hideMask(); aviary.close();
+
+            if (eventHandler) eventHandler(imgId, newUrl);
+        });
+    }
+</script>
+
+@Html.CssBundle("~/admin/dropzone.css", ModuleUrl.ContentUrl("Scripts/dropzone/basic.css"), ModuleUrl.ContentUrl("Scripts/dropzone/dropzone.css"))
+<script src="@ModuleUrl.ContentUrl("Scripts/dropzone/dropzone.js", true)"></script>
+@Html.JsBundle("~/claw/page.claw.plugin.js", false, "~/content/plugin/aviary/feather.js",
+    "~/scripts/claw.page/page.edit.plugin.js")
+@*}*@
+
+@if (!isFrontEnd)
+{
+    @Html.JsBundle("~/admin/eshop/common.js", ScriptAttribute.Defer, ModuleUrl.ContentUrl("Scripts/admin-eshop-common.js"))
+}
+
+@if (ViewBag.UseCKEditor != null && ViewBag.UseCKEditor)
+{
+    @Html.JsBundle("~/js/editor", true, 100)
+
+    <script type="text/javascript">
+
+        function initEditor(inputNode) {
+            if (!$.fn.clawEditor) setTimeout(initEditor, 100);
+            else {
+                var arr = (inputNode ? inputNode : $('.ckeditor_standard,.ckeditor_simple'));
+                arr.each(function () {
+                    var ckHeight = $(this).attr('ck_height'), item = $(this);
+                    if (!item.hasClass('ckeditor-inst')) {
+                        if (item.hasClass('ckeditor_simple') || item.hasClass('sub_ckeditor_simple')) {
+                            item.clawEditor('simple', { height: ckHeight ? ckHeight : '120px' });
+                        }
+                        else item.clawEditor('basic', { height: ckHeight ? ckHeight : '200px' });
+                        item.addClass('ckeditor-inst');
+
+                        CKEDITOR.instances[item.attr('id')].on('blur', function (e) {
+                            item.val($.trim(e.sender.getData())); item.valid();
+                        });
+                    }
+                });
+            }
+        }
+
+        function termEditor(inputNodes) {
+            if (CKEDITOR && CKEDITOR.instances) {
+                inputNodes.each(function () {
+                    try {
+                        $(this).removeClass('ckeditor-inst');
+                        CKEDITOR.instances[$(this).attr("id")].destroy();
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                });
+            }
+        }
+
+        $(function () { initEditor(); });
+
+    </script>
+}

@@ -1,0 +1,248 @@
+﻿@using System.Text
+@using Claw.Core.Constants
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Core
+@model GeneralModel
+@{
+    var logoSize = ViewBag.logoSize;
+}
+<style>
+	.dz-image-preview img {max-width: 100%;}
+</style>
+<form action="@ModuleUrl.AdminUrl("Setting", "General")" id="editForm" method="post">
+
+    @Html.ValidationSummary(true)
+    @Html.HiddenFor(x => x.Currency)
+    @Html.HiddenFor(x => x.DefaultTaxId)
+
+    @*tab general*@
+    @*<section class="wr_clo1"> </section>*@
+    @*<section class="row_content_box">
+            <section class="clo_left txt_align_r td-eshop">
+
+            </section>
+        </section>*@
+
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@StringTable.StoreDetail</h2>
+            <label>@StringTable.EditStoreInformation</label>
+            @*logo*@
+            <section class="" style="float:right; margin-right:8px; padding-top:10px;">
+                @Html.HiddenFor(x => x.Logo)
+                @Html.HiddenFor(x => x.ImageFsUrl)
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Logo) @logoSize</span>
+                <div>
+                    <input id="imageUpload" name="imageUpload" type="file" accept="image/*" style="display: none" />
+                    <div class="padding-top10 wr-img-sub">
+                        <div id="dropzone-form" class="dropzone single wr-upload-img-es" style="">
+                            <div class="wr-img-show">
+                                <div class="wr-upload-img-es mask-dropzone mask-dropzone-show" style="">
+                                    <span>@StringTable.AddOrDropImage</span>
+                                </div>
+                                <div class="dz-message" style="display: none"></div>
+                                <ul class="dropzone-preview-box" style=""></ul>
+                            </div>
+                            <div class="clear_fix"></div>
+                            <ul class="btn_center set-relative mb10">
+                                <li>
+                                    <input id="add-file" value="@StringTable.UploadImage" class="btn_update" type="button">
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div style="float: right"><span id="image-error-msg" class="error" style="cursor: pointer"></span></div>
+                </div>
+                <script type="text/javascript">
+                    $(function () {
+                        var img = $('#@Html.IdFor(m => m.Logo)');
+                        @*var imgThumb = $('#@Html.IdFor(m => m.ImageThumb)');*@
+                        var imgFsUrl = $('#@Html.IdFor(m => m.ImageFsUrl)');
+                        var imgErrMsg = $('#image-error-msg').click(function () { $(this).html(''); });
+
+                        var dzEle = dropzoneInit('#dropzone-form', '#imageUpload', '#add-file',
+                            { acceptedFiles: '@SettingsBiz.GetSettings().Display.Admin.Image.Extensions.GetFileExtensionDropZone(false)' },
+                            function (result) {
+                                $("#dropzone-form .mask-dropzone-show").hide();
+                                img.val(result.Image.FileName);
+                                //imgThumb.val(result.Image.ThumbUrl);
+                                imgFsUrl.val(result.Image.FilePath);
+                            }, function (file, e) {
+                                $("#dropzone-form .mask-dropzone-show").show(); img.val(''); imgFsUrl.val('');
+                                setImageErrMsg(imgErrMsg, e.Message + ' (' + file.name + ')');
+                            });
+
+
+
+                        //remove file
+                        var dropzone = dzEle[0].dropzone; dropzone.idGenerator = 1;
+                        dropzone.on("removedfile", function (file) {
+                            //console.log("removedfile", file);
+                            if (file.status == "success") {
+                                $("#dropzone-form .mask-dropzone-show").show();
+                                img.val("");
+                                imgFsUrl.val("");
+                            }
+                        });
+
+                        dropzone.on("addedfile", function (file) {
+                            var node = $(file.previewElement).find('img[data-dz-thumbnail]');
+                            $(file.previewElement).find('.image-edit').unbind('click').click(function () {
+                                //console.log('click', node, file);
+                                aviaryInit($('#@Html.IdFor(m => m.ImageFsUrl)'), [$('#@Html.IdFor(m => m.Logo)'), $('#@Html.IdFor(m => m.Logo)'), node]);
+                            });
+                            //console.log('addedfile', node,node.attr('id'), file, $(file.previewElement).find('.image-edit'));
+                        });
+
+                        if ($.trim(img.val()) != '') {
+                            $("#dropzone-form .mask-dropzone-show").hide();
+                            dropzoneAdd(dzEle[0].dropzone, img.val(), "", img.val(), (img.val() == '' ? img.val() : '@Model.Logo'), 'image/*');
+                        }
+
+                    });
+
+                    function setImageErrMsg(node, msg) {
+                        node.html(msg);
+                        setTimeout(function () { node.html(''); }, 10000);
+                    }
+
+                </script>
+            </section>
+        </section>
+        <section class="clo_right col-right-eshop">
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.StoreName) (*)</span>
+                @Html.LocalizeTextBoxFor(x => x.StoreName, new { })
+                <section>@Html.LocalizeValidationMessageFor(x => x.StoreName)</section>
+            </section>
+
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.OrgNumber)</span>
+                    @Html.LocalizeTextBoxFor(x => x.OrgNumber, new { })
+                </section>
+                <div class="input-col-2"></div>
+            </section>
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.ContactPhone) (+47 xxxx xxx, +47.xxxx.xxx,...)</span>
+                    @Html.LocalizeTextBoxFor(x => x.ContactPhone, new { })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.ContactPhone)</section>
+                </section>
+                <section class="input-col-2">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Fax) (+47 xxxx xxx, +47.xxxx.xxx,...)</span>
+                    @Html.LocalizeTextBoxFor(x => x.Fax, new { })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Fax)</section>
+                </section>
+            </section>
+
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Country)</span>
+                    @Html.DropDownListFor(x => x.Country, Claw.Modules.Eshop.DAL.SettingMgr.GetCountryList(""), new { @class = "select_es " })
+                </section>
+                <div class="input-col-2"></div>
+            </section>
+
+
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Address) (*)</span>
+                @Html.LocalizeTextBoxFor(x => x.Address, new { })
+                <section>@Html.LocalizeValidationMessageFor(x => x.Address)</section>
+            </section>
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Postnr) (*)</span>
+                    @Html.LocalizeTextBoxFor(x => x.Postnr, new { @id = "postnummerInput" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Postnr)</section>
+                </section>
+                <section class="input-col-2">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Poststed) (*)</span>
+                    @Html.LocalizeTextBoxFor(x => x.Poststed, new { @id = "postnummerResult" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Poststed)</section>
+                </section>
+            </section>
+
+            <div class="controls" style="display:none">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.City)</span>
+                @Html.LocalizeTextBoxFor(x => x.City, new { @id = "" })
+            </div>
+
+        </section>
+    </section>
+    <section class="wr-line-eshop"></section>
+    @*<section class="row_content_box">
+            <section class="clo_left txt_align_r td-eshop"></section>
+        </section>*@
+
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@StringTable.StoreEmail</h2>
+            <label>@StringTable.EditStoreEmailWhichUser</label>
+        </section>
+        <section class="clo_right col-right-eshop">
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.PublicEmail) (*)</span>
+                @Html.LocalizeTextBoxFor(x => x.PublicEmail, new { })
+                <section>@Html.LocalizeValidationMessageFor(x => x.PublicEmail)</section>
+
+                <label>@StringTable.YouCustomerWillSee</label>
+            </section>
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.NotifyEmail) (*)</span>
+                @Html.LocalizeTextBoxFor(x => x.NotifyEmail, new { })
+                <section>@Html.LocalizeValidationMessageFor(x => x.NotifyEmail)</section>
+            </section>
+        </section>
+    </section>
+
+    <script type="text/javascript">
+        function LoadPosted(inputField, outputElement) {
+            var curentUrl = window.location.href.replace('#', '');
+            var iso = ["NO", "DK", "SE", "FI", "NL", "DE", "US", "BE", "FO", "GL"]
+            var country = $("#Country").val();
+            if (jQuery.inArray(country, iso) < 0) {
+                outputElement.prop('readonly', false);
+            }
+            else {
+                if (inputField.val().length == 4) {
+                    $.getJSON('/modules/eshop/BringShippingGuide/GetPostalCode?country=' + country + '&pnr=' + inputField.val(),
+                    function (data) {
+                        if (data.valid) {
+                            outputElement.val(data.result);
+                            outputElement.prop('readonly', true);
+                        }
+                        else {
+                            outputElement.prop('readonly', false);
+                        }
+                    });
+                }
+                else {
+                    outputElement.prop('readonly', false);
+                }
+            }
+        }
+
+        $(document).ready(function () {
+            var inputField = $('#postnummerInput');
+            var outputElement = $('#postnummerResult');
+            LoadPosted(inputField, outputElement);
+
+            //select country
+            $("#Country").change(function () {
+                LoadPosted(inputField, outputElement);
+            });
+            //for tab
+            inputField.keydown(function (e) {
+                if (e.keyCode == 9)
+                    LoadPosted(inputField, outputElement);
+            });
+
+            inputField.keyup(function () {
+                LoadPosted(inputField, outputElement);
+            });
+        });
+    </script>
+</form>

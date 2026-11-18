@@ -1,0 +1,117 @@
+﻿@using System.Linq
+@using System.Web.UI.WebControls
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model TechSpecValModel
+
+@{
+    Layout = "Layout/Input.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+
+    ViewBag.Title = StringTable.AddEditTechSpecVal(Model.Id);
+    ViewBag.ShowDeleteBtn = (Model != null && Model.Id > 0);
+    ViewBag.UseCKEditor = true;
+    //ViewBag.UseDatePicker = true;
+    ViewBag.UseDropZone = true;
+    ViewBag.TranslateMaxWidth = 700;
+    ViewBag.TranslateMaxHeight = 220;
+
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/TechSpec";
+    ViewBag.ParentBreadcrumbTitle = StringTable.TechSpec;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var languages = (List<Language>)ViewBag.Languages;
+    var versionSetting = VersionHelper.GetVersionSetting();
+    if (versionSetting != null)
+    {
+        if (versionSetting.Languages.Count > 0)
+        {
+            var lstLangCode = versionSetting.Languages.Select(p => p.Code.ToLower());
+            languages = languages.Where(p => lstLangCode.Contains(p.ShortLangCode.ToLower())).ToList();
+        }
+    }
+    var langOpt = LanguageMgr.ValidOptLang(Model.Id);
+    var langCode = langOpt.LanguageCode;
+
+    ViewBag.DZItemWidth = 120;//settings.Display.Category.Icon.Width;
+    ViewBag.DZItemHeight = 100;//settings.Display.Category.Icon.Height;
+}
+
+@if (!ViewBag.PermissionEdit)
+{
+    <style type="text/css">
+        .dz-preview-menu a {display: none;}
+    </style>
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageTechSpecVals)
+}
+
+@section CurrentTitleSection {
+    <a href="/admin/modules/eshop/TechSpecVal/">@(StringTable.ManageTechSpecVals)</a>
+}
+
+@section TabTitleSection {
+    @StringTable.AddEditTechSpecVal(Model.Id)
+}
+
+@using (@Html.BeginForm("Input", Html.GetController(), FormMethod.Post, new { @id = "editForm", enctype = "multipart/form-data" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(x => x.Id)
+
+    <section class="row-content-lang-box">
+        <section class="row_content_box">
+            <section class="clo_left txt_align_r">
+
+            </section>
+            <section class="clo_right col-right-eshop">
+                <div class="tab-style">
+                    <div id="lang-form-list"></div>
+                </div>
+                <section class="controls">
+                    <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.Value)</span>
+                    <section>
+                        @Html.LocalizeTextBoxFor(x => x.Value, new { @class = "js-required" })
+                    </section>
+                    <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Value)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.Description)</span>
+                    <section>
+                        @Html.LocalizeTextAreaFor(x => x.Description, new { @class = "ckeditor_standard" })
+                    </section>
+                    <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Description)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.DisplayOrder)</span>
+                    <section>
+                        @Html.LocalizeTextBoxFor(x => x.DisplayOrder, new { @class = "js-required", @type = "number" })
+                    </section>
+                    <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.DisplayOrder)</section>
+                </section>
+            </section>
+        </section>
+
+    </section>
+    <section class="wr-line-eshop"></section>
+}
+
+<script type="text/javascript">
+    var form = $('#editForm')[0];
+
+    form.customValidFields = function () {
+        return true;
+    };
+
+    form.CustomLangFormSwitch = function (langcode, node, senderuid) {
+        var ownerbox = node.closest('.row_content_box');
+    };
+
+</script>

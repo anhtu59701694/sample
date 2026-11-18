@@ -1,0 +1,137 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model IEnumerable<TechSpecModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+
+    ViewBag.Title = StringTable.ManageTechSpecs;
+    ViewBag.AddAction = "Add";
+    ViewBag.UseInlineEdit = true;
+    ViewBag.UseImgPreview = true;
+    
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/TechSpec";
+    ViewBag.ParentBreadcrumbTitle = StringTable.TechSpec;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+
+<style type="text/css">
+
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageTechSpecs)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageTechSpecs)
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<TechSpecModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", "Input", null, "(function(e){gridOnInlineEdit(e, '#DisplayOrder', gridRefreshRow);})")
+    .DataSource(m => m.Id, "List", null, null, "gridGetParams")
+    .Paging(10, new [] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetDefaultSort(true)    
+            .SetInlineEdit(true)
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+
+        grid.Col(m => m.Values, "ListValue", m => m.Id)
+            .SetCssClass("td-center"),
+
+        grid.Col(m => m.Icon, false, 90)
+            .SetTemplate(@"<a href='#:IconFsUrl#' class='preview'><img src='#:IconThumb#'/></a>"),
+
+        grid.Col(m => m.DisplayOrder, true, 120)
+            .SetInlineEdit(true)
+            .SetCssClass("td-center")
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+            
+        grid.Col(m => m.Featured, "", m => m.Id, false, 80)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-feature"),
+
+        grid.Col(m => m.Active, "", m => m.Id, false, 80)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-status"),
+    })
+    .ColumnCommand(grid => new[]
+    {
+        grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr"),
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true) : null,
+        grid.Cmd(m => m.Id, "ListValue", "Detail", " detail_fr",false)
+    }.Where(x => x != null).ToArray(), 170)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid'), permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+    var statusActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "Enable"))';
+    var featureActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "Feature"))';
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function gridCustom(grid) {
+
+        initGridStatusAction(grid, '.k-grid-status', statusActUrl,
+           function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+           function (row) { return { id: row.Id, active: row.Active }; });
+
+        initGridStatusAction(grid, '.k-grid-feature', featureActUrl,
+           function (row) { return row.Featured; }, function (row, feature) { row.Featured = feature; },
+           function (row) { return { id: row.Id, feature: row.Featured }; });
+
+        //gridMarkLangDisabled(grid, '.k-grid-name', function (row) { return !row.LangVisible; });
+
+        gridHideCell(grid, '.k-grid-Delete', function (row) { return (row.Id == @(settings.Hidden.OrderDetailDataTechspecId)); });
+
+        gridDisableCheckBox(grid, function (row) { return (row.Id == @(settings.Hidden.OrderDetailDataTechspecId)); });
+
+        if (permEdit)
+            $('tr', grid.element).each(function() {
+                $(this).dblclick(function(e) {
+                    if (!grid.editable) grid.editRow($(this));
+                });
+            });
+
+        initImagePreview(null, grid.element, false);
+    }
+
+    function gridRefreshRow(grid, rowEle) {
+
+        initGridStatusAction(grid, rowEle.find('.k-grid-status'), statusActUrl,
+            function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+            function (row) { return { id: row.Id, active: row.Active }; });
+
+        initGridStatusAction(grid, '.k-grid-feature', featureActUrl,
+           function (row) { return row.Featured; }, function (row, feature) { row.Featured = feature; },
+           function (row) { return { id: row.Id, feature: row.Featured }; });
+
+        //gridHideCell(grid, rowEle.find('.k-grid-Delete'), function (row) { return row.AnyChild; });
+
+        //gridDisableCheckBox(grid, function (row) { return row.AnyChild; }, rowEle.find('.row-checkbox'));
+
+        if (permEdit)
+            rowEle.dblclick(function(e) {
+                if (!grid.editable) grid.editRow($(this));
+            });
+    }
+
+    function gridGetParams(grid, e) {
+        return {};
+    }
+
+</script>

@@ -1,0 +1,828 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@using System.Text.RegularExpressions
+@model ProductModel
+@{
+    var langCode = (string)ViewData["LangCode"];
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var templBundling = (ProductBundleModel)ViewBag.TemplBundling;
+}
+<style type="text/css">
+    /*#gridbundling thead.k-grid-header {display: none;}*/
+    #gridbundling .bundling-quantity{padding-left: 7px;}
+    #bundlings.wr_table_all {padding: 0px; margin: 0px; float: left; width: 100%; overflow:visible !important;}
+    #gridbundling td .prop-desc{clear: both;}
+    #gridbundling .variant-prod{float: right;color: blueviolet;font-size: smaller;}
+    #gridprodsel td.image {padding: 3px;}
+    #gridprodsel .k-detail-cell {padding: 0 !important;}
+    /*#gridprodsel .price_2{font-size: small; padding: 0px 1px;}*/
+    #gridprodsel .k-detail-cell .price_2{margin-left: 5px;}
+    #gridprodsel .line-through {float:left;width:100%;}
+
+    .btn_delete_bundle_group {
+      cursor: pointer; display: inline-block; font-size: 12px; height: 28px; line-height: 28px; color: #3d3d3d;
+      background: url('/areas/admin/styles/images/icon_btn.png') 0px -56px no-repeat scroll;
+      border: none; outline: 0; padding: 0px 10px 0px 35px;
+    }
+    .btn_add_bundle_group {
+      cursor: pointer;display: inline-block;font-size: 12px;height: 28px;
+      line-height: 28px;color: #3d3d3d;background: url('/areas/admin/styles/images/icon_btn.png') 0px -155px no-repeat scroll;
+      border: none; outline: 0; padding: 0px 10px 0px 35px;
+    }
+</style>
+
+@{
+    Model.Bundlings.Insert(0, templBundling);
+
+    var qtyTempl = Html.LocalizeTextBoxFor(m => m.Bundlings[0].Quantity, new
+    {
+        @id = "qty-#:Key#",
+        @class = "bundling-cell bundling-quantity input-price",
+        @style = "width:50px !important",
+        @data_bind = "Quantity",
+        @type = "number",
+    }).Replace(new { @name = "_Bundlings[#:Iseq#].Quantity", @value = "#:Quantity#" }) + "<span class='error' data-valmsg-for='_Bundlings[#:Iseq#].Quantity' data-valmsg-replace='true'></span>";
+
+    var imgTemplate = "<a href='#:safePropImg(ProductImage,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(ProductImage,\"Thumb\")#'/></a>";
+
+    Model.Bundlings.Remove(templBundling);
+
+    var salePricetmp = @"
+    <span class='line-through'>#:safeProp(ProductPriceInc,'Text')#</span>
+    <span class='price_2'>#:safeProp(ProductSalePriceInc,'Text')#</span>";
+
+    var priceTempl = @"<span>#:safeProp(ProductPriceInc,'Text')#</span>";
+    var listPriceTitle = "eshop_adm_product_priceinc, eshop".Localize("List price");
+    var quantityInStokTitle = "eshop_adm_product_quantity, eshop".Localize("Quanity in stock");
+    var quantityProductImageTitle = "eshop_adm_product_image, eshop".Localize("Product image");
+    var quantityProductNameTitle = "eshop_adm_product_name, eshop".Localize("Product name");
+    
+}
+<div class="wr_table_all validable-form-field" id="bundlings">
+    @(Html.LocalizeGridFor<ProductBundleModel>("gridbundling", "Product")
+        .DataSource(m => m.Id, Model.Bundlings)
+        .Paging(2, new int[] { 10, 20, 30, 50, 100 }, StringTable.Products)
+        .Columns(grid => new[]
+        {
+            grid.Col(m => m.ProductImage,quantityProductImageTitle, false, 100)
+                .SetTemplate(imgTemplate)
+                .SetCssClass("txt_align_c image"),
+
+            grid.Col(m => m.ProductName, "Edit", m => m.ProductId)
+                .SetDefaultSort(true)
+                .SetTemplate(StringTable.NewWinEditTempl(Html, "ProductName") + "<div class='prop-desc'>#:ifnull(PropDesc)#</div><div class='variant-prod'>#:ProductVariantNum ? '" + StringTable.Variant + "':''#</div>")
+                .SetCssClass("name-pro2"),
+
+            grid.Col(m => m.ProductCostPrice, Html.LocalizeNameFor(m=>m.CostPrice), true, 100)
+                .SetCssClass("td-right")
+                .SetTemplate("#:safeProp(ProductCostPrice,'Text')#"),
+            
+              
+            grid.Col(m => m.ProductPriceInc,listPriceTitle, true, 100)
+                .SetCssClass("td-right")
+                .SetTemplate("# if (parseFloat(safeProp(ProductSalePriceInc,'Value')) > 0) { # "+salePricetmp+" # }  else{#" + priceTempl + "#} #"),
+            
+                
+            grid.Col(m => m.Quantity,false,150)
+                .SetTemplate(qtyTempl)
+                .SetCssClass("txt_align_c")
+        })
+        .ColumnCheckBox("Key", "_bundle")
+        .Sortable(true)
+        .Config(grid => { grid.CustomScript = "gridBundlingCustom"; })
+        .ToMvcHtmlString())
+</div>
+
+<div class="controls">
+    <ul class="wr_submit_top set-relative">
+        <li class="mr0 delete_big" style="padding:0">
+            <input class="btn_delete" value="@StringTable.RemoveFromBundle" type="button">
+        </li>
+    </ul>
+</div>
+
+@if (Model.Id > 0 && settings.Hidden.ProdBundleGroupAccessory)
+{
+    <div id="bundle-groups" style="max-width: 600px;">
+        @{ var groupHtml = Html.GetHtmlHelper<ProductBundleGroupModel>(); }
+        <div style="font-weight: bold;">@StringTable.ProductBundleGroups:</div>
+        <div class="wr_table_all validable-form-field">
+            @(groupHtml.LocalizeGridFor<ProductBundleGroupModel>("gridbundlegroup", "ProductBundleGroup", "Delete", "Input", "Input",
+                  @"(function(e){gridBundleGroupOnInlineEditCustom(e);gridOnInlineEdit(e, null, gridBundleGroupRefreshRow);})", null, null, grid =>
+                  {
+                      grid.ButtonDelBigClass += "_bundle_group";
+                      grid.CheckBoxSelAllCss += "_bundle_group";
+                      grid.CheckBoxRowCssClass += "_bundle_group";
+                      grid.InputSearchId += "_bundle_group";
+                      grid.FormSearchId += "_bundle_group";
+                  })
+                  .DataSource(m => m.Id, "List", null, null, "gridBundleGroupGetParams")
+                  .Paging(2, new[] {10, 20, 30, 50, 100}, StringTable.ProductBundleGroups)
+                  .Columns(grid => new[]
+                  {
+                      grid.Col(m => m.Name)
+                          .SetInlineEdit(true),
+                      grid.Col(m => m.ShowVariant)
+                          .SetTemplate(StringTable.BoolTempl)
+                          .SetCssClass("k-grid-ShowVariant"),
+                      grid.Col(m => m.Accessories, false, 60).SetCssClass("td-center"),
+                      grid.Col(m => m.MinPrice, false, 80).SetCssClass("td-right")
+                          .SetTemplate("#:safeProp(data.MinPrice, 'Text')#"),
+                  })
+                  .ColumnCommand(grid => new[]
+                  {
+                      ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "(function(uid){ gridCmdInlineEdit('gridbundlegroup', uid); })", "Edit", "edit_fr", false, null, true) : null,
+                  }.Where(x => x != null).ToArray(), 90)
+                  .ColumnCheckBox("Id", "bundle_group_")
+                  .Sortable(true)
+                  .Config(grid => { grid.CustomScript = "gridBundleGroupCustom"; })
+                  .ToMvcHtmlString())
+        </div>
+        <ul class="wr_submit_top set-relative">
+            <li class="mr0 delete_big_bundle_group" style="padding: 0; margin-right: 7px !important;">
+                <input class="btn_delete_bundle_group" value="@StringTable.RemoveFromBundleGroup" type="button">
+            </li>
+            <li class="mr0 js-add-new-bundle-group" style="padding: 0">
+                <input class="btn_add_bundle_group" value="@StringTable.AddBundleGroup" type="button">
+            </li>
+        </ul>
+        <script>
+
+            var permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+            var showVariantActUrl = '@(ModuleUrl.AdminUrl("ProductBundleGroup", "SetShowVariant"))';
+
+            $('#gridbundlegroup').find('#SelectAll')
+                .attr('id', 'SelectAll_bundle_group')
+                .closest('th').find('label')
+                .attr('for', 'SelectAll_bundle_group');
+
+            $(function() {
+                gridbundlegroupInit('#gridbundlegroup', true);
+            });
+
+            function gridBundleGroupCustom(grid) {
+
+                if (permEdit)
+                    $('tr', grid.element).each(function() {
+                        $(this).dblclick(function(e) {
+                            if (!grid.editable) grid.editRow($(this));
+                        });
+                    });
+
+                if (permEdit)
+                    setTimeout(function() {
+                        $('.js-add-new-bundle-group')
+                            .unbind('click')
+                            .click(function() { grid.addRow(); }).attr('type', 'button');
+                    }, 1);
+
+                setTimeout(function() {
+                    var bundleGroup = $('#BundleGroupId').data('kendoDropDownList');
+                    if (bundleGroup) bundleGroup.dataSource.read();
+                }, 10);
+
+                initGridStatusAction(grid, '.k-grid-ShowVariant', function(node, rw) {
+                        if (rw && rw.id) ajaxCmd(showVariantActUrl, { id: rw.Id, value: rw.ShowVariant }, function() {});
+                    },
+                    function(row) { return row.ShowVariant; }, function(row, status) { row.ShowVariant = status; },
+                    function(row) { return { id: row.Id, value: row.ShowVariant }; });
+
+            }
+
+            function gridBundleGroupRefreshRow(grid, rowEle) {
+
+                if (permEdit)
+                    rowEle.dblclick(function(e) {
+                        if (!grid.editable) grid.editRow($(this));
+                    });
+            }
+
+            function gridBundleGroupGetParams(gridOwner, e) {
+                return { productid: @(Model.Id) };
+            }
+
+            function gridBundleGroupOnInlineEditCustom(e) {
+                e.model.InlineEdit = e.model.QuickAdd = true;
+                e.model.ProductId = @(Model.Id);
+                e.model.MinPrice = null;
+                e.model.Accessories = null;
+
+                if(e.model.ShowVariant == null) e.model.ShowVariant = true;
+            }
+
+        </script>
+        <div id="accessory-bundle" style="clear: both; margin-top: 80px;">
+            <div style="font-weight: bold;">@StringTable.Accessories:</div>
+            @{
+                ViewData["LangCode"] = langCode;
+                Html.ClawRenderPartial("Admin/_ProductsAccessory.cshtml", Model, ViewData);
+            }
+        </div>
+
+    </div>
+}
+else
+{
+    if (settings.Hidden.ProdBundleGroupAccessory)
+    {
+        <div>
+            <ul class="">
+                <li><input type="button" value="@StringTable.Save" onclick="doSaveReload()" style="margin: 0;" class="btn"></li>
+            </ul>
+        </div>
+        <script>
+            function doSaveReload() {
+                var form = $('#editForm');
+                form.attr('action', urlMergeParamsEx(form.attr('action'), { selfreload: true, refpartid:'bundle-groups' }, true));
+                $('.wr_submit_top.form-action-menu #btn_save').first().click();
+            }
+
+            function urlMergeParamsEx(url, params, lowercase) {
+                if (!url || !params) return url;
+
+                if (typeof (params) == 'string') params = urlToJSON('?' + params, false);
+
+                var idx = url.indexOf('?');
+
+                if (idx == -1) url += '?';
+                else {
+                    params = $.extend(urlToJSON(url, true), params);
+                    url = url.substr(0, idx + 1);
+                }
+
+                Object.keys(params).forEach(function(key) {
+                    if (!params[key]) delete params[key];
+                });
+
+                if (lowercase) {
+                    var params2 = {};
+                    Object.keys(params).forEach(function(key) {
+                        params2[key.toLowerCase()] = params[key];
+                    });
+                    return url + $.param(params2);
+                }
+                else return url + $.param(params);
+            }
+
+        </script>
+    }  
+}
+<div id="prodsel-templ" style="display: none">
+    @{
+        var imgTemplateN = "<a href='#:safePropImg(Image,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(Image,\"Thumb\")#'/></a>";
+        var imgVariantTempl = "<a href='#:ImageFsUrl#' class='preview'><img id='vari_thumb_#:Id#' src='#:ImageThumb#'/></a>";
+
+        var salePricetmp1 = @"
+            <span class='line-through'>#:safeProp(PriceInc,'Text')#</span>
+            <span class='price_2'>#:safeProp(SalePriceInc,'Text')#</span>";
+
+        var priceTempl1 = @"<span>#:safeProp(PriceInc,'Text')#</span>";
+
+    }
+    @(Html.LocalizeGridFor<ProductModel>("gridprodsel", "Product", null, null, null, null, null,
+    "gridProdSelInitDetail", grid =>
+    {
+        grid.ButtonDelBigClass += "_prosel";
+        grid.CheckBoxSelAllCss += "_prosel";
+        grid.CheckBoxRowCssClass += "_prosel";
+        grid.InputSearchId += "_prodsel";
+        grid.FormSearchId += "_prodsel";
+    })
+    .DataSource(m => m.Id, "List", null, null, "gridProdSelGetParams")
+    .Paging(4, new int[] { 10, 20, 30, 50, 100 }, StringTable.Products)
+    .ColumnCheckBox(m => m.Id, 20, "_prodsel")
+    .Columns(grid => new[] {
+        grid.Col(m => m.Image, false, 50)
+            .SetTemplate(imgTemplateN)
+            .SetCssClass("txt_align_c image"),
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetCssClass("name-pro2")
+            .SetTemplate(StringTable.NewWinEditTempl(Html, "Name"))
+            .SetDefaultSort(true),
+            
+        //grid.Col(m => m.CostPrice, true, 100)
+        //    .SetCssClass("td-right") 
+        //    .SetTemplate("#:safeProp(CostPrice,'Text')#"),
+                            
+        grid.Col(m => m.PriceInc, true, 100)
+            .SetCssClass("td-right") 
+            .SetTemplate("# if (parseFloat(safeProp(SalePriceInc,'Value')) > 0) { # "+salePricetmp1 + " # }  else{#" + priceTempl1 + "#} #"),
+            
+        grid.Col(m => m.Quantity, false, 150)
+            .SetCssClass("td-right"),
+        //grid.Col(m => m.SKU, false, 120),
+    })
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridProdSelCustom"; })
+    .ToMvcHtmlString(false, false))
+</div>
+<div id="variantsel-templ" style="display: none">
+    @(Html.LocalizeGridFor<VariantModel>("gridvariantsel", "Variant", null, null, null, null, null,
+    null, grid => { grid.CheckBoxSelAllCss += "_varsel"; grid.CheckBoxRowCssClass += "_varsel"; grid.ButtonDelBigClass += "_varsel"; })
+    .DataSource(m => m.Id, "List", null, null, "gridVariantSelGetParams")
+    .Paging(2, new int[] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id, 20, "_varsel")
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.ImageThumb, false, 50)
+            .SetTemplate(imgVariantTempl)
+            .SetCssClass("txt_align_c image"),
+        grid.Col(m => m.PropDesc),
+    
+        //grid.Col(m => m.CostPrice, true, 100)
+        //    .SetCssClass("td-right") 
+        //    .SetTemplate("#:safeProp(CostPrice,'Text')#"),
+                
+         grid.Col(m => m.PriceInc,listPriceTitle, true, 100)
+                .SetCssClass("td-right")
+                .SetTemplate("# if (parseFloat(safeProp(SalePriceInc,'Value')) > 0) { # "+salePricetmp1 + " # }  else{#" + priceTempl1 + "#} #"),
+        
+        grid.Col(m => m.Quantity,quantityInStokTitle, false, 150)
+            .SetCssClass("td-right"),
+        //grid.Col(m => m.SKU, false, 120), 
+    })
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridVariantSelCustom"; })
+    .ToMvcHtmlString(false, false))
+</div>
+<script type="text/javascript">
+
+    var grid = $('#gridbundling'), updateBundlingPriceTimer = 0;
+
+    $(function () {
+
+        $('#gridprodsel').attr('id', 'gridprodsel-templ'); $('#qty-holder').hide();
+
+        gridbundlingInit('#gridbundling', true);
+
+        grid.data('kendoGrid').dataSource.bind('change', function (e) { });
+
+        $('#@Html.IdFor(m => m.Quantity)').change(function () {
+            if ($(this).valid() && parseInt($(this).val()) >= 0) grid.data('kendoGrid').refresh();
+        });
+    });
+
+    function updateBundleQty() {
+
+        var qty = null, weight = 0, statusNode = $('#@Html.IdFor(m => m.ProductStatusId)'), qtyNode = $('#@Html.IdFor(m => m.Quantity)');
+
+        if (!statusNode.data('kendoDropDownList')) {
+            setTimeout(updateBundleQty, 1000); return;
+        }
+
+        grid.data('kendoGrid').dataSource.data().forEach(function (rw) {
+            var rwQty = parseInt(rw.Quantity); console.log('updateBundleQty', rw);
+            var tmp = !rwQty || rw.ProductAllowBackorder ? (rw.ProductAllowBackorder ? 10000 : 0) : Math.floor(rw.ProductQty / rwQty);
+            qty = qty == null ? tmp : Math.min(qty, tmp);
+
+            var rwWeight = (safeProp(rw.Weight, 'Value') || 0);
+            switch (rw.WUnit) {
+            case @WeightUnit.Gram.Val():
+                weight += rwQty*(rwWeight / 1000);
+                break;
+            case @WeightUnit.Lbs.Val():
+                weight += rwQty*(rwWeight * 0.453592);
+                break;
+            case @WeightUnit.Kg.Val():
+                weight += rwQty*rwWeight;
+                break;
+            }
+        });
+
+        qty = qty || 0;
+
+        var statusId = parseInt(statusNode.val()), oldQty = parseInt(qtyNode.val());
+
+        qtyNode.val(qty);
+        $('#quantity-view').val(qty);
+
+        var weightNode = $('#@Html.IdFor(m => m.Weight)'), weightKd = weightNode.data('kendoNumericTextBox');
+        weightNode.val(localizeFloatToString(weight)).change();
+        if(weightKd) weightKd.value(weight);
+
+        var wunitNode = $('#@Html.IdFor(m => m.WUnit)'), wunitKd = weightNode.data('kendoDropDownList');
+        wunitNode.val('@WeightUnit.Kg.Val()').change();
+        if(wunitKd) wunitKd.value(wunitNode.val());
+
+        if ((qty > 0 ^ oldQty > 0) && ((statusId == 2 && qty == 0) || (statusId == 3 && qty > 0)))
+        {
+            var statusKd = statusNode.data('kendoDropDownList');
+            statusKd.value(qty > 0 ? 2 : 3); statusKd.element.change();
+        }
+
+        console.log('updateBundleQty', weight, qty, oldQty, qty > 0 ^ oldQty > 0, (statusId == 2 && qty == 0) || (statusId == 3 && qty > 0));
+    }
+
+    function updateBundlingPrice() {
+
+        if (updateBundlingPriceTimer) clearTimeout(updateBundlingPriceTimer);
+
+        updateBundlingPriceTimer = setTimeout(function () {
+
+            updateBundlingPriceTimer = 0;
+
+            var priceIncNode = $('#@Html.IdFor(m => m.PriceInc)'), priceIncVal = 0;
+            var costpriceIncNode = $('#@Html.IdFor(m => m.CostPriceInc)'), costpriceIncVal = 0;
+            var salepriceIncNode = $('#@Html.IdFor(m => m.SalePriceInc)'), salepriceIncVal = 0;
+            var bundleDiscountRateNode = $('#@Html.IdFor(m => m.BundleDiscountRate)'), bundleDiscountRateVal = localizeParseFloat(bundleDiscountRateNode.val()) / 100.0;
+            var bundleDiscProfit = $('#BundleDiscProfitTrue').prop('checked');
+
+            grid.data('kendoGrid').dataSource.data().forEach(function (rw) {
+                priceIncVal += (/*(rw.ProductSalePriceInc.Value != null) ? rw.ProductSalePriceInc.Value : */rw.ProductPriceInc.Value) * rw.Quantity;
+                var cVal = safeProp(rw.ProductCostPriceInc, 'Value');
+                if (bundleDiscProfit && !cVal) cVal = 0.8 * rw.ProductPriceInc.Value;
+                if(!cVal || costpriceIncVal == null)costpriceIncVal = null;
+                else costpriceIncVal += cVal * rw.Quantity;
+            });
+
+            priceIncNode.data('kendoNumericTextBox').value(priceIncVal);
+            priceIncNode.change();
+
+            costpriceIncNode.data('kendoNumericTextBox').value(costpriceIncVal);
+            costpriceIncNode.change();
+            
+            var newSalePriceInc = bundleDiscountRateVal ? (bundleDiscProfit ? (costpriceIncVal*(1 + bundleDiscountRateVal)) : (priceIncVal * (1 - bundleDiscountRateVal))) : null;
+
+            salepriceIncNode.data('kendoNumericTextBox').value(newSalePriceInc);
+            salepriceIncNode.change();
+        }, 1000);
+    }
+
+    function gridVariantSelCustom(grid) {
+
+        initImagePreview(false, grid.element);
+
+        gridAdjustPopup($('#gridprodsel').data('kendoGrid'), '.wcontent', '.wr_clo1', null, null, null, 30);
+    }
+
+    function gridVariantSelGetParams(gridOwner, e) {
+        var productid = gridOwner.element.attr('data-id'), data = grid.data('kendoGrid').dataSource.data(), exceptids = [];
+        data.forEach(function (row) { if (row.VariantId && row.ProductId == productid) exceptids.push(row.VariantId); });
+        return { productid: productid, exceptids: exceptids.join(','), minQty: 1, active: true, fullMode: true };
+    }
+
+    function gridProdSelFirstRun() {
+        var grid = $('#gridprodsel'), headerRow = grid.find('thead > tr');
+
+        headerRow.append('<th class="k-hierarchy-cell k-header" style="display:none"></th>');
+        // { 0: 0, 2: 5, 3: 2, 4: 3, 5: 4 }
+        gridSwapElements(headerRow, 'th', { 0: 0, 2: 5, 3: 2, 4: 3, 5: 4 },
+            function (i, node) { if (i == 3) $(node).attr('colspan', '2'); });
+        grid.attr('data-deep', '0');
+
+        var gridTempl = grid.clone();
+
+        gridTempl.attr('id', '');
+        gridprodselInit('#gridprodsel', true);
+
+        var gridColGroup = grid.find('colgroup');
+        gridSwapElements(gridColGroup, 'col', { 0: 1, 1: 2, 2: 0 }, function (i, node) { if (i == 0) $(node).css('width', '56px'); });
+
+        var cols = gridColGroup.html(), gridData = grid.data('kendoGrid');
+
+        gridData.rowTemplate = gridGetRowTemplate(gridData, false, { 0: 1, 1: 2, 2: 0 });
+        gridData.altRowTemplate = gridGetRowTemplate(gridData, true, { 0: 1, 1: 2, 2: 0 });
+
+        grid.data({ 'clawGridTempl': gridTempl, 'clawGridCols': cols });
+    }
+
+    function gridProdSelInitDetail(e) {
+        var gridTempl = $('#gridvariantsel');
+        var gridDiv = gridTempl.clone(), selAll = gridDiv.find('#SelectAll');
+
+        gridDiv.attr('id', 'grid-' + e.data.id);
+        gridDiv.attr('data-id', e.data.id);
+        gridDiv.attr('data-deep', parseInt(e.sender.element.attr('data-deep')) + 1);
+
+        selAll.attr('id', 'SelectAll-' + e.data.id);
+        selAll.closest('div').find('label').attr('for', 'SelectAll-' + e.data.id);
+
+        e.detailCell.append(gridDiv);
+        e.detailRow.find('.k-hierarchy-cell').remove();
+        e.detailRow.find('.k-detail-cell').attr('colspan', '7');
+
+        gridvariantselInit('#' + gridDiv.attr('id'), false);
+    }
+
+    function gridProdSelCustom(grid) {
+        gridHideCell(grid, '.k-hierarchy-cell .k-icon.k-plus', function (row) { return row.VariantCount == 0; });
+
+        //if($('#BundleHideSubItemsTrue').prop('checked'))
+        //    gridDisableCheckBox(grid, function (row) { return row.VariantCount > 0; }, '.row-checkbox_prosel');
+
+        gridAdjustPopup(grid, '.wcontent', '.wr_clo1', null, null, null, 30);
+
+        initImagePreview(false, grid.element);
+    }
+
+    function gridProdSelGetParams() {
+        var data = grid.data('kendoGrid').dataSource.data(), exceptids = [1, '@Model.Id'], exceptVariantIds = [];
+        data.forEach(function (row) {
+            exceptids.push(row.ProductId);
+            if (row.VariantId) exceptVariantIds.push(row.VariantId);
+        });
+        
+        if(window.gridaccessory)
+            window.gridaccessory.data('kendoGrid').dataSource.data().forEach(function (row) { exceptids.push(row.AccessoryId); });
+
+        return { exceptids: exceptids.join(','), type: '@((int)ProductType.Normal)', countVariant: 'true', minQty: 1, VisibilityWeb: true, exceptVariantids: exceptVariantIds.join(','), download: false };
+    }
+
+    function gridBundlingCustom(grid) {
+        //$('.preview[href=""]', grid.element).hide();
+
+        $('.delete_big').unbind('click').click(function () {
+            var arrRws = [], rows = grid.tbody.find('input:checked').closest('tr');
+            rows.each(function () { arrRws.push(grid.dataItem($(this))); });
+
+            arrRws.forEach(function (item) {
+                prodFormRemove(item);
+                grid.dataSource.data().remove(item);
+            });
+            if (arrRws.length != 0) updateBundlingPrice();
+        });
+
+        $('#bundling-form-list > .bundling-form[data-valid=1]').each(function () {
+            var prodForm = $(this), row = gridGetRow(grid, $(this).attr('data-id'), $(this).attr('data-key'));
+            if (row) {
+                $('tr[data-uid=' + row.uid + '] .bundling-cell', grid.element).change(function () {
+                    if ($(this).is('input,textarea,select')) {
+                        if ($(this).valid()) {
+                            var field = $(this).attr('data-bind');
+                            if (field) bindInputField(prodForm, row, field, $(this).val());
+
+                            //console.log('tests')
+                            updateBundlingPrice();
+
+                            if ($(this).is('.bundling-quantity')) updateBundleQty();
+                        } else $(this).focus();
+                    }
+                });
+                $(this).attr('data-uid', row.uid);
+                row.ProductForm = prodForm;
+            } else console.log('databound: row is null', $(this).attr('data-key'), prodForm);
+        });
+
+        var quantity = parseInt($('#@Html.IdFor(m => m.Quantity)').val()), bundleHideSubItemsErrs = 0;
+        $('.bundling-quantity', grid.element).each(function () {
+            var row = grid.dataItem($(this).closest('tr'));
+            var maxVal = quantity > 0 ? Math.floor(Math.max(row.ProductQty || 0, 1) @*/ quantity *@) : null;
+            var errMsg = maxVal > 0 ?
+                '@StringTable.ErrMsgRangeLimit.ModErrLocalize()' :
+                (maxVal == 0 ? '@StringTable.ErrMsgNotEnoughQuantity' : '@StringTable.ErrMsgMinLimit.ModErrLocalize()');
+            $(this).attr({
+                'data-val-range-max': maxVal >= 0 ? maxVal : '@int.MaxValue',
+                'data-val-range': errMsg.replace('{1}', '1').replace('{2}', maxVal || '')
+            }).rules('remove');
+            
+            if(!row.VariantId && row.ProductVariantNum) bundleHideSubItemsErrs++;
+        });
+        
+        window.BundleHideSubItemsErrs = bundleHideSubItemsErrs;
+
+        if((bundleHideSubItemsErrs && window.AcceHideSubItemsErrs != null) || window.AcceHideSubItemsErrs){
+            //$('#BundleHideSubItemsFalse').prop('checked', true);
+            //$('#bundle-groups,#accessory-bundle').show();
+            //$('#BundleHideSubItemsTrue').prop('disabled', true);
+        } //else $('#BundleHideSubItemsTrue').prop('disabled', false);
+
+        initImagePreview(false, grid.element);
+
+        formUpdateValidRules(grid.element);
+
+        if (grid.dataSource.total() == 0) {
+            grid.element.closest(".wr_table_all").hide();
+        } else {
+            grid.element.closest(".wr_table_all").show();
+            setTimeout(function () {
+                $('.bundling-quantity', grid.element).each(function () {
+                    if ($(this).length > 0) $(this).valid();
+                });
+                bundleShowValidateErrors(grid);
+            }, 500);
+
+            if ($('.bundling-quantity', grid.element).valid()) updateBundleQty();
+        }
+    }
+
+    function bundleShowValidateErrors(grid, trNode) {
+        $('.bundling-quantity', trNode || grid.element).each(function () {
+            var name = ($(this).attr('name') || '').substring(1), msg = modelState[name];
+            if (name && msg) {
+                $(this).closest('td').find('span.error')
+                    .removeClass('field-validation-valid')
+                    .addClass('field-validation-error').html('').append($('<span>').html(msg));
+                delete modelState[name];
+                if (!firstErrorInputElement) {
+                    firstErrorInputElement = $(this);
+                    setTimeout(function () { firstErrorInputElement.focus(); }, 2000);
+                };
+            } else $(this).removeClass('input-validation-error');
+        });
+    }
+
+    function openAssignForm() {
+        var width = Math.max(200, Math.min(770, $(window).width() - 50));
+        var height = Math.max(200, Math.min(2048, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popTemplate = $("<div>").html($("#bundling-popup-form-templ").html());
+        popTemplate.find('.htmlcontent .wr_table_all').html($('#gridprodsel-templ').clone().attr('id', 'gridprodsel').wrap('<p>').parent().html());
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@StringTable.AddProducts', popTemplate.html(),
+            width, height, [], null,
+            function (modal) {
+
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+
+                $('#gridprodsel #SelectAll', modal).attr('id', 'SelectAll_prodsel').closest('div')
+                    .find('label').attr('for', 'SelectAll_prodsel');
+
+                //gridprodselInit('#gridprodsel', true);
+                gridProdSelFirstRun();
+
+                var gridProdSel = $('#gridprodsel').data('kendoGrid');
+
+                modal.find(".btn_save").click(function () {
+
+                    var selCBox = $('.row-checkbox_prosel:checked,.row-checkbox_varsel:checked', gridProdSel.element);
+
+                    selCBox.each(function () {
+                        var owner = $(this).closest('div.k-grid').data('kendoGrid');
+                        var row = owner.dataItem($(this).closest('tr'));
+                        //console.log(row);
+                        if (row.ProductId) productAdd(row.ProductId, row.ProductName, row.Image ? { Thumb: row.ImageThumb, FsUrl: row.ImageFsUrl } : row.CombinedImage,
+                            row.Id, row.PropDesc, row.Quantity, row.SKU, row.ProdVat, row.Price, row.PriceInc, row.SalePrice, row.SalePriceInc, row.Weight, row.ProductWUnit, row.CostPrice, row.CostPriceInc, null, row.AllowBackorder);
+                        else productAdd(row.Id, row.Name, row.Image, row.VariantId, null, row.Quantity, row.SKU, row.Vat, row.Price, row.PriceInc, row.SalePrice, row.SalePriceInc, row.Weight, row.WUnit, row.CostPrice, row.CostPriceInc, row.VariantCount, row.AllowBackorder);
+                    });
+
+                    if (selCBox.length != 0) updateBundlingPrice();
+
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close(); $(window).scrollTop(scrollTop);
+                });
+                modal.find(".btn_cancel").click(function () {
+
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close(); $(window).scrollTop(scrollTop);
+                });
+            });
+    }
+
+    function productAdd(id, name, image, variantId, propDesc, productQty, sku, vat, price, priceInc, salePrice, salePriceInc, weight, wUnit, costPrice, costPriceInc, variantNum, allowBackorder) {
+        productAddRaw({
+            ProductId: id, VariantId: variantId, Quantity: 1, ProductQty: productQty, ProductAllowBackorder: allowBackorder,
+            BundleId: '@Model.Id', ProductName: name, ProductImage: image, PropDesc: propDesc,
+            ProductSKU: sku, ProductVat: vat, ProductPrice: price, ProductPriceInc: priceInc,
+            ProductSalePrice: salePrice, ProductSalePriceInc: salePriceInc, Weight: weight, WUnit: wUnit,
+            ProductCostPrice: costPrice, ProductCostPriceInc: costPriceInc, ProductVariantNum: variantNum,
+            Key: id + '-' + (variantId || 0)
+        });
+    }
+
+    function productAddRaw(fieldVals) {
+
+        var gridData = grid.data('kendoGrid');
+        var newRow = $.extend(true, {}, templBundling);
+
+        for (var prop in fieldVals) {
+            var pval = fieldVals[prop];
+            newRow[prop] = pval;
+        }
+
+        //console.log('productAdd', newRow);
+
+        var newForm = prodFormAdd(fieldVals);
+        newRow.Iseq = fieldVals['Iseq'];
+        newForm.attr('data-key', newRow.Key);
+        gridData.dataSource.data().push(newRow);
+    }
+
+    function prodFormAdd(fieldVals) {
+
+        var lst = $('#bundling-form-list'), idx = parseInt(lst.attr('count'));
+
+        fieldVals['Iseq'] = idx;
+
+        lst.attr('count', idx + 1);
+
+        var newForm = $('<div>').html($('#bundling-form-template').html()).find('.bundling-form');
+
+        newForm.find('input,textarea,select').each(function () {
+            $(this).attr('id', $(this).attr('id').replace('_0_', '_' + idx + '_'));
+            $(this).attr('name', $(this).attr('name').replace('[0]', '[' + idx + ']'));
+
+            if ($(this).attr('binding')) {
+                if ($(this).is('textarea')) $(this).html('');
+                else $(this).val('');
+            }
+        });
+
+        if (fieldVals)
+            for (var field in fieldVals) {
+                var fVal = fieldVals[field];
+
+                var node = newForm.find('.bundling-form-field[binding=' + field + ']');
+                if (node.is('textarea')) $(this).html(fVal);
+                else node.val(fVal);
+            }
+
+        newForm.attr({ 'data-id': 0, 'data-valid': 1 });
+
+        lst.append(newForm);
+
+        //console.log(newForm.html());
+
+        return newForm;
+    }
+
+    function prodFormRemove(row) {
+        console.log('prodFormRemove', row, row.ProductForm);
+        row.ProductForm.attr('data-valid', 0);
+        row.ProductForm.find('input,textarea,select').val('').attr('datavalid', 0);
+        $('#editform-change-state').val(1).change();
+    }
+
+    function bindInputField(prodForm, row, field, newVal) {
+        var inputField;
+
+        row[field] = newVal;
+        inputField = prodForm.find('.bundling-form-field[binding=' + field + ']');
+        inputField.val(newVal); console.log(inputField);
+    }
+
+    function gridGetRow(grid, id, key) {
+
+        if (id != null && id != 0) return grid.dataSource.get(id);
+        else return grid.dataSource.data().find(function (item) { return item.Key == key; });
+    }
+
+    function safePropImg(obj, propName) {
+        if (obj == null) return '@ImageModel.NoImg';
+        return obj[propName] || '';
+    }
+
+</script>
+
+<div id="bundling-form-list" count="@Model.Bundlings.Count" style="display: none">
+    @for (int i = 0; i < Model.Bundlings.Count; i++)
+    {@RenderBundlingForm(i)}
+</div>
+<script id="bundling-form-template" type="text/bundling-form-template">
+    @{ Model.Bundlings.Insert(0, templBundling); }
+    @RenderBundlingForm(0)
+</script>
+@Html.Raw("<script type='text/javascript'> var templBundling = " + Json.Encode(templBundling) + ";</script>")
+
+@helper RenderBundlingForm(int idx)
+{
+    <div class="bundling-form" data-id="@Model.Bundlings[idx].Id" data-key="@Model.Bundlings[idx].Key" data-valid="1">
+        @Html.SimpleHiddenFor(m => m.Bundlings[idx].Id, new { @class = "bundling-form-field" })
+        @Html.SimpleHiddenFor(m => m.Bundlings[idx].ProductId, new { @class = "bundling-form-field", @binding = "ProductId" })
+        @Html.SimpleHiddenFor(m => m.Bundlings[idx].VariantId, new { @class = "bundling-form-field", @binding = "VariantId" })
+        @Html.SimpleHiddenFor(m => m.Bundlings[idx].Quantity, new { @class = "bundling-form-field", @binding = "Quantity" })
+    </div>
+}
+
+<script type="text/x-kendo-template" id="bundling-popup-form-templ">
+    <style type="text/css">
+        .popupBody .k-detail-row .k-detail-cell { padding: 0 !important; }
+        .popupBody .k-detail-row .k-detail-cell .k-grid {
+            border-top: 1px solid #390f3d !important;
+            border-bottom: 1px solid #390f3d !important;
+        }
+    </style>    
+    <div class="popupBody">
+        <section id="err-message-holder" style="float: left; width: 100%;"></section>
+        <section class="row_content_box kpopup-content">
+            <section class="wr_clo1">
+                <div class="wcontent" style="margin: 0 10px; color: #390F3D;line-height:2em">
+                    <div class="htmlcontent">
+                        <form id="formSearch_prodsel" style="margin-bottom:10px">
+                            <section class="wr-search-eshop" style="margin-left:0;">
+                                <input type="text" placeholder="@StringTable.SearchProducts" class="text-l" id="inputSearch_prodsel">
+                                <input type="submit" value="" class="button-l" name="button">
+                            </section>
+                        </form>
+                        <section class="clear"></section>
+                        <div class="wr_table_all" style="margin:0"></div>
+                    </div>
+                </div>
+            </section>
+            <section class="clear"></section>
+            <ul class="wr_submit_top form-action-menu" style="position:relative; padding:5px 0;">
+                <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+            </ul>
+        </section>
+    </div>
+
+</script>

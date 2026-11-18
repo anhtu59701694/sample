@@ -1,0 +1,56 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model CategoryModel
+@{
+    var langCode = (string)ViewData["LangCode"];
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+<style type="text/css">
+</style>
+
+@{
+    
+}
+
+<div class="wr_table_all" id="customers">
+    @(Html.LocalizeGridFor<CategoryCustomerModel>("gridcustcate", "Customer")
+        .DataSource(m => m.Id, "ListCate", null, null, "gridCustCateParams")
+        .Paging(4, new int[] { 10, 20, 30, 50, 100 }, StringTable.Customers)
+        .Columns(grid => new[]
+        {
+            grid.Col(m => m.CustomerName, "Edit", m => m.CustomerId, true),
+            grid.Col(m => m.CustomerEmail, true)
+                .SetTemplate("<a class='k-grid-link' href='mailto\\:#:CustomerEmail#'>#:CustomerEmail#</a>"),
+            grid.Col(m => m.DiscountRate, true)
+            .SetTemplate("#:safeProp(DiscountRate,'Text')# %"),
+            grid.Col(m => m.Notes)
+        })
+        //.ColumnCheckBox(m => m.CustomerId)
+        .Sortable(true)
+        .Config(grid => { grid.CustomScript = "gridCustCateCustom"; })
+        .ToMvcHtmlString())
+</div>
+
+<script type="text/javascript">
+
+    $(function () {
+
+        gridcustcateInit('#gridcustcate', true);
+
+    });
+
+    function gridCustCateCustom(grid) {
+
+        if (grid.dataSource.total() == 0) $(".customer-discount-box").hide();
+        else $(".customer-discount-box").show();
+    }
+    
+    function gridCustCateParams() {
+        return { categoryid: '@Model.Id' }
+    }
+
+</script>
+

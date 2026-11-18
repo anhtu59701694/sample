@@ -1,0 +1,353 @@
+﻿@using System.Text.RegularExpressions
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@using Proteria = Eshop.Shipping.Proteria;
+@model ProteriaBookingModel
+@{
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var errMsg = (string)ViewBag.ErrorMsg;
+    var pickUpPoints = (Proteria.PickUpPoint[])ViewBag.PickUpPoints;
+    var printers = (Proteria.Printer[])ViewBag.Printers;
+
+    if (Model.CarrierName.IsNullOrEmpty())
+    {
+        Model.CarrierName = "BringV2";
+    }
+
+
+    var api = new Proteria.CloudConnect(settings.Display.Admin.Proteria.ApiKey);
+    var shippingMethods = api.GetShippingMethodsForCustomer();
+    //var shippingMethods = api.GetShippingMethods();
+        
+    var carriers = shippingMethods.Select(m => m.Carrier).Distinct(m => m.ToLower()).Select(m => new { CarrierName = m }).ToArray();
+    var products = shippingMethods.Where(m => m.Carrier.EqualsIgCase(Model.CarrierName))
+        .Select(m => new { Id = m.Id, Type = m.Carrier, Name = m.DisplayText }).ToArray();
+        
+        
+}
+
+@functions{
+    public static Proteria.PickUpPoint[] GetPickUpPointsEx(string countryCode, string postCode, ref string errorMsg, string carrier = "Bring")
+    {                          
+		if(carrier.InList("BringV2")) { carrier = "Bring"; } 
+		
+        if ((!carrier.InList("Bring", "BringV2") || !countryCode.InList("SE", "NO", "DK", "FI")) &&
+            (!carrier.InList("PostNord") || !countryCode.InList("SE", "NO", "DK", "FI", "DE", "BE", "NL", "LU")))
+            return new Proteria.PickUpPoint[0];
+
+        try
+        {
+            var settings = SettingsBiz.GetSettings().Display.Admin.Proteria;
+            var api = new Proteria.CloudConnect(settings.ApiKey);
+            return api.GetPickUpPoints(countryCode, postCode, carrier) ?? new Proteria.PickUpPoint[0];
+        }
+        catch (Exception err)
+        {
+            if (errorMsg.IsNullOrEmpty()) errorMsg = err.Message;
+            return new Proteria.PickUpPoint[0];
+        }
+    }
+}
+
+<style type="text/css">
+    .booking-service{ display: inline-block; margin-right: 15px; min-width: 170px}
+    #proteria-booking-form .right { margin-top: 3px; margin-left: 2%; width: 72%; }
+    #proteria-booking-form .right.link { margin-top: 7px;height: 2em;overflow: hidden;border: 1px solid #ccc;padding-left: 5px; }
+    #proteria-booking-form .left { width: 22%; text-align: right; }
+    #proteria-booking-form .item { margin: 0;  }
+</style>
+
+<div id="proteria-booking-form" style="float: left; margin-bottom: 20px;">
+    @Html.SimpleHiddenFor(m => m.OrderId, new { @class = "" })
+    @Html.SimpleHiddenFor(m => m.ProductName, new { @class = "" })
+    @Html.SimpleHiddenFor(m => m.Description, new { })
+
+    @if (Model.BookingShipmentId.IsNullOrEmpty() && Model.BookingTrackingNumber.IsNullOrEmpty())
+    {
+        if (errMsg.IsNullOrEmpty())
+        {
+            var odom = OrderMgr.GetDom(new DefaultDb(), Model.OrderId);
+            pickUpPoints = GetPickUpPointsEx(odom.DeliverCountry.Code, odom.DeliverPostnr, ref errMsg, Model.CarrierName);
+        }
+
+        <div class="request-form">
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.CarrierName):</div>
+                <div class="right">
+                    @Html.LocalizeDropDownListKendoFor(m => m.CarrierName, carriers.Select((x, idx) => new SelectListItem()
+                    {
+                        Text = string.Format("{0}", x.CarrierName), Value = x.CarrierName,
+                    }), null, new { @style = "", @onchange = "/*kendoDropDownHideProducts()*/" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.CarrierName)</div>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.ProductId):</div>
+                <div class="right">
+                    @Html.LocalizeDropDownListKendoLangFor(m => m.ProductId, products.Select((x, idx) => new DDListItem()
+                    {
+                        Text = (x.Type.EqualsIgCase("Bring") ? "Bring " : "") + x.Name,
+                        Value = x.Id,
+                        Active = true,
+                        LangVisible = true,
+                        Model = x,
+                        id = idx + 1
+                    }), StringTable.SelectProduct, new { @style = "min-width:450px" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.ProductId)</div>
+                </div>
+            </div>
+            <div class="item" id="pickup-point-box" style="@(pickUpPoints.SafeCount() == 0 ? "display: none" : "")">
+                <div class="left">@Html.LocalizeNameFor(m => m.PickupPointId):</div>
+                <div class="right">
+                    @Html.LocalizeDropDownListKendoLangFor(m => m.PickupPointId, pickUpPoints.Select(x => new DDListItem()
+                    {
+                        Text = string.Format("{0}, {1}, {3} {4}", x.name, x.address, null, x.city, x.postcode, x.countryCode),
+                        Value = x.id,
+                        Active = true,
+                        LangVisible = true,
+                        Model = x,
+                    }), StringTable.SelectPickupPoint, new { @style = "min-width:450px" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.PickupPointId)</div>
+                </div>
+            </div>
+
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.WeightInKg):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.WeightInKg, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.WeightInKg)</div>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.WidthInCm):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.WidthInCm, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.WidthInCm)</div>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.HeightInCm):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.HeightInCm, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.HeightInCm)</div>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.LengthInCm):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.LengthInCm, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.LengthInCm)</div>
+                </div>
+            </div>
+            <div class="item service-box" >
+                <div class="left">@StringTable.BookingServices:</div>
+                <div class="right" style="margin-top: 5px">
+                    <ul>
+                        @*<li class="booking-service">
+                            @Html.LocalizeCheckBoxFor(m => m.NotiSms, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.NotiSms)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.NotiSms)</label>
+                            <input name="@Html.NameFor(m => m.NotiSms)" value="false" type="hidden" />
+                        </li>
+                        <li class="booking-service">
+                            @Html.LocalizeCheckBoxFor(m => m.NotiEmail, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.NotiEmail)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.NotiEmail)</label>
+                            <input name="@Html.NameFor(m => m.NotiEmail)" value="false" type="hidden" />
+                        </li>*@
+                        <li class="booking-service">
+                            @Html.LocalizeCheckBoxFor(m => m.ServiceCod, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.ServiceCod)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.ServiceCod)</label>
+                            <input name="@Html.NameFor(m => m.ServiceCod)" value="false" type="hidden" />
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="item" style="display: none">
+                <div class="left">@Html.LocalizeNameFor(m => m.CodAccountNumber):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.CodAccountNumber, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.CodAccountNumber)</div>
+                </div>
+            </div>
+            <div class="item" style="display: none">
+                <div class="left">@Html.LocalizeNameFor(m => m.Amount):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.Amount, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Amount)</div>
+                </div>
+            </div>
+        </div>
+
+        <script type="text/javascript">
+            var proteriaHolder = '#proteria-booking-form';
+            var productId = $('#@Html.IdFor(m => m.ProductId)', proteriaHolder);
+
+            formUpdateValidRules($('#proteria-booking-form'));
+
+            productId.change(function () {
+                var kdNode = $(this).data("kendoDropDownList");
+                $('#@Html.IdFor(m => m.ProductName)', proteriaHolder).val(kdNode.text());
+            });
+
+            $('#@Html.IdFor(m => m.ServiceCod)', proteriaHolder).change(function () {
+
+                var amountBox = $('#@Html.IdFor(m => m.Amount)', proteriaHolder).closest('.item').hide();
+                var codAccountBox = $('#@Html.IdFor(m => m.CodAccountNumber)', proteriaHolder).closest('.item').hide();
+
+                if ($(this).prop('checked')) { amountBox.show(); codAccountBox.show(); }
+
+                formDisableValidation(amountBox.find('input'), !amountBox.is(':visible'));
+                formDisableValidation(codAccountBox.find('input'), !codAccountBox.is(':visible'));
+            }).change();
+
+            setTimeout(function () {
+                kendoDropDownHideProducts();
+                if (productId.val()) productId.change();
+            }, 1000);
+
+            function kendoDropDownHideProducts() {
+                var nodeKd = $('#@Html.IdFor(m => m.ProductId)').data('kendoDropDownList'), carrier = $('#@Html.IdFor(m => m.CarrierName)').val(), idx = 0;
+
+                $('li.k-item', nodeKd.ul).each(function () {
+                    if (!idx) { idx++; return; }
+
+                    var liCarrier = $(this).attr('data-carrier')
+                    if (!liCarrier) {
+                        var row = nodeKd.dataSource.data()[idx - 1];
+                        $(this).attr('data-carrier', liCarrier = row.Model.Type);
+                    };
+
+                    if (liCarrier == carrier) $(this).show();
+                    else $(this).hide();
+                    idx++;
+                });
+            }
+
+        </script>
+    }
+    else
+    {
+        <div class="result-form">
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.BookingShipmentId):</div>
+                <div class="right">@Html.LocalizeTextBoxFor(m => m.BookingShipmentId, new { @readonly = "readonly", @style = "width: 150px !important;min-width: 0;" })</div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.BookingTrackingNumber):</div>
+                <div class="right">@Html.LocalizeTextBoxFor(m => m.BookingTrackingNumber, new { @readonly = "readonly", @style = "width: 150px !important;min-width: 0;" })</div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.BookingCreatedAt):</div>
+                <div class="right">@Html.LocalizeTextBoxFor(m => m.BookingCreatedAt.TextF, new { @readonly = "readonly", @style = "width: 150px !important;min-width: 0;" })</div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.BookingLabelPdf):</div>
+                <div class="right link">
+                    @if (!Model.BookingTrackingNumber.IsNullOrEmpty())
+                    {
+                        <a href="@ModuleUrl.AdminUrl(Html.GetController(), "DownloadPdf", new RouteValueDictionary(new {@shipmentId = Model.BookingShipmentId}))" target="_blank">
+                            @StringTable.DownLoadA
+                        </a>
+                    }
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.BookingTrackingUrl):</div>
+                <div class="right link">
+                    <a href="@Model.BookingTrackingUrl" target="_blank">@Model.BookingTrackingUrl</a>
+                </div>
+            </div>
+            @if (printers != null && !Model.BookingTrackingNumber.IsNullOrEmpty())
+            {
+                <div class="item" >
+                    <div class="left">@Html.LocalizeNameFor(m => m.BookingPrinter):</div>
+                    <div class="right">
+                        @Html.LocalizeDropDownListKendoFor(m => m.BookingPrinter, printers.Where(x => x.State.IsNullOrEmpty() || x.State.EqualsIgCase("online")).Select((x,idx) => new DDListItem()
+                        {
+                            Text = x.Name + (x.Type.IsNullOrEmpty() ? "" : " (" + x.Type + ")"),
+                            Value = (idx + 1).ToString(), Active = true, LangVisible = true, Model = x, id = idx + 1,
+                        }), m => m.Value, m => m.Text, null, new { @style = "min-width:100px" })
+                        @if(printers.SafeCount() != 0) {
+                            <input onclick="printBooking()" class="btn" style="margin: 0;width: 40px !important;" type="button" value="@StringTable.BookingPrint" />
+                        }
+                        <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.BookingPrinter)</div>
+                    </div>
+                </div>
+            }
+        </div>
+
+        <script type="text/javascript">
+
+            function printBooking() {
+                var trackingNumber = $('#@Html.IdFor(m => m.BookingTrackingNumber)');
+                var shipmentId = $('#@Html.IdFor(m => m.BookingShipmentId)');
+                var printer = $('#@Html.IdFor(m => m.BookingPrinter)');
+                var printerKd = printer.data('kendoDropDownList');
+
+                if (!printer.valid() || !trackingNumber.val()) return;
+
+                var row = printerKd.dataSource.get(printer.val());
+
+                ajaxCmdStatus('@ModuleUrl.AdminUrl(Html.GetController(), "PrintBooking")', {
+                    shipmentId: shipmentId.val(), printId: row.Model.Id, printType: row.Model.Type, printName: row.Model.Name
+                }, function () {
+                    if (window.ProteriaBookingForm) window.ProteriaBookingForm.find(".btn_cancel").click();
+                });
+            }
+
+        </script>
+
+        if (QParam.GetField<bool?>("checkbooking", false, true) == true)
+        {
+            <script type="text/javascript">
+
+                function checkBookingResult(counter) {
+
+                    if (!window.ProteriaBookingForm) return;
+
+                    if (!counter) admincommon.showMessage('@("check Booking Result waiting".ModLocalize("Waiting for the result"))');
+
+                    counter = counter || 1;
+
+                    var interval = 1500;
+
+                    if (counter > (120000 / interval)) {
+                        admincommon.showMessage('@("check Booking Result timed out".ModLocalize("Timed out"))', 1);
+                        $('#booking-loading').hide();
+                        return;
+                    }
+
+                    $('#booking-loading').show();
+
+                    ajaxREST('@ModuleUrl.AdminUrl(Html.GetController(), "GetShippingState", Model.OrderId)', 'GET', {}, 'booking-loading-fake',
+                        function (result) {
+                            if (result && result.Data && (result.Data.TrackingNumber || result.Data.Error || result.Data.Valid == false)) {
+                                $('#booking-loading').hide(); openProteriaBookingForm(true);
+                            }
+                            else setTimeout(function () { checkBookingResult(counter + 1); }, interval);
+                        });
+                }
+
+                $(function () { checkBookingResult(); })
+
+            </script>
+        }
+
+    }
+</div>
+
+<script type="text/javascript">
+    var errMsg = '@Regex.Replace(errMsg ?? "","\\s"," ")';
+
+    setTimeout(function () {
+        if (errMsg) admincommon.showMessage(errMsg, 'Error');
+    }, 500);
+
+</script>
+@*<script>
+    var bringProducts = [{ "Id": "1100", "Produkt": "Posten", "Sendingstype": "Bring Parcels", "Pakketype": "Klimanøytral servicepakke", "KreverEgenAvtale": "Nei" }, { "Id": "1101", "Produkt": "Posten", "Sendingstype": "Bring Parcels", "Pakketype": "Returservice Servicepakke", "KreverEgenAvtale": "Ja" }, { "Id": "1102", "Produkt": "Posten", "Sendingstype": "Bring Parcels", "Pakketype": "På Døren", "KreverEgenAvtale": "Nei" }, { "Id": "1105", "Produkt": "Posten", "Sendingstype": "Bring Parcels", "Pakketype": "Hjemlevering prosjekt", "KreverEgenAvtale": "Ja" }, { "Id": "1106", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "Bedriftspakke", "KreverEgenAvtale": "Nei" }, { "Id": "1108", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "Returservice Bedriftspakke", "KreverEgenAvtale": "Ja" }, { "Id": "1109", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "Bedriftspakke Ekspress over Natt", "KreverEgenAvtale": "Nei" }, { "Id": "1111", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "Returservice Bedriftspakke Ekspress", "KreverEgenAvtale": "Ja" }, { "Id": "1112", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "Postens Pallelaster", "KreverEgenAvtale": "Nei" }, { "Id": "1113", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "Bedriftspakke Flerkolli", "KreverEgenAvtale": "Nei" }, { "Id": "1114", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "Abonnement-transport", "KreverEgenAvtale": "Ja" }, { "Id": "1115", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "Cross Docking", "KreverEgenAvtale": "Ja" }, { "Id": "1116", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "Cross Docking Ekspress", "KreverEgenAvtale": "Ja" }, { "Id": "1117", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "Miljøretur", "KreverEgenAvtale": "Ja" }, { "Id": "1120", "Produkt": "Posten", "Sendingstype": "Bring Parcels", "Pakketype": "Minipakke", "KreverEgenAvtale": "Nei" }, { "Id": "1121", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn HomeShopping", "KreverEgenAvtale": "Nei" }, { "Id": "1122", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn HomeShopping Return", "KreverEgenAvtale": "Ja" }, { "Id": "1123", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn HomeShopping BulkSplit", "KreverEgenAvtale": "Ja" }, { "Id": "1124", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn HomeShopping BulkReturn", "KreverEgenAvtale": "Ja" }, { "Id": "1126", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn Business", "KreverEgenAvtale": "Nei" }, { "Id": "1127", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn Business Return", "KreverEgenAvtale": "Ja" }, { "Id": "1128", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn Business 09.00", "KreverEgenAvtale": "Nei" }, { "Id": "1129", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn Business Bulksplit 09.00", "KreverEgenAvtale": "Ja" }, { "Id": "1130", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn Business Bulksplit", "KreverEgenAvtale": "Ja" }, { "Id": "1131", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn Business Pallet", "KreverEgenAvtale": "Nei" }, { "Id": "1132", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn Business Pallet Return", "KreverEgenAvtale": "Ja" }, { "Id": "1134", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn Business Bulk Return", "KreverEgenAvtale": "Ja" }, { "Id": "1137", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn Business Pallet 09.00", "KreverEgenAvtale": "Nei" }, { "Id": "1138", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn Business EU-import", "KreverEgenAvtale": "Ja" }, { "Id": "1139", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "CarryOn HomeShopping EU-import", "KreverEgenAvtale": "Ja" }, { "Id": "1144", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "Pakke i postkassen med sporing", "KreverEgenAvtale": "Ja" }, { "Id": "1145", "Produkt": "Bring", "Sendingstype": "Bring Parcels", "Pakketype": "Pakke i postkassen uten sporing", "KreverEgenAvtale": "Ja" }, { "Id": "1200", "Produkt": "Bring", "Sendingstype": "Bring Cargo", "Pakketype": "Stykkgods (innenlands)", "KreverEgenAvtale": "Nei" }, { "Id": "1201", "Produkt": "Bring", "Sendingstype": "Bring Cargo", "Pakketype": "Partigods (innenlands)", "KreverEgenAvtale": "Nei" }, { "Id": "1202", "Produkt": "Bring", "Sendingstype": "Bring Cargo", "Pakketype": "Stykkgods (utenlands)", "KreverEgenAvtale": "Ja" }, { "Id": "1203", "Produkt": "Bring", "Sendingstype": "Bring Cargo", "Pakketype": "Flyfrakt", "KreverEgenAvtale": "Ja" }, { "Id": "1204", "Produkt": "Bring", "Sendingstype": "Bring Cargo", "Pakketype": "Sjøfrakt", "KreverEgenAvtale": "Ja" }, { "Id": "1205", "Produkt": "Bring", "Sendingstype": "Bring Cargo", "Pakketype": "Supply Base Truck", "KreverEgenAvtale": "Ja" }, { "Id": "1206", "Produkt": "Bring", "Sendingstype": "Bring Cargo", "Pakketype": "Supply Base Ship", "KreverEgenAvtale": "Ja" }, { "Id": "1207", "Produkt": "Bring", "Sendingstype": "Bring Cargo", "Pakketype": "Partigods (utenlands)", "KreverEgenAvtale": "Nei" }, { "Id": "1208", "Produkt": "Bring", "Sendingstype": "Bring Cargo", "Pakketype": "Cargo Bulk Split", "KreverEgenAvtale": "Nei" }, { "Id": "1209", "Produkt": "Bring", "Sendingstype": "Bring Cargo", "Pakketype": "Cargo Full Load", "KreverEgenAvtale": "Nei" }, { "Id": "1210", "Produkt": "Bring", "Sendingstype": "Bring Cargo", "Pakketype": "Transport", "KreverEgenAvtale": "Nei" }, { "Id": "1300", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Courier VIP", "KreverEgenAvtale": "Ja" }, { "Id": "1301", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Courier 1H", "KreverEgenAvtale": "Ja" }, { "Id": "1302", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Courier 2H", "KreverEgenAvtale": "Ja" }, { "Id": "1303", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Courier 4H", "KreverEgenAvtale": "Ja" }, { "Id": "1304", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Courier 6H", "KreverEgenAvtale": "Ja" }, { "Id": "1305", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Courier bicycle VIP", "KreverEgenAvtale": "Ja" }, { "Id": "1306", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Courier bicycle 1H", "KreverEgenAvtale": "Ja" }, { "Id": "1307", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Courier bicycle 2H", "KreverEgenAvtale": "Ja" }, { "Id": "1308", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Courier bicycle 4H", "KreverEgenAvtale": "Ja" }, { "Id": "1309", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Quickpack sameday", "KreverEgenAvtale": "Ja" }, { "Id": "1310", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Quickpack over night 0900", "KreverEgenAvtale": "Ja" }, { "Id": "1311", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Quickpack over night 1200", "KreverEgenAvtale": "Ja" }, { "Id": "1312", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Quickpack day certain", "KreverEgenAvtale": "Ja" }, { "Id": "1313", "Produkt": "Bring", "Sendingstype": "Bring Express", "Pakketype": "Quickpack express economy", "KreverEgenAvtale": "Ja" }];
+    var otherProducts = [{ "Id": "40", "Pakketype": "Schenker Stykkgods" }, { "Id": "41", "Pakketype": "Schenker Bedriftspakke" }, { "Id": "42", "Pakketype": "Schenker Partigods" }, { "Id": "43", "Pakketype": "Schenker Direkte distribusjon" }, { "Id": "44", "Pakketype": "Schenker Ekspress" }, { "Id": "70", "Pakketype": "Norsk Fraktbrev" }, { "Id": "71", "Pakketype": "Norsk Fraktbrev, Toten Transport" }, { "Id": "90", "Pakketype": "Budbilsending Standard" }, { "Id": "91", "Pakketype": "Budbilsending Express" }, { "Id": "92", "Pakketype": "Budbilsending Pall" }, { "Id": "93", "Pakketype": "Budbilsending VIP" }, { "Id": "94", "Pakketype": "Budbilsending Økonomi" }, { "Id": "95", "Pakketype": "Budbilsending Varetransport" }, { "Id": "96", "Pakketype": "Budbilsending Sykkel" }, { "Id": "101", "Pakketype": "PostNord Partloads (partifrakt)" }, { "Id": "102", "Pakketype": "PostNord Groupage (stykkgods)" }, { "Id": "103", "Pakketype": "PostNord DPD Innland" }, { "Id": "104", "Pakketype": "PostNord DPD Utland" }, { "Id": "105", "Pakketype": "PostNord MyPack Collect" }, { "Id": "106", "Pakketype": "PostNord Return Drop Off" }, { "Id": "107", "Pakketype": "PostNord MyPack Home" }, { "Id": "108", "Pakketype": "PostNord MyPack Home Small" }, { "Id": "109", "Pakketype": "PostNord Ekspress Neste Dag" }, { "Id": "110", "Pakketype": "PostNord Pallet" }, { "Id": "111", "Pakketype": "PostNord InNight" }, { "Id": "120", "Pakketype": "Brevpost innland" }, { "Id": "121", "Pakketype": "Brevpost utland" }, { "Id": "132", "Pakketype": "DHL Innland" }, { "Id": "150", "Pakketype": "Toten Transport Frakt Innland" }, { "Id": "151", "Pakketype": "Toten Transport Import" }, { "Id": "152", "Pakketype": "Toten Transport Export" }, { "Id": "153", "Pakketype": "Toten Transport Direkte Oslo" }, { "Id": "154", "Pakketype": "Toten Transport Ekspress" }, { "Id": "160", "Pakketype": "Ontime Logistics Stykkgods" }, { "Id": "161", "Pakketype": "Ontime Logistics Partigods" }, { "Id": "180", "Pakketype": "Eek Transport Stykkgods" }, { "Id": "181", "Pakketype": "Eek Transport Partigods" }, { "Id": "201", "Pakketype": "Nor Lines Stykkgods" }, { "Id": "202", "Pakketype": "Nor Lines Partigods" }, { "Id": "211", "Pakketype": "System-Transport Stykkgods" }, { "Id": "212", "Pakketype": "System-Transport Partigods" }, { "Id": "221", "Pakketype": "Best Transport Økonomi budbil" }, { "Id": "222", "Pakketype": "Best Transport Bud budbil" }, { "Id": "223", "Pakketype": "Best Transport Bud varebil" }, { "Id": "224", "Pakketype": "Best Transport Bud lastebil" }, { "Id": "225", "Pakketype": "Best Transport Express budbil" }, { "Id": "226", "Pakketype": "Best Transport Express varebil" }, { "Id": "227", "Pakketype": "Best Transport Express lastebil" }, { "Id": "228", "Pakketype": "Best Transport Vip budbil" }, { "Id": "229", "Pakketype": "Best Transport Vip varebil" }, { "Id": "230", "Pakketype": "Best Transport Distribusjon varebil" }, { "Id": "231", "Pakketype": "Best Transport Distribusjon rute" }, { "Id": "251", "Pakketype": "DSV Stykkgods" }, { "Id": "252", "Pakketype": "DSV Partigods" }, { "Id": "301", "Pakketype": "Toms Transport Økonomi" }, { "Id": "302", "Pakketype": "Toms Transport Bud" }, { "Id": "303", "Pakketype": "Toms Transport Ekspress" }, { "Id": "304", "Pakketype": "Toms Transport Vip" }, { "Id": "305", "Pakketype": "Toms Transport Lastebil" }, { "Id": "311", "Pakketype": "Oslo Budservice Bud 1 time" }, { "Id": "312", "Pakketype": "Oslo Budservice Bud 2 timer" }, { "Id": "313", "Pakketype": "Oslo Budservice Bud 3 timer" }, { "Id": "314", "Pakketype": "Oslo Budservice Vare 1 time" }, { "Id": "315", "Pakketype": "Oslo Budservice Vare 2 timer" }, { "Id": "316", "Pakketype": "Oslo Budservice Vare 3 timer" }, { "Id": "317", "Pakketype": "Oslo Budservice Bud ekspress" }, { "Id": "318", "Pakketype": "Oslo Budservice Vare ekspress" }, { "Id": "321", "Pakketype": "Speedy Distribusjon Liten vare" }, { "Id": "322", "Pakketype": "Speedy Distribusjon Vare" }, { "Id": "323", "Pakketype": "Speedy Distribusjon Stor vare" }, { "Id": "324", "Pakketype": "Speedy Distribusjon Liten lastebil" }, { "Id": "325", "Pakketype": "Speedy Distribusjon Lastebil kl. 1" }, { "Id": "326", "Pakketype": "Speedy Distribusjon Lastebil kl. 2" }, { "Id": "331", "Pakketype": "Skedsmo Bud og Vare Varebil" }, { "Id": "332", "Pakketype": "Skedsmo Bud og Vare Lastebil" }, { "Id": "341", "Pakketype": "Svipp Standard" }, { "Id": "351", "Pakketype": "Bjørgs Budbil og Transport Distribusjon" }, { "Id": "352", "Pakketype": "Bjørgs Budbil og Transport Budbil" }, { "Id": "353", "Pakketype": "Bjørgs Budbil og Transport Varetur" }, { "Id": "354", "Pakketype": "Bjørgs Budbil og Transport Ekspress" }, { "Id": "355", "Pakketype": "Bjørgs Budbil og Transport Vip" }, { "Id": "356", "Pakketype": "Bjørgs Budbil og Transport Pall" }, { "Id": "357", "Pakketype": "Bjørgs Budbil og Transport Lastebil" }, { "Id": "361", "Pakketype": "Hurtig-Gutta Bud" }, { "Id": "362", "Pakketype": "Hurtig-Gutta Vare" }, { "Id": "363", "Pakketype": "Hurtig-Gutta Stor vare" }, { "Id": "364", "Pakketype": "Hurtig-Gutta Express bud" }, { "Id": "365", "Pakketype": "Hurtig-Gutta Express vare" }, { "Id": "366", "Pakketype": "Hurtig-Gutta Express Stor vare" }, { "Id": "367", "Pakketype": "Hurtig-Gutta Lastebil" }, { "Id": "368", "Pakketype": "Hurtig-Gutta Express lastebil" }, { "Id": "369", "Pakketype": "Hurtig-Gutta Distribusjon" }, { "Id": "371", "Pakketype": "Pilotene Bud" }, { "Id": "372", "Pakketype": "Pilotene Vare" }, { "Id": "373", "Pakketype": "Pilotene Stor vare" }, { "Id": "374", "Pakketype": "Pilotene Timesbud" }, { "Id": "375", "Pakketype": "Pilotene Timesbud vare" }, { "Id": "376", "Pakketype": "Pilotene Ekspress" }, { "Id": "377", "Pakketype": "Pilotene Ekspress vare" }, { "Id": "378", "Pakketype": "Pilotene Ekspress vare stor" }, { "Id": "379", "Pakketype": "Pilotene Lastebil" }, { "Id": "381", "Pakketype": "ColliCare Bud - Direct" }, { "Id": "382", "Pakketype": "ColliCare Express Bud - Direct'" }, { "Id": "383", "Pakketype": "ColliCare Vare - Direct" }, { "Id": "384", "Pakketype": "ColliCare Express Vare - Direct" }, { "Id": "385", "Pakketype": "ColliCare Lastebil - Direct" }, { "Id": "386", "Pakketype": "ColliCare Trekker - Direct" }, { "Id": "387", "Pakketype": "ColliCare Container - Direct" }, { "Id": "388", "Pakketype": "ColliCare Direkte distribusjon - Direct" }, { "Id": "389", "Pakketype": "ColliCare Kranbil - Direct" }, { "Id": "390", "Pakketype": "ColliCare Stykkgods - Distribution" }, { "Id": "391", "Pakketype": "ColliCare Parti - Distribution" }, { "Id": "401", "Pakketype": "Ramberg Stykkgods" }, { "Id": "402", "Pakketype": "Ramberg Partigods" }, { "Id": "403", "Pakketype": "Ramberg Pall-priset gods" }, { "Id": "404", "Pakketype": "Ramberg Kolli-priset gods" }, { "Id": "411", "Pakketype": "Kirkestuen Stykkgods" }, { "Id": "421", "Pakketype": "Kjell Hansen Shipping Stykkgods" }, { "Id": "431", "Pakketype": "SR Transport Stykkgods" }, { "Id": "441", "Pakketype": "Xpressbud Bud" }, { "Id": "442", "Pakketype": "Xpressbud Ekspress" }, { "Id": "443", "Pakketype": "Xpressbud Distribusjon" }, { "Id": "444", "Pakketype": "Xpressbud VIP" }, { "Id": "445", "Pakketype": "Xpressbud Vare" }, { "Id": "461", "Pakketype": "Frode Pilskog Bud" }, { "Id": "462", "Pakketype": "Frode Pilskog Stykkgods" }, { "Id": "463", "Pakketype": "Frode Pilskog Ekspress" }, { "Id": "464", "Pakketype": "Frode Pilskog Parti" }, { "Id": "471", "Pakketype": "AtB Transport Budbil" }, { "Id": "472", "Pakketype": "AtB Transport Varebil" }, { "Id": "473", "Pakketype": "AtB Transport Stor varebil" }, { "Id": "474", "Pakketype": "AtB Transport Lastebil" }, { "Id": "475", "Pakketype": "AtB Transport Økonomi" }, { "Id": "476", "Pakketype": "AtB Transport Hastebil" }, { "Id": "481", "Pakketype": "24/7 Ekspress Rute: bestilling før 12:00" }, { "Id": "482", "Pakketype": "24/7 Ekspress Budbil" }, { "Id": "483", "Pakketype": "24/7 Ekspress Varebil" }, { "Id": "484", "Pakketype": "24/7 Ekspress Ekspress budbil" }, { "Id": "485", "Pakketype": "24/7 Ekspress Ekspress varebil" }, { "Id": "486", "Pakketype": "24/7 Ekspress Vip-bil omgående levering" }, { "Id": "487", "Pakketype": "24/7 Ekspress Lastebil" }, { "Id": "491", "Pakketype": "Singh Transport Budbil" }, { "Id": "492", "Pakketype": "Singh Transport Varebil" }, { "Id": "493", "Pakketype": "Singh Transport Stor varebil" }, { "Id": "494", "Pakketype": "Singh Transport Lastebil" }, { "Id": "495", "Pakketype": "Singh Transport Stor lastebil" }, { "Id": "496", "Pakketype": "Singh Transport Ekspress budbil" }, { "Id": "497", "Pakketype": "Singh Transport Ekspress varebil" }, { "Id": "498", "Pakketype": "Singh Transport Ekspress stor varebil" }, { "Id": "499", "Pakketype": "Singh Transport Ekspress lastebil" }, { "Id": "501", "Pakketype": "Budbilen Oslo Budbil" }, { "Id": "502", "Pakketype": "Budbilen Oslo Varebil" }, { "Id": "503", "Pakketype": "Budbilen Oslo Lastebil kl. 1" }, { "Id": "504", "Pakketype": "Budbilen Oslo Lastebil kl. 2" }, { "Id": "505", "Pakketype": "Budbilen Oslo Ekspress" }, { "Id": "506", "Pakketype": "Budbilen Oslo Timesbil" }, { "Id": "511", "Pakketype": "Trobud Budbil" }, { "Id": "512", "Pakketype": "Trobud Varebil" }, { "Id": "513", "Pakketype": "Trobud Varebil m/bakløft" }, { "Id": "514", "Pakketype": "Trobud Lastebil m/bakløft" }, { "Id": "521", "Pakketype": "Proff Logistikk Distribusjon" }, { "Id": "522", "Pakketype": "Proff Logistikk Nattdistribusjon" }, { "Id": "523", "Pakketype": "Proff Logistikk Ekspress" }, { "Id": "531", "Pakketype": "Kvikkas Budbil" }, { "Id": "541", "Pakketype": "RST Budbil" }, { "Id": "551", "Pakketype": "Transport-service Stykkgods" }, { "Id": "561", "Pakketype": "SpedTrans Stykkgods" }, { "Id": "571", "Pakketype": "Vennesla Transport Stykkgods" }, { "Id": "572", "Pakketype": "Vennesla Transport Partigods" }];
+</script>*@

@@ -1,0 +1,276 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model ProductModel
+@{
+
+    var properties = (List<PropertyModel>)ViewBag.Properties;
+}
+<style type="text/css">
+    #popupForm .htmlcontent input[type=text] {height: 24px;clear: left;}
+    .prop-val-form .prop-val-input-form {width: 240px;}
+    .var-property{padding-bottom: 5px; }
+    .var-property .css-labelcheck {margin-left: 4px; }
+    .var-property .var-prop-cbox{padding: 8px 3px 6px 3px;margin-right: 7px;border: 1px solid #ddd;}
+    .var-property .pval-list {
+        width: auto; max-width: 85%; border: 1px solid #DDD; padding: 0; margin-right: 7px;margin-bottom: 3px; max-height: 305px; overflow-y: auto;
+    }
+    .var-property .pval-list li{margin: 0;padding: 7px 10px;}
+    .var-property .pval-list li .name-color{ min-width: 40px; }
+    #popupForm .htmlcontent .prop-val-form .wr_submit_top {margin: 6px 0;}
+    #popupForm .htmlcontent .wr_submit_top li { margin-right: 0;height: 22px;padding-right: 4px; }
+    #popupForm .htmlcontent .wr_submit_top li input {
+        margin-top:-2px;padding: 0px 0px 0px 18px;vertical-align: middle; line-height: 1em; height: 24px; 
+    }
+    #popupForm .htmlcontent .wr_submit_top li input.btn_add { background-position: -8px -158px; }
+    #popupForm .htmlcontent .wr_submit_top li input.btn_cancel { background-position: -8px -272px; }
+    #popupForm .htmlcontent .wr_submit_top li input.btn_save { background-position: -8px -31px; }
+</style>
+<div>
+    <div class="controls">
+        <div id="sel-prop-list">
+            @foreach (var prop in properties)
+            { @RenderProperty(prop, true) }
+        </div>
+        <div class="wr-choose prop-form" style="margin-bottom: 40px">
+            <div class="prop-input-form" style="display: none;padding-top: 10px;border-top: 1px solid #DDD;">
+                @Html.LocalizeTextBoxFor(m => m.Opt.PropertyNameInput, new
+                {
+                    @id = "prop-name",
+                    @class = "prop-name",
+                    @datavalid = 0,
+                    @style = "min-width: 0px; width: 100px;float:left;",
+                    @placeholder = Html.LocalizeNameFor(m => m.Opt.PropertyNameInput),
+                })
+                @Html.LocalizeImageLoading(new { @id = "prop-loading" })
+                <input id="sel-prop-alias" type="hidden" />
+                <ul class="wr_submit_top remove-format">
+                    <li>
+                        <input value="@StringTable.Save" class="btn_save" type="button" />
+                    </li>
+                    <li style="margin-left: 4px;">
+                        <input value="@StringTable.Cancel" class="btn_cancel" type="button" />
+                    </li>
+                </ul>
+                <section style="clear: both">@Html.LocalizeValidationMessageFor(m => m.Opt.PropertyNameInput)</section>
+            </div>
+            <ul class="wr_submit_top remove-format">
+                <li>
+                    <input id="btn-add-prop" class="btn_add btn-add-prop" value="@StringTable.AddProperty" type="button">
+                </li>
+            </ul>
+        </div>
+        <script id="sel-prop-val-templ" type="text/prop-val-template">
+            @RenderPropVal(new PropValModel())
+        </script>
+        <script id="sel-prop-templ" type="text/prop-template">
+            @RenderProperty(new PropertyModel(), false)
+        </script>
+    </div>
+</div>
+
+<script type="text/javascript">
+
+    var selpropAddCounter = 0, popupForm = $('#popupForm');
+
+    selpropcboxInit(popupForm);
+    selpropvalBtnInit(popupForm);
+    formUpdateValidRules(popupForm);
+
+    $('.btn-add-prop', popupForm).unbind('click').click(function () {
+        var pvalForm = $(this).closest('.prop-form'), inputForm = pvalForm.find('.prop-input-form');
+        var node = $(this).closest('ul'), txtNode = pvalForm.find('.prop-name');
+        var aliasNode = $('#sel-prop-alias'), errNode = inputForm.find('span.error');
+
+        inputForm.show();
+        node.hide();
+
+        inputForm.find('input.btn_save')
+            .unbind('click')
+            .click(function () {
+
+                var name = $.trim(txtNode.val());
+
+                if (!txtNode.val(name).valid()) return;
+                else { errNode.html(''); AutoGenerateAlias(name, 'sel-prop-alias', true); }
+
+                ajaxREST('@ModuleUrl.AdminUrl("Property", "Input")', 'POST',
+                    { id: 0, code: aliasNode.val(), name: name, displayorder: 1000, lang: getFocusLang(), QuickAdd: true, InlineEdit: true }, 'prop-loading',
+                    function (result) {
+                        var errMsg = kendoGetResultError(result), row = result.Data[0];
+                        if (!errMsg) {
+                            var propEle = selpropAdd(row.Id, row.Name);
+                            $('#sel-prop-list').append(propEle);
+                            console.log($('#sel-prop-list'), propEle);
+                            selpropcboxInit(propEle);
+                            selpropvalBtnInit(propEle);
+                            selpropAddCounter++;
+                            txtNode.val(''); errNode.html(''); inputForm.hide(); node.show();
+                            dropDownCreateNewProp('temp-prop-' + row.Id, 0, row.DDOptionLabel);
+                        } else errNode.html(errMsg);
+                    }, function (e) { errNode.html('@StringTable.AjaxCommandErrorMessage'); });
+
+                return false;
+            });
+
+        inputForm.find('input.btn_cancel')
+            .unbind('click')
+            .click(function () { inputForm.hide(); node.show(); txtNode.val(''); errNode.html(''); });
+    });
+
+    function selpropvalBtnInit(holder) {
+
+        $('.btn-add-prop-val', holder).unbind('click').click(function () {
+            var pvalForm = $(this).closest('.prop-val-form'), inputForm = pvalForm.find('.prop-val-input-form');
+            var node = $(this).closest('ul'), txtNode = inputForm.find('.prop-val-name');
+            var aliasNode = $('#sel-prop-val-alias'), errNode = inputForm.find('span.error');
+
+            inputForm.show();
+            node.hide();
+
+            inputForm.find('input.btn_save')
+                .unbind('click')
+                .click(function () {
+
+                    var name = $.trim(txtNode.val());
+
+                    if (!txtNode.val(name).valid()) return;
+                    else { errNode.html(''); AutoGenerateAlias(name, 'sel-prop-val-alias', true); }
+
+                    var propId = node.closest('.var-property').attr('data-id');
+
+                    ajaxREST('@ModuleUrl.AdminUrl("PropVal", "Input")', 'POST',
+                        { id: 0, code: aliasNode.val(), name: name, displayorder: 1000, propertyId: propId, lang: getFocusLang(), QuickAdd: true, InlineEdit: true }, 'prop-val-loading',
+                        function (result) {
+                            var errMsg = kendoGetResultError(result), row = result.Data[0];
+                            console.log(result);
+                            if (!errMsg) {
+                                var pvalEle = selpropValAdd(row.Id, row.Name);
+                                node.closest('.var-property').find('ul.pval-list').show().append(pvalEle);
+                                //console.log(node.closest('.var-property').find('ul.pval-list'), pvalEle);
+                                txtNode.val('');
+                                errNode.html('');
+                                inputForm.hide();
+                                node.show();
+                                ddlistAddPropVal(propId, row.Id, row.Name);
+                            } else errNode.html(errMsg);
+                        }, function (e) { errNode.html('@StringTable.AjaxCommandErrorMessage'); });
+
+                    return false;
+                });
+
+            inputForm.find('input.btn_cancel')
+                .unbind('click')
+                .click(function () { inputForm.hide(); node.show(); txtNode.val(''); errNode.html(''); });
+        });
+    }
+
+    function selpropcboxInit(holder) {
+        $('.var-prop-cbox input', holder).unbind('click').click(function () {
+            var maxProps = parseInt('@VariantModel.MaxProps');
+            var propBox = $(this).closest('.var-property');
+
+            if ($(this).prop('checked')) {
+                propBox.find('.prop-val-form').show();
+                if (propBox.find('.pval-list li').length > 0) propBox.find('.pval-list').show();
+                else propBox.find('.pval-list').hide();
+            }
+            else propBox.find('.pval-list,.prop-val-form').hide();
+
+            var disUnchecked = $('.var-prop-cbox input[type=checkbox]:checked', holder).length >= maxProps;
+            var uncheckList = $('.var-prop-cbox input[type=checkbox]:unchecked', holder).closest('.var-property');
+            var propFrm = $('.prop-form', '#popupForm');
+            if (disUnchecked) { uncheckList.hide(); propFrm.hide(); }
+            else { uncheckList.show(); propFrm.show(); }
+        });
+    }
+
+    function selpropValAdd(id, name) {
+
+        var newItem = $('<div>').html($('#sel-prop-val-templ').html()).find('li');
+
+        newItem.attr({ 'data-id': id, 'data-name': name });
+        newItem.find('.prop-val-name').html(name);
+        newItem.find('input').attr('id', 'sel-prop-val-' + id).attr('name', 'sel-prop-val-' + id).val(id);
+        newItem.find('label').attr('for', 'sel-prop-val-' + id);
+
+        return newItem;
+    }
+
+    function selpropAdd(id, name) {
+
+        var newItem = $('<div>').html($('#sel-prop-templ').html()).find('div.var-property');
+        var cbox = newItem.find('.var-prop-cbox');
+
+        newItem.attr({ 'data-id': id, 'data-name': name });
+        cbox.find('.prop-name').html(name);
+        cbox.find('input').attr('id', 'sel-prop-' + id).attr('name', 'sel-prop-' + id).val(id);
+        cbox.find('label').attr('for', 'sel-prop-' + id);
+
+        newItem.find('.prop-val-input-form .prop-val-name').attr({ id: 'prop-val-name-' + id, name: 'prop-val-name-' + id });
+        newItem.find('.prop-val-input-form span.error').attr({ 'data-valmsg-for': 'prop-val-name-' + id });
+
+        return newItem;
+    }
+
+</script>
+
+@helper RenderProperty(PropertyModel prop, bool renderPropVals)
+{
+    <div class="wr-choose var-property" data-id="@prop.Id" data-name="@prop.Name">
+        <div class="tt-name bold var-prop-cbox ml0">
+            <span class="prop-name">@prop.Name</span><br>
+            <input name="sel-prop-@prop.Id" class="css-checkbox" id="sel-prop-@prop.Id" value="@prop.Id" type="checkbox">
+            <label class="css-labelcheck" for="sel-prop-@prop.Id"></label>
+        </div>
+        <div class="popup-variant">
+            <ul class="wr-color pval-list" style="display: none">
+                @if (renderPropVals)
+                {
+                    foreach (var pval in prop.GetPropVals(true))
+                    { @RenderPropVal(pval) }
+                }
+            </ul>
+            <div class="prop-val-form" style="display: none">
+                <div class="prop-val-input-form" style="display: none">
+                    @Html.Raw(Html.LocalizeTextBoxFor(m => m.Opt.PropValNameInput, new
+                    {
+                        @id = "prop-val-name-" + prop.Id,
+                        @class = "prop-val-name",
+                        @datavalid = 0,
+                        @style = "min-width: 0px; width: 90px;float:left",
+                        @placeholder = Html.LocalizeNameFor(m => m.Opt.PropValNameInput),
+                    }).Replace(new { name = "prop-val-name-" + prop.Id }))
+                    @Html.LocalizeImageLoading(new { @id = "prop-val-loading" })
+                    <input id="sel-prop-val-alias" type="hidden" />
+                    <ul class="wr_submit_top remove-format">
+                        <li>
+                            <input value="@StringTable.Save" class="btn_save" type="button" />
+                        </li>
+                        <li style="margin-left: 4px;">
+                            <input value="@StringTable.Cancel" class="btn_cancel" type="button" />
+                        </li>
+                    </ul>
+                    <section style="clear: both">
+                        <span class="error field-validation-error" data-validate="false" data-valmsg-for="prop-val-name-@prop.Id" data-valmsg-replace="true"></span>
+                    </section>
+                </div>
+                <ul class="wr_submit_top remove-format">
+                    <li>
+                        <input id="btn-add-prop-val-@prop.Id" class="btn_add btn-add-prop-val" value="@StringTable.AddValue" type="button">
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </div>
+}
+
+@helper RenderPropVal(PropValModel pval)
+{
+    <li class="name-color" data-id="@pval.Id" data-name="@pval.Name">
+        <div class="name-color"><span class="prop-val-name">@pval.Name</span></div><br>
+        <input name="sel-prop-val-@pval.Id" class="css-checkbox" id="sel-prop-val-@pval.Id" value="@pval.Id" type="checkbox">
+        <label class="css-labelcheck" for="sel-prop-val-@pval.Id"></label>
+    </li>
+}

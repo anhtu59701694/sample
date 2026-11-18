@@ -1,0 +1,146 @@
+﻿@using System.Text
+@using Claw.Core.Constants
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Core
+@using System.Linq
+
+@model AccountingModel
+@{
+    var lstScope = new List<string>(){
+        "AppFramework.All"
+        //"Sales.Reporting",
+        //"Sales.Quote",
+        //"Sales.Order",
+        //"Sales.Manager",
+        //"Sales.Invoice",
+        //"Sales.Admin"
+   };
+    var idx = 0;
+
+    var currentScopes = (Model.UniMicro.Scope ?? "").Trim().Split(' ');
+}
+<style>
+    .check_list {
+        height: 180px;
+    }
+
+    .txt-certpath {
+        width: calc(100% - 140px) !important;
+    }
+
+    #btnUpload {
+        height: 29px;
+        border-radius: 3px;
+        border: 1px solid #ccc;
+        padding: 0 13px;
+    }
+</style>
+<form action="@ModuleUrl.AdminUrl("Setting", "Accounting")" id="editForm" method="post">
+
+    @Html.ValidationSummary(true)
+
+    @if (SettingsBiz.GetSettings().Hidden.UniMicro)
+    {
+        <section class="row_content_box">
+            <section class="clo_left txt_align_r">
+                <h2>@Html.LocalizeNameFor(m => m.UniMicro)</h2>
+                <label></label>
+            </section>
+            <section class="clo_right col-right-eshop">
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.UniMicro.LoginUrl)</span>
+                    @Html.LocalizeTextBoxFor(m => m.UniMicro.LoginUrl, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.UniMicro.LoginUrl)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.UniMicro.BaseUrl)</span>
+                    @Html.LocalizeTextBoxFor(m => m.UniMicro.BaseUrl, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.UniMicro.BaseUrl)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.UniMicro.ClientId)</span>
+                    @Html.LocalizeTextBoxFor(m => m.UniMicro.ClientId, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.UniMicro.ClientId)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.UniMicro.CertPath)</span>
+                    @Html.LocalizeTextBoxFor(m => m.UniMicro.CertPath, new { @readonly = "readonly", @class = "txt-certpath" })
+                    <button type="button" id="btnUpload">@StringTable.UploadCert</button>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.UniMicro.CertPath)</section>
+                    <input id="fuCert" type="file" style="display: none;" />
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.UniMicro.CertPassword)</span>
+                    @Html.LocalizeTextBoxFor(m => m.UniMicro.CertPassword, new { @class = "", @type = "password" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.UniMicro.CertPassword)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.UniMicro.Scope)</span>
+
+                    <ul class="check_list" style="display: none;">
+                        @foreach (var scope in lstScope)
+                        {
+                            var isChecked = currentScopes.Contains(scope) ? "checked" : "";
+                            <li>
+                                <input id="scope_@(idx)" value="@scope" @isChecked class="css-checkbox" type="checkbox">
+                                <label for="scope_@(idx++)" class="css-labelcheck">@scope</label>
+                            </li>
+                        }
+                    </ul>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.UniMicro.Scope)</section>
+                    
+                        @Html.LocalizeTextBoxFor(m => m.UniMicro.Scope, new { @readonly = "readonly", @class = "" })
+                    
+                </section>
+            </section>
+        </section>
+    }
+</form>
+
+<script>
+    $(document).ready(function () {
+        $('.check_list :checkbox').change(function () {
+            var val = $.map($('.check_list :checkbox:checked'), function (item, idx) { return ($(item).val()); }).join(' ');
+
+            $('#UniMicro_Scope').val(val);
+        })
+
+        $('#btnUpload').click(function () {
+            $('#fuCert').click();
+        })
+
+        $('#fuCert').change(function () {
+            var file = $('#fuCert').val();
+
+            var formData = new FormData();
+            formData.append("file", $("#fuCert")[0].files[0]);
+
+            admincommon.showMask();
+
+            $.ajax({
+                async: true,
+                type: 'POST',
+                url: '/admin/modules/eshop/setting/CertUpload/',
+                data: formData,
+                success: function (result) {
+                    admincommon.hideMask();
+
+                    if (result.error == 0) {
+                        $('#UniMicro_CertPath').val(result.filePath);
+                        admincommon.showMessage(result.msg);
+                    }
+                    else {                        
+                        admincommon.showMessage(result.msg, 2);
+                    }
+
+                    $('#fuCert').val('');
+                },
+                cache: false,
+                contentType: false,
+                processData: false
+            });
+        })
+    })
+</script>

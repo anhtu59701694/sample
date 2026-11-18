@@ -1,0 +1,157 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model OrderModel
+@{
+    var settings = (SettingsBiz)ViewBag.Settings;
+
+    Model.BackOrderDetails.Action(m =>
+    {
+        var raw = m.GetRaw();
+        if (raw != null)
+        {
+            var backOrderQty = raw.Variant == null ? raw.Product.BackOrderQty : raw.Variant.BackOrderQty;
+            if (backOrderQty != 0 && raw.Product.Id != 1)
+            {
+                m.ProductName += string.Format(" [Backorder qty = -{0}]", backOrderQty);
+            }
+            
+            var dataExp = (IDictionary<string, object>)raw.Data.ToExpando();
+			var dataExp2 = dataExp != null && dataExp.Count != 0 ? dataExp.Where(x => !x.Key.InList("bundlevariantids", "bundleAccessoryids")).ToList() : null;
+			if (dataExp2 != null && dataExp2.Count != 0)
+			{
+			    m.ProductName += "[";
+                m.ProductName += dataExp2.Select(x => string.Format("{0}: {1}", ("odetail_datajson_" + x.Key).ModLocalize(), x.Value)).ToString(", ");
+                m.ProductName += "]";
+			}					
+        }
+    });
+}
+
+<style type="text/css">
+    #gridbackodetail .backorder-quantity{padding-left: 7px;margin: 0;width:90% !important}
+    #gridbackodetail .k-pager-wrap.k-widget{border-top: 1px solid #CCC !important;}
+</style>
+
+@{
+    var qtyTempl = Model.BackOrderDetails.Count == 0 ? "": Html.LocalizeTextBoxFor(m => m.BackOrderDetails[0].Quantity, new
+    {
+        @id = "qty-#:Iseq#",
+        @class = "backorder-cell backorder-quantity",
+        @data_bind = "Quantity",
+        @type = "number",
+    }).Replace(new { @name = "_BackOrderDetails[#:Iseq#].Quantity", @value = "#:Quantity#" })
+    + "<span class='error' data-valmsg-for='_BackOrderDetails[#:Iseq#].Quantity' data-valmsg-replace='true'></span>";
+
+    var imgTemplate = "<a href='#:safePropImg(ProductImage,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(ProductImage,\"Thumb\")#'/></a>";
+}
+<div class="wr_table_all" style="margin: 0;">
+    @(Html.LocalizeGridFor<BackOrderDetailModel>("gridbackodetail", "None", null, null, null, null, int.MaxValue, null, grid =>
+    {
+        grid.ButtonDelBigClass += "_backod";
+        grid.CheckBoxSelAllCss += "_backod";
+        grid.CheckBoxRowCssClass += "_backod";
+        grid.InputSearchId += "_backod";
+        grid.FormSearchId += "_backod";
+    })
+    .DataSource(m => m.Id, Model.BackOrderDetails)
+    //.ColumnCheckBox("Key", "_backod")
+    //.Paging(4, new int[] { 10, 20, 30, 50, 100 })
+    .Columns(grid => new[]
+    {
+        //grid.Col(m => m.ProductImage, false, 100)
+        //    .SetTemplate(imgTemplate)
+        //    .SetCssClass("txt_align_c image"),
+        grid.Col(m => m.ProductName)
+            .SetDefaultSort(true)
+            .SetTemplate("#:ProductName#")
+            .SetCssClass("name-pro2"),
+        grid.Col(m => m.OriginQty, false, 120)
+            .SetCssClass("td-right"),
+        grid.Col(m => m.Quantity, false, 120)
+            .SetTemplate(qtyTempl)
+            .SetCssClass("td-right"),
+        grid.Col(m => m.PriceInc, false, 120)
+            .SetCssClass("td-right")
+            .SetTemplate("#:safeProp(PriceInc,'Text')#"),
+    })
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridBackODetailCustom"; })
+    .ToMvcHtmlString())
+</div>
+
+<script type="text/javascript">
+
+    function gridBackODetailCustom(grid) {
+
+        $('#backorder-form-list > .backorder-form[data-valid=1]').each(function () {
+            var backodForm = $(this), row = backodGridGetRow(grid, 0, $(this).attr('data-key'));
+            if (row) {
+                var trNode = $('tr[data-uid=' + row.uid + ']', grid.element);
+
+                $('.backorder-cell', trNode).change(function() {
+                    if ($(this).is('input,textarea,select')) {
+                        if ($(this).valid()) {
+                            var field = $(this).attr('data-bind');
+                            if (field) backodBindInputField(backodForm, row, field, $(this).val());
+                        } else $(this).focus();
+                    }
+                });
+
+                $('.backorder-quantity', trNode).attr({
+                    'data-val-range-max': row.OriginQty,
+                    'data-val-range': '@StringTable.ErrMsgRangeLimit.ModErrLocalize().Replace("{1}","0")'.replace('{2}', row.OriginQty)
+                });
+
+                $(this).attr('data-uid', row.uid);
+                row.BackODForm = backodForm;
+            } else console.log('databound: row is null', $(this).attr('data-key'), backodForm);
+        });
+
+        //initImagePreview();
+
+        formUpdateValidRules(grid.element);
+
+        gridAdjustPopup(grid, '.wcontent', '.wr_clo1', null, null, null, 45);
+
+        if (grid.dataSource.total() == 0) $(".wr_table_all").hide();
+        else $(".wr_table_all").show();
+    }
+
+    function backodBindInputField(form, row, field, newVal) {
+
+        row[field] = newVal;
+        var inputField = form.find('.backorder-form-field[binding=' + field + ']');
+        inputField.val(newVal); console.log(inputField);
+    }
+
+    function backodGridGetRow(grid, id, key) {
+
+        if (id != null && id != 0) return grid.dataSource.get(id);
+        else return grid.dataSource.data().find(function (item) { return item.Key == key; });
+    }
+
+    function safePropImg(obj, propName) {
+        if (obj == null) return '@ImageModel.NoImg';
+        return obj[propName] || '';
+    }
+
+</script>
+
+<div id="backorder-form-list" style="display: none">
+    <input name="blockType" value="backorderdetails" type="hidden" />
+    @for (int i = 0; i < Model.BackOrderDetails.Count; i++)
+    {@RenderBackODetailForm(i)}
+</div>
+
+@helper RenderBackODetailForm(int idx)
+{
+    <div class="backorder-form" data-id="@Model.BackOrderDetails[idx].Id" data-key="@Model.BackOrderDetails[idx].Key" data-valid="1">
+        @Html.SimpleHiddenFor(m => m.BackOrderDetails[idx].Id, new { @class = "backorder-form-field" })
+        @Html.SimpleHiddenFor(m => m.BackOrderDetails[idx].OrderDetailId, new { @class = "backorder-form-field" })
+        @Html.SimpleHiddenFor(m => m.BackOrderDetails[idx].Quantity, new { @class = "backorder-form-field", @binding = "Quantity" })
+    </div>
+}

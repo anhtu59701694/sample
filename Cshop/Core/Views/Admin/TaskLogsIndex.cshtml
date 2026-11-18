@@ -1,0 +1,58 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Core
+@model IEnumerable<TaskLogModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.Title = StringTable.ManageTaskLogs;
+    //ViewBag.AddAction = "Add";
+    //ViewBag.UseInlineEdit = true;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/Eshop/TaskLog";
+    ViewBag.ParentBreadcrumbTitle = StringTable.ManageTaskLogs;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var tasks = (List<TaskModel>)ViewBag.Tasks;
+}
+
+<style type="text/css">
+
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageTaskLogs)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageTaskLogs)
+}
+
+@Html.AntiForgeryToken()
+@(Html.LocalizeGridFor("grid", Html.GetController())
+    .DataSource(m => m.Id, "List")
+    .Paging(10, new [] { 10, 20, 30, 50, 100 })
+    //.ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Id),
+        grid.Col(m => m.Data),
+        grid.Col(m => m.CreatedDate, true)
+            .SetTemplate("#:safeProp(CreatedDate,'TextF')#"),
+    })
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; })
+    .ToMvcHtmlString())
+
+<script type="text/javascript">
+
+    var grid = $('#grid'); 
+    
+    gridInit('#grid', true);
+
+    function gridCustom(grid) {
+
+    }
+
+</script>

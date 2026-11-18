@@ -1,0 +1,126 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Core
+@model IEnumerable<CurrencyModel>
+@{
+    Layout = "Layout/List.cshtml";
+    ViewBag.ControlSetting = true;
+
+    ViewBag.Title = StringTable.ManageCurrency;
+    ViewBag.AddAction = "Add";
+    ViewBag.UseInlineEdit = true;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/setting";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Settings;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+
+<style type="text/css">
+
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageCurrency)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageCurrency)
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<CurrencyModel> kgrid = null;
+
+ var rateTempl = @"<span class='price_1 size18'>#:safeProp(Rate,'Text')#</span>";
+}
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", "Input", null, "(function(e){gridOnInlineEditCustom(e);gridOnInlineEdit(e, '#DisplayOrder', gridRefreshRow);})")
+    .DataSource(m => m.Id, "List", null, null, "")
+    .Paging(10, new[] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Name,"Edit", m => m.Id, true)
+            .SetDefaultSort(true)
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+
+       grid.Col(m => m.Token,StringTable.CurrencyText,false, 100),
+
+       grid.Col(m => m.Rate,m => m.Rate, false, 150)
+            .SetTemplate(rateTempl),
+            
+       grid.Col(m => m.Default, false, 80)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-default"),
+            
+        grid.Col(m => m.Active, "", m => m.Id, false, 80)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-status"),
+    })
+    .ColumnCommand(grid => new[]
+    {
+        grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr"),
+        grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true),
+    }, 120)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid');
+    var statusActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "Enable"))';
+    var defaultActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "SetDefault"))';
+
+    gridInit('#grid', true, function (params) { return gridEagerLoadConfig(params, gridEagerItems); });
+
+    function gridCustom(grid) {
+
+        initGridStatusAction(grid, '.k-grid-status', statusActUrl,
+           function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+           function (row) { return { id: row.Id, active: row.Active }; });
+        
+        initGridStatusAction(grid, '.k-grid-default', defaultActUrl,
+           function (row) { return row.Default; }, function (row, value) { row.Default = value; },
+           function (row) { if (row.Default) setTimeout(function () { grid.clawSkipHideMsg = true; grid.dataSource.read(); }, 1000); return { id: row.Id, value: row.Default }; });
+
+        gridHideCell(grid, '.k-grid-Delete', function (row) { return row.Default || row.AnyOrder; });
+
+        gridDisableCheckBox(grid, function (row) { return row.Default || row.AnyOrder; });
+
+        $('tr', grid.element).each(function () {
+            $(this).dblclick(function (e) {
+                if (!grid.editable) grid.editRow($(this));
+            });
+        });
+        $(".k-grid-default a.enable").click(function() {
+            return false;
+        });
+        $('td.k-grid-default a.enable').closest('td').next().find('a.enable').click(function(){return false;});
+    }
+
+    function gridRefreshRow(grid, rowEle) {
+
+        initGridStatusAction(grid, rowEle.find('.k-grid-status'), statusActUrl,
+            function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+            function (row) { return { id: row.Id, active: row.Active }; });
+
+        initGridStatusAction(grid, rowEle.find('.k-grid-default'), defaultActUrl,
+            function (row) { return row.Default; }, function (row, value) { row.Default = value; },
+            function (row) { if (row.Default) setTimeout(function () { grid.clawSkipHideMsg = true; grid.dataSource.read(); }, 1000); return { id: row.Id, value: row.Default }; });
+
+        gridHideCell(grid, rowEle.find('.k-grid-Delete'), function (row) { return row.Default; });
+
+        gridDisableCheckBox(grid, function (row) { return row.Default; }, rowEle.find('.row-checkbox'));
+
+        rowEle.dblclick(function (e) {
+            if (!grid.editable) grid.editRow($(this));
+        });
+        $(".k-grid-default a.enable").click(function() {
+            return false;
+        });
+        $('td.k-grid-default a.enable').closest('td').next().find('a.enable').click(function(){return false;});
+    }
+
+</script>

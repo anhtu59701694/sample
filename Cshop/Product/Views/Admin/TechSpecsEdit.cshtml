@@ -1,0 +1,228 @@
+﻿@using System.Linq
+@using System.Web.UI.WebControls
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model TechSpecModel
+
+@{
+    Layout = "Layout/Input.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+
+    ViewBag.Title = StringTable.AddEditTechSpec(Model.Id);
+    ViewBag.ShowDeleteBtn = (Model != null && Model.Id > 0 && Model.Id != SettingsBiz.GetSettings().Hidden.OrderDetailDataTechspecId);
+    ViewBag.UseCKEditor = true;
+    //ViewBag.UseDatePicker = true;
+    ViewBag.UseDropZone = true;
+    ViewBag.TranslateMaxWidth = 700;
+    ViewBag.TranslateMaxHeight = 220;
+
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/TechSpec";
+    ViewBag.ParentBreadcrumbTitle = StringTable.TechSpec;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var languages = (List<Language>)ViewBag.Languages;
+    var versionSetting = VersionHelper.GetVersionSetting();
+    if (versionSetting != null)
+    {
+        if (versionSetting.Languages.Count > 0)
+        {
+            var lstLangCode = versionSetting.Languages.Select(p => p.Code.ToLower());
+            languages = languages.Where(p => lstLangCode.Contains(p.ShortLangCode.ToLower())).ToList();
+        }
+    }
+    var langOpt = LanguageMgr.ValidOptLang(Model.Id);
+    var langCode = langOpt.LanguageCode;
+
+    ViewBag.DZItemWidth = 120;//settings.Display.Category.Icon.Width;
+    ViewBag.DZItemHeight = 100;//settings.Display.Category.Icon.Height;
+}
+
+@if (!ViewBag.PermissionEdit)
+{
+    <style type="text/css">
+        .dz-preview-menu a {display: none;}
+    </style>
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageTechSpecs)
+}
+
+@section CurrentTitleSection {
+    <a href="/admin/modules/eshop/TechSpec/">@(StringTable.ManageTechSpecs)</a>
+}
+
+@section TabTitleSection {
+    @StringTable.AddEditTechSpec(Model.Id)
+}
+
+@using (@Html.BeginForm("Input", Html.GetController(), FormMethod.Post, new { @id = "editForm", enctype = "multipart/form-data" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(x => x.Id)
+
+    @Html.HiddenFor(x => x.Icon)
+    @Html.HiddenFor(x => x.IconThumb)
+    @Html.HiddenFor(x => x.IconFsUrl)
+
+    <section class="row-content-lang-box">
+        <section class="row_content_box">
+            <section class="clo_left txt_align_r">
+                <label class="font14 clear_fix mt_10">@StringTable.Icon (@settings.Display.Product.TechSpecIcon.GetTitleHint())</label>
+                <div>
+                    <input id="imageUpload" name="imageUpload" type="file" accept="image/*" style="display: none" />
+                    <div class="wr-img-sub">
+                        <div id="dropzone-form" class="dropzone single wr-upload-img-es" style="">
+                            <div class="wr-img-show">
+                                <div class="wr-upload-img-es mask-dropzone mask-dropzone-show" style="">
+                                    <span>@StringTable.AddOrDropImage</span>
+                                </div>
+                                <div class="dz-message" style="display: none"></div>
+                                <ul class="dropzone-preview-box" style=""></ul>
+                            </div>
+                            <div class="clear_fix"></div>
+                            <ul class="btn_center set-relative mb10">
+                                <li>
+                                    <input id="add-file" value="@StringTable.UploadImage" class="btn_update" type="button">
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div style="float: right"><span id="image-error-msg" class="error" style="cursor: pointer"></span></div>
+                </div>
+            </section>
+            <section class="clo_right col-right-eshop">
+                <div class="tab-style">
+                    <div id="lang-form-list"></div>
+                </div>
+                <section class="controls">
+                    <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.Name)</span>
+                    <section>
+                        @Html.LocalizeTextBoxFor(x => x.Name, new { @class = "js-required" })
+                    </section>
+                    <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Name)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.Description)</span>
+                    <section>
+                        @Html.LocalizeTextAreaFor(x => x.Description, new { @class = "ckeditor_standard" })
+                    </section>
+                    <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Description)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Featured)</span>
+                    <table>
+                        <tr>
+                            <td style="vertical-align: top">
+                                @Html.LocalizeRadioButtonFor(model => model.Featured, "true", new { @id = "IsFeaturedTrue", @class = "css-radio js-required" })
+                                <label for="IsFeaturedTrue" class="css-labelradio">@StringTable.Yes</label>
+                                @Html.LocalizeRadioButtonFor(model => model.Featured, "false", new { @id = "IsFeaturedFalse", @class = "css-radio js-required" })
+                                <label for="IsFeaturedFalse" class="css-labelradio">@StringTable.No</label>
+                            </td>
+                            <td>&nbsp;</td>
+                            <td><span class="error" style="display: none; float: left;">*</span></td>
+                        </tr>
+                    </table>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Active)</span>
+                    <table>
+                        <tr>
+                            <td style="vertical-align: top">
+                                @Html.LocalizeRadioButtonFor(model => model.Active, "true", new { @id = "IsActiveTrue", @class = "css-radio js-required" })
+                                <label for="IsActiveTrue" class="css-labelradio">@StringTable.Visible</label>
+                                @Html.LocalizeRadioButtonFor(model => model.Active, "false", new { @id = "IsActiveFalse", @class = "css-radio js-required" })
+                                <label for="IsActiveFalse" class="css-labelradio">@StringTable.Hidden</label>
+                            </td>
+                            <td>&nbsp;</td>
+                            <td><span class="error" style="display: none; float: left;">*</span></td>
+                        </tr>
+                    </table>
+                </section>
+                <section class="controls" style="margin-bottom: 0px;">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.DisplayOrder)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.DisplayOrder, new { @class = "js-required", @type = "number", @style = "float:left;" })
+                            <span class="error" style="display: none; float: left;">*</span>
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.DisplayOrder)</section>
+                    </section>
+                </section>
+
+            </section>
+        </section>
+
+    </section>
+    <section class="wr-line-eshop"></section>
+}
+
+<script type="text/javascript">
+    var form = $('#editForm')[0];
+
+    form.customValidFields = function () {
+        return true;
+    };
+
+    form.CustomLangFormSwitch = function (langcode, node, senderuid) {
+        var ownerbox = node.closest('.row_content_box');
+    };
+
+    $(function () {
+        var img = $('#@Html.IdFor(m => m.Icon)');
+        var imgThumb = $('#@Html.IdFor(m => m.IconThumb)');
+        var imgFsUrl = $('#@Html.IdFor(m => m.IconFsUrl)');
+        var imgErrMsg = $('#image-error-msg').click(function () { $(this).html(''); });
+
+        var dzEle = dropzoneInit('#dropzone-form', '#imageUpload', '#add-file',
+            { acceptedFiles: '@settings.Display.Admin.Image.Extensions.GetFileExtensionDropZone(false)' },
+            function (result) {
+                $("#dropzone-form .mask-dropzone-show").hide();
+                img.val(result.Image.FileName);
+                imgThumb.val(result.Image.ThumbUrl);
+                imgFsUrl.val(result.Image.FilePath);
+            }, function (file, e) {
+                $("#dropzone-form .mask-dropzone-show").show(); img.val(''); imgThumb.val(''); imgFsUrl.val('');
+                setImageErrMsg(imgErrMsg, e.Message + ' (' + file.name + ')');
+            });
+
+        var dropzone = dzEle[0].dropzone;
+        dropzone.on("removedfile", function (file) {
+            if (file.status == "success") {
+                $("#dropzone-form .mask-dropzone-show").show();
+                img.val("");
+                imgThumb.val("");
+                imgFsUrl.val("");
+                $('#editform-change-state').val(1).change();
+            }
+        });
+
+        dropzone.on("addedfile", function (file) {
+            var node = $(file.previewElement).find('img[data-dz-thumbnail]');
+            $(file.previewElement).find('.image-edit').unbind('click').click(function () {
+                aviaryInit($('#@Html.IdFor(m => m.IconFsUrl)'), [$('#@Html.IdFor(m => m.Icon)'), $('#@Html.IdFor(m => m.IconThumb)'), node]);
+            });
+        });
+
+        if ($.trim(img.val()) != '') {
+            $("#dropzone-form .mask-dropzone-show").hide();
+            dropzoneAdd(dzEle[0].dropzone, imgFsUrl.val(), img.val(), imgFsUrl.val(), imgThumb.val(), 'image/*');
+        }
+        //setTimeout(function () { initMsTranslator('no-loading-image'); }, 1000);
+    });
+
+    function setImageErrMsg(node, msg) {
+        node.html(msg);
+        setTimeout(function () { node.html(''); }, 10000);
+    }
+
+</script>
+
+@Html.JsBundle("~/claw/page.claw.plugin.js", false, "~/content/plugin/aviary/feather.js",
+    "~/scripts/claw.page/page.edit.plugin.js")
+

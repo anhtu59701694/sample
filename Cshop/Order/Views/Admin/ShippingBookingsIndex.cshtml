@@ -1,0 +1,83 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model IEnumerable<ShippingBookingModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.OrderEdit;
+    ViewBag.Title = StringTable.ManageShippingBookings;
+    ViewBag.AddAction = "Add";
+    //ViewBag.UseInlineEdit = true;
+    //ViewBag.ShowFilterBox = true;
+    ViewBag.ShowSearchBox = true;
+    
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/Eshop/order";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Orders;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+ 
+<style type="text/css">
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageShippingBookings)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageShippingBookings)
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<ShippingBookingModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController())
+    .DataSource(m => m.Id, "List", null, null, "gridGetParams")
+    .Paging(10, new [] { 10, 20, 30, 50, 100 })
+    //.ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.RecipientName, "Edit", m => m.Id, true),
+        grid.Col(m => m.AddressInfo),
+        grid.Col(m => m.RecipientNotiMobile, true),
+        grid.Col(m => m.RecipientNotiEmail, true)
+            .SetTemplate("<a class='k-grid-link' href='mailto\\:#:RecipientNotiEmail#'>#:RecipientNotiEmail#</a>"),
+        grid.Col(m => m.BookingId),
+        grid.Col(m => m.LabelUrl)
+            .SetTemplate("<a class='k-grid-link' target='_blank' href='#:LabelUrl#'>#:LabelUrl#</a>"),
+        grid.Col(m => m.TrackingUrl)
+            .SetTemplate("<a class='k-grid-link' target='_blank' href='#:TrackingUrl#'>#:TrackingUrl#</a>"),
+        grid.Col(m => m.CreatedDate.Text, m => m.CreatedDate, true, 130),
+    })
+    .ColumnCommand(grid => new[]
+    {
+        grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr", false, StringTable.Edit),
+        //ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true, StringTable.Delete) : null,
+    }.Where(x => x != null).ToArray())
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid'), permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function gridCustom(grid) {
+
+    }
+
+    function gridGetParams(grid, e) {
+        return { };
+    }
+
+    function onFilterChange() {
+        grid.data('kendoGrid').dataSource.page(1);
+    }
+
+</script>

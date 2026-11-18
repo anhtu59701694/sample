@@ -1,0 +1,1433 @@
+﻿@using System.Dynamic
+@using Claw.Controls.DifferText
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@using Domain = Claw.Modules.Eshop.Domain
+@model OrderModel
+@{
+    var langCode = (string)ViewData["LangCode"];
+    var offer = Html.GetController().InList("Offer");
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var templOrderDetail = (OrderDetailModel)ViewBag.TemplOrderDetail;
+    var editMode = Model.Id == 0 || offer || (Model.OrderStatus.InList(OrderStatus.New, OrderStatus.Processing) && Model.GetRaw().CanUpdateOrder());
+    var dataJsonDic = new Dictionary<string, string>();
+
+    if (settings.Hidden.OrderDetailDataJson && Model.OrderDetails.Any(m => m.DataExp != null))
+    {
+        foreach (IDictionary<string, object> itm in Model.OrderDetails.Where(m => m.DataExp != null).Select(m => m.DataExp))
+        {
+            foreach (var k in itm.Keys)
+            {
+                if (!dataJsonDic.ContainsKey(k)) { dataJsonDic.Add(k, ("odetail_datajson_" + k).ModLocalize(k)); }
+            }
+        }
+    }
+
+    Dictionary<string, Dictionary<string, object>> odetailDataDic = null;
+    var offerView = offer && Model.CartOrderId > 0 && (Model.OfferEmailSent ?? true);
+
+    if (offerView)
+    {
+        var db = new DefaultDb();
+        odetailDataDic = new Dictionary<string, Dictionary<string, object>>();
+        Model.OrderDetails.Action(m =>
+        {
+            var prod = Claw.Modules.Eshop.Product.DAL.ProductMgr.GetDom(db, m.ProductId ?? 0);
+            var vari = Claw.Modules.Eshop.Product.DAL.VariantMgr.GetDom(db, m.VariantId ?? 0);
+            var itm = new Dictionary<string, object>();
+            odetailDataDic[m.Key] = itm;
+            itm["ProductQty"] = vari == null ? prod.SafeProp(z => z.Quantity) : vari.Quantity;
+            itm["ProductStatusName"] = vari == null
+                ? (prod != null && (m.VariantId ?? 0) == 0 ? prod.ProductStatus.Name : string.Format("<span style='color:red'>{0}</span>", "Deleted".ModLocalize()))
+                : vari.ProductStatus.Name;
+            itm["AllowBackorder"] = prod.SafeProp(z => z.AllowBackorder);
+            itm["VisibleWeb"] = prod == null || 0 != (prod.Visibility & (byte)VisibilityType.Web) ? (vari == null || vari.Active ? "1" : "") : "";
+        });
+    }
+}
+
+<script src="@(Globals.ResolveClientUrl(LanguageMgr.KendoPath))/kendo.combobox.js"></script>
+
+<style type="text/css">
+    #gridorderdetail .k-detail-row .k-grid .k-grid-header { display: none; }
+    #gridorderdetail .k-detail-row { padding: 0 !important; }
+    #gridorderdetail .k-detail-cell { padding: 0 !important; }
+    #gridorderdetail .k-detail-cell .gift-name { margin-left: 36px; }
+    #gridorderdetail .k-detail-cell .gift { color: gray; text-align: center; }
+    #gridorderdetail .odetail-edit { display: none; }
+    #gridorderdetail .odetail-view .odetail-coupon{display: none;}
+    #gridorderdetail .odetail-view .odetail-discount{display: none;}
+    #gridorderdetail .odetail-coupon, #gridorderdetail .odetail-discount{font-size: smaller; font-style: italic;}
+    #gridorderdetail .odetail-view .odetail-sku[data-sku=''] {display: none;}
+    #gridorderdetail .odetail-view a.grid-row-edit {display: inline;float: none;}
+    #gridorderdetail .odetail-view a.grid-row-edit.deleted {cursor: default;}
+    #gridorderdetail .odetail-view a.grid-row-edit.deleted:hover {text-decoration: none;}
+    #gridorderdetail .price-origin[data-val='1']{display: block;text-decoration:line-through;font-size:smaller;font-style:italic;color:#666;line-height:1.1em;}
+    #gridorderdetail .price-origin[data-val='0']{display: none;}
+    #gridprodsel .k-pager-sizes.k-label { white-space: nowrap; }
+    #gridprodsel td.image, #gridorderdetail td.image{padding: 3px;}
+    #gridprodsel .price_2{font-size: small; padding: 0px 1px;}
+    #gridprodsel .k-detail-cell .price_2{margin-left: 5px;}
+    #gridprodsel .prod-status .backorder, #gridorderdetail .k-grid-ProductQty .backorder {color: goldenrod;font-size: smaller;font-style: italic;}
+    #gridprodsel .prod-status .status,#gridorderdetail .k-grid-ProductQty .prodstatus{color: red;font-size: smaller;font-style: italic;float:left;}
+    #gridprodsel .prodstatus,#gridorderdetail .k-grid-ProductQty .status{color: gray;font-size: smaller;font-style: italic;}
+    #gridprodsel .k-grid-Quantity{vertical-align:top;}
+    #gridorderdetail .k-grid-ProductQty .qty{text-align:right;}
+    #gridorderdetail .k-grid-ProductQty .borderstatus,#gridorderdetail .k-grid-ProductQty .prodstatus,#gridorderdetail .k-grid-ProductQty .status{text-align:right !important;float:none !important;}
+    .odetail-datajson ul{ list-style:none;}
+    .odetail-datajson li{ display:inline-block;}
+    .odetail-datajson .name{font-style:italic;font-size:smaller;color:blueviolet;}
+    .odetail-datajson .value{font-style:italic;font-size:smaller;color:brown;}
+    .odetail-datajson .value{font-style:italic;font-size:smaller;color:brown;word-wrap:anywhere;word-break:break-all;}
+    .odetail-datajson .giftcard a{font-style:italic;font-size:smaller;color:brown;word-wrap:anywhere;word-break:break-all; padding: 0 !important; line-height: 1em;}
+    #gridorderdetail .k-grid-ProductQty div{ min-width:0; width:71px !important; }
+    #gridorderdetail .k-grid-ProductQty .od-qty{ min-width: 0 !important; margin: 0; text-align:right; }
+    #gridorderdetail .k-grid-ProductQty div[data-backqty='0'] .od-backqty { display:none; } 
+    #gridorderdetail .k-grid-ProductQty div[data-backqty='1'] .od-backqty { min-width: 0; width: 35px;margin: 0;border-left: none; }
+    #gridorderdetail .k-grid-ProductQty div[data-backqty='1'] .od-qty { width: 31px !important; padding-left: 0 !important; }
+    #gridorderdetail .k-grid-Tags .k-combobox { width:120px; }
+    #gridorderdetail input[type=number].odetail-cell {padding: 0 3px 0 5px;margin: 0;height: 26px;}
+    #gridorderdetail .odetail-bundle ul{}
+    #gridorderdetail .odetail-bundle li{color:#777;font-size:small;}
+    #gridorderdetail .odetail-bundle li .name {float:none;color:#777;padding:0;}
+    #gridorderdetail .odetail-bundle li .name:hover {text-decoration:underline;}
+    #gridorderdetail .name-pro2.offer-view .odetail-view {display:block !important}
+    #gridorderdetail .name-pro2.offer-view .odetail-edit {display:none !important}
+    #gridorderdetail .shoppingqty {font-size: small;}
+    #gridorderdetail div[data-shoppingqty='0'] .shoppingqty {display:none;}
+    #gridorderdetail .serial{font-size: smaller;color:#333;font-style: italic}
+</style>
+@if (!settings.Hidden.ShoppingProduct)
+{
+    <style type="text/css">
+        #gridorderdetail .shoppingqty {display:none !important;}
+    </style>
+}
+else
+{
+    <style type="text/css">
+        #gridorderdetail div[data-shoppingqty='1'] input {max-height:1.4em;}
+    </style>
+}
+@{
+    Model.OrderDetails.Insert(0, templOrderDetail);
+
+    var imgTemplate = "<a href='#:safePropImg(ProductImage,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(ProductImage,\"Thumb\")#'/></a>";
+    var imgTemplatePopup = "<a href='#:safePropImg(Image,\"FsUrl\")#' class='preview'><img id='sel_thumb_#:Id#' src='#:safePropImg(Image,\"Thumb\")#'/></a>";
+    var imgVariantTempl = "<a href='#:ImageFsUrl#' class='preview'><img id='vari_thumb_#:Id#' src='#:ImageThumb#'/></a>";
+
+    var priceIncTempl = "<span class='odetail-view'>#:odetailCurrencyToString(safeProp(PriceInc,'Text'))#</span><div class='odetail-edit'>"
+    + Html.LocalizeTextBoxFor(m => m.OrderDetails[0].PriceInc, new
+    {
+        @id = "priceinc-#:Key#",
+        @dataid = "#:Id#",
+        @class = "odetail-cell odetail-priceinc",
+        @data_bind = "PriceInc_Text",
+        @onchange = "",
+    }).Replace(new { @name = "_OrderDetails[#:Iseq#].PriceInc", @value = "#:safeProp(PriceInc,'Text')#" })
+    + "<span class='error' data-valmsg-for='_OrderDetails[#:Iseq#].PriceInc' data-valmsg-replace='true'></span>"
+    + "</div>";
+
+    var quantityTempl = "<span class='odetail-view'>#:Quantity#</span><div class='odetail-edit'>"
+    + Html.LocalizeTextBoxFor(m => m.OrderDetails[0].Quantity, new
+    {
+        @id = "quantity-#:Key#",
+        @dataid = "#:Id#",
+        @class = "odetail-cell odetail-quantity",
+        @data_bind = "Quantity",
+        @style = "width:60px !important",
+        @type = "number",
+        @min = "0"
+    }).Replace(new { @name = "_OrderDetails[#:Iseq#].Quantity", @value = "#:Quantity#" })
+    + "<span class='error' data-valmsg-for='_OrderDetails[#:Iseq#].Quantity' data-valmsg-replace='true'></span>"
+    + Html.LocalizeImageLoading(new { @id = "checking-discount-#:Key#" })
+    + "</div>";
+
+    var couponcodeTempl = Html.LocalizeTextBoxFor(m => m.OrderDetails[0].CouponCode, new
+    {
+        @id = "couponcode-#:Key#",
+        @class = "odetail-cell odetail-couponcode",
+        @data_bind = "CouponCode",
+        @style = "width:60px !important"
+    }).Replace(new { @name = "_OrderDetails[#:Iseq#].CouponCode", @value = "#:ifnull(CouponCode)#", @data_val_regex_pattern = "[0-9a-zA-Z%2d]%2b" })
+    + "<span class='error' data-valmsg-for='_OrderDetails[#:Iseq#].CouponCode' data-valmsg-replace='true'></span>"
+    + Html.LocalizeImageLoading(new { @id = "checking-couponcode-#:Key#" });
+
+    var nameTempl = "<div class='odetail-view'><a class='grid-row-edit #:ProductDeleted ? 'deleted': '' # ' productid='#:ProductId#' href='javascript:void(0)' recontroller='Order' title='" + StringTable.Edit + "' target='_blank'>#:ProductName#</a> <span class='odetail-sku' data-sku='#:(ProductSKU||'')#'>("
+        + Html.LocalizeNameFor(m => m.OrderDetails[0].ProductSKU)
+        + "\\: #:(ProductSKU||'')#)</span> <div class='odetail-datajson'>#=odetailFormatData(DataExp, OrderGiftCards, SerialNumber, OrderDetailBundles)#</div> <div class='odetail-bundle'>#=odetailFormatBundle(OrderDetailBundles)#</div> <div class='odetail-coupon'>#:ProductShippingTypeText#</div></div>"
+        + "<div class='odetail-edit'>"
+        + Html.LocalizeTextBoxFor(m => m.OrderDetails[0].ProductName, new
+        {
+            @id = "productname-#:Key#",
+            @dataid = "#:Id#",
+            @class = "odetail-cell odetail-productname",
+            @data_bind = "ProductName",
+            @style = "width:100% !important"
+        }).Replace(new { @name = "_OrderDetails[#:Iseq#].ProductName", @value = "#:ifnull(ProductName)#" })
+        + "<span class='error' data-valmsg-for='_OrderDetails[#:Iseq#].ProductName' data-valmsg-replace='true'></span>"
+        + "</div>";
+
+    var vatTempl = "<span class='odetail-view'>#:localizeFloatToString(Vat.Value*100,'n2')# %</span><div class='odetail-edit'>"
+        + Html.LocalizeTextBoxFor(m => m.OrderDetails[0].Vat, new
+        {
+            @id = "vat-#:Key#",
+            @dataid = "#:Id#", @productid = "#:ProductId#",
+            @class = "odetail-cell odetail-vat",
+            @data_bind = "Vat_Text",
+            @style = "width:60px !important",
+        }).Replace(new { @name = "_OrderDetails[#:Iseq#].Vat", @value = "#:safeProp(Vat, 'Text')#" })
+        + "<span class='error' data-valmsg-for='_OrderDetails[#:Iseq#].Vat' data-valmsg-replace='true'></span>"
+        + "</div>";
+
+    Model.OrderDetails.Remove(templOrderDetail);
+
+    var originPriceIncTempl = offer
+        ? @"# if (safeProp(OriginSalePriceInc, 'Value') > 0) { # 
+           <span class='odetail-view line-through'>#:odetailCurrencyToString(safeProp(PriceOriginExInc,'Value'))#</span>
+           <span class='odetail-view'>#:odetailCurrencyToString(safeProp(OriginSalePriceInc,'Value'))#</span> 
+           # }  else{#<span class='odetail-view'>#:odetailCurrencyToString(safeProp(PriceOriginExInc,'Value'))#</span>#} #"
+        : "<span class='odetail-view'>#:odetailCurrencyToString(safeProp(OriginPriceInc,'Value'))#</span><span class='odetail-view price-origin' data-val='#:safeProp(PriceOriginInc,'Value') > 0 ? 1 : 0 #'>#:odetailCurrencyToString(safeProp(PriceOriginInc,'Value'))#</span>";
+    var priceExcTempl = "<span class='odetail-view'>#:odetailCurrencyToString(odetailGetPriceDisc(Price, DiscountValue, Vat))#</span><span class='odetail-view price-origin' data-val='#:safeProp(PriceOrigin,'Value') > 0 ? 1 : 0 #'>#:odetailCurrencyToString(safeProp(PriceOrigin,'Text'))#</span>";
+    var totalExcTempl = "<span class='odetail-view'>#:odetailCurrencyToString(safeProp(Total_Exc,'Value'))#</span>";
+    var totalIncTempl = @"<div class='odetail-view'>#:odetailCurrencyToString(safeProp(Total_Inc,'Value') - safeProp(DiscountValue,'Value')*Quantity)#
+    <div class='price-origin' data-val='#:safeProp(PriceOriginInc,'Value') > 0 ? 1 : 0 #'>#:odetailCurrencyToString(safeProp(PriceOriginInc,'Value')*Quantity)#</div>
+    <div class='odetail-coupon' data-val='#: safeProp(CouponValue,'Value') ? 1 : 0 #'>(#:odetailCurrencyToString(-1*Quantity*safeProp(CouponValue,'Value'))#)</div>
+    <div class='odetail-discount' data-val='#: safeProp(DiscountValue,'Value') ? 1 : 0 #'>(#:odetailCurrencyToString(-1*Quantity*safeProp(DiscountValue,'Value'))#)</div></div>";
+
+    //var nameTempl = "<div class='odetail-view'>#:ProductName# <div class='odetail-coupon'>#:ProductShippingTypeText#</div></div>";
+}
+
+<div class="wr_table_all" id="order-details" style="float: left; width: 100%; margin-bottom: 5px;">
+    @(Html.LocalizeGridFor<OrderDetailModel>("gridorderdetail", "Product", "Delete", null, null, null, int.MaxValue,
+    /*"gridorderdetailInitDetail"*/null, grid =>
+                                   {
+                                       grid.ButtonDelBigClass += "_odetail";
+                                       grid.ButtonAddNewClass += "_odetail";
+                                       grid.CheckBoxSelAllCss += "_odetail";
+                                       grid.CheckBoxRowCssClass += "_odetail";
+                                   })
+    .DataSource(m => m.Id, Model.OrderDetails)
+    //.Paging(10, new[] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Key)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.ProductImage, false, 50)
+            .SetTemplate(imgTemplate)
+            .SetCssClass("txt_align_c image"),
+
+        grid.Col(m => m.ProductName, "Edit", m => m.ProductId)
+            .SetTemplate(nameTempl)
+            .SetCssClass("name-pro2" + (offerView ? " offer-view" : "")),
+
+        grid.Col(m => m.Vat, false, 70)
+            .SetCssClass("td-right")
+            .SetTemplate(vatTempl),
+
+        offer
+        ? grid.Col(m => m.CostPriceInc).SetTemplate("#:odetailCurrencyToString(safeProp(CostPriceInc, 'Value'))#").SetCssClass("td-right")
+        : null,
+
+        editMode
+        ? grid.Col(m => m.OriginPriceInc, Html.LocalizeName(new OrderDetailModel(), m => m.PriceInc), false, 120).SetTemplate(originPriceIncTempl).SetCssClass("td-right")
+        : null,
+
+        grid.Col(m => m.PriceInc, StringTable.DiscountPriceInc, false, 120).SetTemplate(priceIncTempl),
+        grid.Col(m => m.Price, false, 120).SetTemplate(priceExcTempl).SetCssClass("td-right"),
+
+        grid.Col(m => m.Quantity, false, 80)
+            .SetTemplate(quantityTempl),
+
+        offerView
+        ? grid.Col(m => m.ProductQty, false, 80)
+            .SetCssClass("k-grid-ProductQty")
+            .SetTemplate(@"<div class=status>#=odetailDataDic[Key]['ProductStatusName']#</div> 
+                <div class=qty>#:odetailDataDic[Key]['ProductQty']#</div> 
+                <div class=borderstatus>#=odetailDataDic[Key]['AllowBackorder'] ? '<span class=backorder>" + "Backorder".ModLocalize() + @"</span>' : '' #
+                #=odetailDataDic[Key]['VisibleWeb'] ? '': '<span class=prodstatus>" + "Inactive".ModLocalize() + "</span>' #</div>")
+        : grid.Col(m => m.ProductQty, false, 80)
+            .SetCssClass("k-grid-ProductQty")
+            .SetTemplate(string.Format(@"<div data-backqty='#:(ProductBackQty ? 1 : 0)#' data-shoppingqty='#:(ProductShopQty ? 1 : 0)#'>
+            <input value='#:ifnull(ProductQty)#' class='od-qty' type='text' disabled=disabled />
+            <input value='- #:ifnull(ProductBackQty)#' class='od-backqty' type='text' disabled=disabled />
+            <div class='shoppingqty'>#:ProductShopQty# {0}</div>
+            </div>", Html.LocalizeName(templOrderDetail, m => m.ProductShopQty))),
+          
+        //grid.Col(m => m.ProductStatusName, false, 80)
+        //    .SetCssClass("k-grid-ProductStatus"),
+            
+        Model.Id == 0 || offer
+        ? null
+        : grid.Col(m => m.Tags, false, 120)
+            .SetCssClass("k-grid-Tags")
+            .SetTemplate("<input name='Tags#:Id#' id='Tags-#:Id#' value='#:(Tags || \"\")#' class='odetail-cell odetail-tags' data-bind='Tags' maxlength='500' type='text' />"),
+
+        offer ? null : grid.Col(m => m.Total_Exc, false, 140)
+            .SetTemplate(totalExcTempl)
+            .SetCssClass("td-right"),
+
+        grid.Col(m => m.Total_Inc, false, 140)
+            .SetTemplate(totalIncTempl)
+            .SetCssClass("td-right"),
+
+        //grid.Col(m => m.CouponCode)
+        //    .SetTemplate(editMode?couponcodeTempl:"#:ifnull(CouponCode)#"),
+        //grid.Col(m => m.CouponValue)
+        //    .SetTemplate("#:safeProp(CouponValue,'Text')#"),
+        //grid.Col(m => m.DiscountId),
+            //.SetTemplate("#:safeProp(DiscountValue,'Text')#"),
+        //Model.Id == 0 ? null : grid.Col(m => m.Delivered)
+        //    .SetCssClass("k-grid-delivered")
+        //    .SetTemplate(StringTable.BoolTempl),
+    }.Where(x => x != null).ToArray())
+    .ColumnCommand(grid => new[]
+    {
+        editMode && !offer && Model.Id != 0 ? grid.Cmd(m => m.Id, "(function(uid){ odetailMakeRowEditable(uid); })", "Edit", "edit_fr", false, null, true) : null,
+        editMode && !offer? grid.Cmd(m => m.Id, "gridorderdetailOnDelete", "Delete", "delete_fr", false, null, true) : null
+    }.Where(x => x != null).ToArray(), 80)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridOrderDetailCustom"; })
+    .ToMvcHtmlString())
+    @if (Model.Id != 0 && !offer)
+    {
+        <div class="wr_clo2" id="odetailcomment-box" style="float: right; width: 98%; margin:1%; display: none">
+            <div class="row_content none-first-pad">
+                <div class="wr_clo1">
+                    @StringTable.Comment (*)
+                </div>
+                <div class="wr_clo1">
+                    <textarea rows="2" id="odetailcomment" name="odetailcomment" class="js-required" style="width:100%!important" data-val="true" data-val-required="@StringTable.ErrMsgRequiredField.ModErrLocalize()"></textarea>
+                    <div class="field-valid-msg"><span class="error" data-validate="false" data-valmsg-for="odetailcomment" data-valmsg-id="odetailcomment" data-valmsg-replace="true"></span></div>
+                </div>
+            </div>
+        </div>
+        <div id="odetail-error-msg" class="error"></div>
+    }
+    @*@if (Model.OrderStatus.InList(OrderStatus.New, OrderStatus.PaymentWaiting, OrderStatus.Processing))
+    {
+        <div class="wr-line-edit">
+            <div class="wr-btn-table btn-edit">
+                <input class="btn_edit" value="@StringTable.Edit" type="button">
+            </div>
+            <div class="wr-btn-table btn-cancel" style="display: none;">
+                <input class="btn_cancel" value="@StringTable.Cancel" type="button">
+            </div>
+            <div class="wr-btn-table btn-save" style="display: none;">
+                <input class="btn_save" value="@StringTable.Save" type="button">
+            </div>
+            <div class="wr-btn-table btn-add" style="display: none;">
+                <input class="btn_add" value="@StringTable.Add" type="button">
+            </div>
+        </div>
+    }*@
+</div>
+@if (odetailDataDic != null)
+{
+    <script>var odetailDataDic = @Html.Raw(Json.Encode(odetailDataDic));</script>
+}
+<div style="height: 15px; width: 100%;">
+    <section id="grid-odetail-massage" class="show_massage" style="display: none;margin-bottom:10px;" data-status="">
+        <span class="nNote"></span><a title="@StringTable.Close" class="close" href="javascript:void(0)">X</a>
+    </section>
+</div>
+<div id="gridodetailgift-templ" style="display: none">
+    @(Html.LocalizeGridFor<OrderDetailGiftModel>("gridodetailgift", "None", "Delete", null, null, null, int.MaxValue, null, grid =>
+    {
+        grid.ButtonDelBigClass += "_odgift";
+        grid.ButtonAddNewClass += "_odgift";
+        grid.CheckBoxSelAllCss += "_odgift";
+        grid.CheckBoxRowCssClass += "_odgift";
+    })
+    .DataSource(m => m.Id, templOrderDetail.OrderDetailGifts)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.none, "", false, 56)
+            .SetCssClass("gift")
+            .SetTemplate(Html.LocalizeName(new OrderDetailGiftModel(), m => m.none)),
+        grid.Col(m => m.ProductName)
+            .SetTemplate("<div class='gift-name'>#:ProductName#</div>")
+            .SetCssClass("name-pro2"),
+        //grid.Col(m => m.ProductImage, false, 87)
+        //    .SetTemplate(imgTemplate)
+        //    .SetCssClass("txt_align_c image"),
+        grid.Col(m => m.PriceInc,false,139)
+            .SetTemplate("#:safeProp(PriceInc,'Text')#"),
+        grid.Col(m => m.Quantity,false,89),
+    })
+    .Config(grid => { grid.CustomScript = "gridOrderDetailGiftCustom"; })
+    .ToMvcHtmlString())
+</div>
+@{
+    var salePricetmp = @"
+    <span class='line-through'>#:safeProp(PriceInc,'Text')#</span>
+    <span class='price_2'>#:safeProp(SalePriceInc,'Text')#</span>";
+
+    var priceTempl = @"<span>#:safeProp(PriceInc,'Text')#</span>";
+}
+<div id="prodsel-templ" style="display: none">
+    @(Html.LocalizeGridFor<ProductModel>("gridprodsel", "Product", null, null, null, null, null,
+            "gridProdSelInitDetail", grid =>
+            {
+                grid.ButtonDelBigClass += "_prosel";
+                grid.CheckBoxSelAllCss += "_prosel";
+                grid.CheckBoxRowCssClass += "_prosel";
+                grid.InputSearchId += "_prodsel";
+                grid.FormSearchId += "_prodsel";
+            })
+            .DataSource(m => m.Id, "List", null, null, "gridProdSelGetParams")
+            .Paging(10, new[] { 10, 20, 30, 50, 100 })
+            .ColumnCheckBox(m => m.Id)
+            .Columns(grid => new[] {
+        grid.Col(m => m.Image, false, 50)
+            .SetTemplate(imgTemplatePopup)
+            .SetCssClass("txt_align_c image"),
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetTemplate(StringTable.NewWinEditTempl(Html, "Name"))
+            .SetCssClass("name-pro2"),
+        grid.Col(m => m.PriceInc, true, 100)
+            .SetCssClass("td-right")
+            .SetTemplate("# if (SalePriceInc.Value > 0) { # "+salePricetmp+" # }  else{#" + priceTempl + "#} #"),
+        grid.Col(m => m.Quantity, true, 150)
+            .SetCssClass("td-right k-grid-Quantity")
+            .SetTemplate(offer ? "<div class=prodstatus>#:ProductStatusName#</div> #:Quantity# <div class='prod-status'> #= AllowBackorder ? '<span class=backorder>" + "Backorder".ModLocalize() + "</span>' : '' # #= VisibleWeb ? '' : '<span class=status>" + "Inactive".ModLocalize() + "</span>' # " : "#:Quantity# </div>"),
+        grid.Col(m => m.SKU, true, 150),
+                //grid.Col(m => m.BarCode, false, 150),
+            })
+            .Sortable(true)
+            .Config(grid => { grid.CustomScript = "gridProdSelCustom"; })
+            .ToMvcHtmlString(false, false))
+</div>
+<div id="variantsel-templ" style="display: none">
+    @(Html.LocalizeGridFor<VariantModel>("gridvariantsel", "Variant", null, null, null, null, null,
+            null, grid =>
+            {
+                grid.CheckBoxSelAllCss += "_varsel"; grid.CheckBoxRowCssClass += "_varsel"; grid.ButtonDelBigClass += "_varsel";
+            })
+            .DataSource(m => m.Id, "List", null, null, "gridVariantSelGetParams")
+            .Paging(10, new[] { 10, 20, 30, 50, 100 })
+            .ColumnCheckBox(m => m.Id, 20, "_var")
+            .Columns(grid => new[]
+            {
+        grid.Col(m => m.ImageThumb, false, 50)
+            .SetTemplate(imgVariantTempl)
+            .SetCssClass("txt_align_c image"),
+        grid.Col(m => m.PropDesc)
+            .SetCssClass("name-pro2"),
+        grid.Col(m => m.PriceInc, true, 100)
+            .SetCssClass("td-right")
+            .SetTemplate("# if (SalePriceInc.Value > 0) { # "+salePricetmp+" # }  else{#" + priceTempl + "#} #"),
+        grid.Col(m => m.Quantity, false, 150)
+            .SetCssClass("td-right k-grid-Quantity")
+            .SetTemplate(offer ? "<div class=prodstatus>#:ProductStatusName#</div> #:Quantity# <div class='prod-status'> #= Active ? '' : '<span class=status>" + "Inactive".ModLocalize() + "</span>' # " : "#:Quantity# </div>"),
+        grid.Col(m => m.SKU, false, 150),
+                //grid.Col(m => m.BarCode, false, 150),
+            })
+            .Sortable(true)
+            .Config(grid => { grid.CustomScript = "gridVariantSelCustom"; })
+            .ToMvcHtmlString(false, false))
+</div>
+<script type="text/javascript">var dataJsonDic = @Html.Raw(Json.Encode(dataJsonDic));</script>
+<div id="dropdown-template-list" style="display: none">
+    @Html.LocalizeDropDownListKendoLang("temp-vat", 0, VatMgr.GetAll(new DefaultDb()).Select(x => new DDListItem()
+{
+    Value = x.Value.Text, Text = x.Name, Active = true, LangVisible = true
+}), null, new { }, false)
+</div>
+
+<script type="text/javascript">
+
+    function DisplayProfit(grid){
+
+        var box = $('.profit-box'), costPriceVal = 0, costPriceIncVal = 0, priceVal = 0, priceIncVal = 0;
+
+        grid.dataSource.data().forEach(function(row){
+
+            if(!row.Price || !row.PriceInc || !row.CostPrice || !row.CostPrice.Value || !row.CostPriceInc || !row.CostPriceInc.Value || costPriceVal == null) {
+                console.log('DisplayProfit.0', costPriceVal, row)
+                costPriceVal = null; return;
+            }
+
+            priceIncVal += row.PriceInc.Value * row.Quantity;
+            priceVal += row.Price.Value * row.Quantity;
+            costPriceVal += row.CostPrice.Value * row.Quantity;
+            costPriceIncVal += row.CostPriceInc.Value * row.Quantity;
+        })
+
+        var profitExc = priceVal - costPriceVal;
+        var profitInc = priceIncVal - costPriceIncVal;
+
+        if(costPriceVal > 0){
+            $('.profit-exc-money', box).html(localizeMoneyToString(profitExc));
+            $('.profit-exc-percent', box).html(localizeFloatToString(100*profitExc/costPriceVal) + ' %');
+            $('.profit-inc-money', box).html(localizeMoneyToString(profitInc));
+            $('.profit-inc-percent', box).html(localizeFloatToString(100*profitInc/priceIncVal) + ' %');
+            box.show();
+        } else box.hide();
+
+        console.log('DisplayProfit',costPriceVal, costPriceIncVal, priceVal, priceIncVal)
+    }
+
+    function dropDownClone(selector, dropdownSelector, holder) {
+        var dropdown = $(dropdownSelector).data('kendoDropDownList');
+        $(selector, holder).each(function () {
+            $(this).kendoDropDownList($.extend(dropdown.options, { value: $(this).val() }));
+        });
+    }
+
+    function odetailMakeRowEditable(uid){
+        var gridKd = $('#gridorderdetail').data('kendoGrid');
+        var row = gridKd.dataSource.getByUid(uid), priceincAct = '';
+
+        row.AllowEdit = !row.AllowEdit;
+        bindInputField(row.OrderDetailForm, row, 'AllowEdit', row.AllowEdit);
+
+        gridKd.dataSource.data().forEach(function(rw){
+            if(!rw.Id || rw.AllowEdit) priceincAct = '1';
+        })
+
+        gridKd.element.attr('priceinc', priceincAct);
+        gridKd.refresh();
+    }
+
+    function odetailFormatBundle(items){
+        if (!items || !items.length) return '';
+
+        var ret = [];
+        items.forEach(function (itm) {
+            ret.push('<span class="qty">' + itm.Quantity + ' </span> x <a class="name" href="/admin/modules/eshop/Product/Input/' 
+                + itm.ProductId +'" title="@StringTable.Edit" target="_blank">' + itm.ProductName + '</a>'
+                + (itm.ProductSKU ? ' (<span class="sku">' + itm.ProductSKU + '</span>)' : '')
+                + (itm.SerialNumber ? '<br/><span class="serial">' + itm.SerialNumber + '</span>' : ''));
+        });
+        return ret.length == 0 ? '' : '<ul><li>' + ret.join('</li><li>') + '</li></ul>';
+    }
+
+    function odetailGetPriceDisc(price, discountValue, vat){
+        return safeProp(price,'Value') - (safeProp(discountValue,'Value')) / (1 + safeProp(vat,'Value'));
+    }
+
+    function odetailFormatData(dataExp, orderGiftCards, serialNumber, odetailBundles) {
+        //if (!dataExp || !dataExp.length) return '';
+
+        var ret = [], ret2 = [];
+        if(dataExp)
+            dataExp.forEach(function (itm) {
+                if(itm.Key != 'bundlevariantids' && itm.Key != 'bundleaccessoryids') ret.push('<span class="name">' + dataJsonDic[itm.Key] + ':</span> <span class="value">' + itm.Value + ' </span>');
+            });
+
+        if(orderGiftCards)
+            orderGiftCards.forEach(function (itm) {
+                ret2.push('<a href="@(ModuleUrl.AdminUrl("Giftcard", "Input"))/'+ itm.Item1 +'">' + itm.Item2 + '</a>');
+            });
+
+        return (ret.length == 0 ? '' : '<ul class="data"><li>' + ret.join('</li>, <li>') + '</li></ul>')
+            + (ret2.length == 0 ? '' : '<ul class="giftcard"><li>' + ret2.join('</li>, <li>') + '</li></ul>')
+            + (serialNumber && !safeProp(odetailBundles, 'length') ? '<span class="serial">' + serialNumber + '</span>' : '');
+    }
+
+    function reloadBrower(){
+        setTimeout(function(){
+            var params = urlToJSON(location.href);
+            params['scrolltop'] = Math.round($(window).scrollTop());
+            location.href = urlMergeParams(location.pathname, params);
+        }, 100);
+    }
+
+    function addEditOrderDetails() {
+        //var errMsg = $('#odetail-error-msg').html('');
+        ajaxCmd('@ModuleUrl.AdminUrl(Html.GetController(), "AddEditOrderDetails", Model.Id)', $('#editForm').serialize(),
+            function (result) {
+                console.log('AddEditOrderDetails', result);
+                if (result.Status == 0) {
+                    //rebindView(result.Order);
+
+                    //var odGrid = gridorderdetail.data('kendoGrid');
+                    //odGrid.dataSource.transport.data = result.Order.OrderDetails;
+                    //odGrid.dataSource.read();
+                    //$('#gridordernote').data('kendoGrid').dataSource.page(1);
+
+                    reloadBrower();
+                }
+                else if(result.Message) gridShowMessage(gridorderdetail.data('kendoGrid'), '#grid-odetail-massage', result.Message, result.Status);
+                else $('#grid-odetail-massage a:visible').click();
+
+                if (result.Message) admincommon.showMessageDefault(result.Message, result.Status);
+                if (result.Errors) result.Errors.forEach(function (err) { formShowErrorMsg('_' + err.Field, err.ErrorMsg); });
+            });
+    }
+
+    function saveOrderDetails(holder) {
+        ajaxCmd('@ModuleUrl.AdminUrl(Html.GetController(), "EditOrderDetails", Model.Id)',
+            $('#editForm').serialize(), function (result) {
+                console.log('EditOrderDetails', result);
+                if (result.Status == 0) {
+                    holder.find('.btn-edit').show();
+                    holder.find('.btn-save,.btn-cancel,.btn-add').hide();
+                    //$('.order-view .field-view[databind]', '#summary-info-block').each(function () {
+                    //    var field = $(this).attr('databind'), value = null;
+                    //    eval('value = result.Order.' + field);
+                    //    console.log(field, value);
+                    //    $(this).html(kendo.htmlEncode(value));
+                    //});
+                    rebindView(result.Order);
+                    $('#odetailcomment-box').hide();
+                    $('#odetailcomment').val('');
+                    skipCalcDiscountCoupon = false;
+
+                    var odGrid = gridorderdetail.data('kendoGrid');
+                    odGrid.dataSource.transport.data = result.Order.OrderDetails;
+                    odGrid.dataSource.read();
+                    $('#gridordernote').data('kendoGrid').dataSource.page(1);
+                }
+                if (result.Message) admincommon.showMessageDefault(result.Message, result.Status);
+                if (result.Errors) result.Errors.forEach(function (err) {
+                    formShowErrorMsg('_' + err.Field, err.ErrorMsg);
+                });
+            });
+    }
+
+    function initODetailUpdateCmd(holder) {
+
+        $('.btn_save,.btn_cancel,.btn_add valid', holder).unbind('click');
+
+        $('.btn-save', holder).unbind('click').click(function () {
+            if (validateSubmit(holder))
+                showConfirmDialog('@StringTable.EditOrderDetails', '@StringTable.OrderDetailSaveConfirmMsg',
+                    function (dialog, kendoWindow, scrollTop) {
+                        saveOrderDetails(holder);
+                        $('#input-err-msg-box').append(kendoWindow.find('#massage.show_massage'));
+                        dialog.close(); $(window).scrollTop(scrollTop);
+                    });
+        });
+
+        $('.btn-cancel', holder).unbind('click').click(function () {
+            holder.find('.btn-edit').show();
+            holder.find('.btn-save,.btn-cancel,.btn-add').hide();
+            holder.find('input[val-bak]').each(function () {
+                if ($(this).data('kendoDropDownList'))
+                    $(this).data('kendoDropDownList').value($(this).attr('val-bak'));
+                else $(this).val($(this).attr('val-bak'));
+                $(this).change();
+            });
+
+            var grid = $('#gridorderdetail').data('kendoGrid');
+            var delRws = grid.dataSource.data().filter(function (rw) { return rw.Id == 0; });
+            delRws.forEach(function (rw) {
+                odetailFormRemove(rw);
+                grid.dataSource.data().remove(rw);
+            });
+
+            skipCalcDiscountCoupon = false;
+        });
+
+        $('.btn-add', holder).unbind('click').click(function () {
+            openODetailAssignForm();
+        });
+    }
+
+    $(function () {
+        $('#order-details .btn-edit').click(function () {
+            var holder = $('#order-details');
+            holder.find('.btn-edit,.btn-save').hide();
+            holder.find('.btn-cancel,.btn-add').show();
+            skipCalcDiscountCoupon = true;
+            initODetailUpdateCmd(holder);
+            formUpdateValidRules(holder);
+            formShowErrorMsg('odetailcomment', '');
+            holder.find('input').each(function () {
+                $(this).attr('val-bak', $(this).val());
+            });
+        });
+
+        var urlParams = urlToJSON(location.href);
+        var scrollTop = safeProp(urlParams, 'scrolltop');
+        if(scrollTop && parseInt(scrollTop) > 0) $(window).scrollTop(scrollTop);
+
+    });
+
+    //setTimeout(function () { $('.order-view').hide(); $('.order-edit').show(); }, 2000);
+    var gridorderdetail = $('#gridorderdetail'), viewModeOrderDetail = '@(editMode ? "" : "1")';
+
+    $(function () {
+        //var headerRow = gridorderdetail.find('thead > tr');
+        //headerRow.append('<th class="k-hierarchy-cell k-header" style="display:none"></th>');
+        //gridSwapElements(headerRow, 'th', { 2: 0, 0: 1, 1: 2, 3: 3 }, function (i, node) { if (i == 3) $(node).attr('colspan', '2'); }, true);
+
+        $('#gridorderdetail #SelectAll')
+            .attr('id', 'SelectAll_odetail').closest('div')
+            .find('label').attr('for', 'SelectAll_odetail');
+
+        $('#gridprodsel').attr('id', 'gridprodsel-templ');
+
+        gridorderdetailInit('#gridorderdetail', true);
+
+        var kgrid = gridorderdetail.data('kendoGrid');
+
+        //gridSwapElements(gridorderdetail.find('colgroup'), 'col', { 0: 1, 1: 2, 2: 0 }, function (i, node) { if (i == 0) $(node).css('width', '56px'); });
+
+        //kgrid.rowTemplate = gridGetRowTemplate(kgrid, false, { 2: 0, 0: 1, 1: 2 });
+        //kgrid.altRowTemplate = gridGetRowTemplate(kgrid, true, { 2: 0, 0: 1, 1: 2 });
+        //kgrid.refresh();
+
+        gridorderdetail.data('kendoGrid').dataSource.bind('change', function (e) {
+            console.log('change', e);
+        });
+
+        $('.js-add-new-selector_odetail').click(function () {
+            openODetailAssignForm();
+        });
+
+        $('.js-add-new-open-selector_odetail').click(function () {
+            orderdetailAddOpen();
+        });
+    });
+
+    function odetailCurrencyToString(value) {
+        if(value == null || value === '') return '';
+
+        return localizeCurrencyToString(value, currency.val());
+    }
+
+    function gridOrderDetailGiftCustom(grid) {
+    }
+
+    function gridorderdetailInitDetail(e) {
+        var gridTempl = $('#gridodetailgift');
+        var gridDiv = gridTempl.clone(), selAll = gridDiv.find('#SelectAll');
+        //console.log('gridorderdetailInitDetail', e);
+        gridDiv.attr('id', 'gridorderdetail-' + e.data.Key);
+        gridDiv.attr('data-id', e.data.Key);
+        gridDiv.attr('data-deep', parseInt(e.sender.element.attr('data-deep')) + 1);
+
+        selAll.attr('id', 'SelectAll-odgift-' + e.data.Key);
+        selAll.closest('div').find('label').attr('for', 'SelectAll-odgift-' + e.data.Key);
+
+        e.detailCell.append(gridDiv);
+        e.detailRow.find('.k-hierarchy-cell').remove();
+        e.detailRow.find('.k-detail-cell').attr('colspan', '5');
+
+        gridodetailgiftInit('#' + gridDiv.attr('id'), false);
+
+        var kgrid = e.data.giftGrid = gridDiv.data('kendoGrid'), items = e.data.OrderDetailGifts;
+        if (items && items.length != 0)
+            items.forEach(function (row) { kgrid.dataSource.data().push(row); });
+    }
+
+    function gridProdSelCustom(grid) {
+        var offer = @(offer ? 1 : 0);
+        gridHideCell(grid, '.k-hierarchy-cell .k-icon.k-plus', function (row) { return row.VariantCount == 0 || (!row.VisibleWeb && offer); });
+
+        gridAdjustPopup(grid, '.wcontent', '.wr_clo1', 400, null, null, 40);
+
+        gridDisableCheckBox(grid, function (row) { return row.VariantCount != 0 || (!row.VisibleWeb && offer) || (row.Quantity <= 0 && !row.AllowBackorder && offer); }, '.row-checkbox_prosel');
+
+        initImagePreview(false, grid.element);
+    }
+
+    function gridProdSelGetParams() {
+        var data = gridorderdetail.data('kendoGrid').dataSource.data(), exceptids = [], exceptVariantIds = [];
+
+        data.forEach(function (row) {
+            if (row.Id == 0) {
+                exceptids.push(row.ProductId);
+                if (row.VariantId) exceptVariantIds.push(row.VariantId);
+            }
+        });
+
+        return { exceptids: exceptids.join(','), @*type: '@((int) ProductType.Normal)',*@ countVariant: 'true', /*minQty: 1, VisibilityWeb: true,*/ exceptVariantids: exceptVariantIds.join(',') };
+    }
+
+    //function gridOrderDetailProcessDiscount(grid, quantity, row, odetailForm) {
+    //    //discountGetItemApplyInfo(row.ProductId, row.VariantId, quantity, 'checking-discount-' + row.Key,
+    //    //    function (result) {
+    //    //        var giftRw = result.Data.Model;
+    //    //        bindInputField(odetailForm, row, 'DiscountId', result.Data.DiscountId);
+    //    //        row.OrderDetailGifts = row.OrderDetailGifts.filter(function (itm) { return itm.Key != giftRw.Key; });
+    //    //        row.OrderDetailGifts.push(giftRw);
+    //    //        odetailgiftFormAdd(odetailForm, {
+    //    //            'Key': giftRw.Key,
+    //    //            'ProductId': giftRw.ProductId,
+    //    //            'VariantId': giftRw.VariantId,
+    //    //            'Quantity': giftRw.Quantity
+    //    //        }, giftRw, row.Iseq);
+    //    //        console.log('gridOrderDetailProcessDiscount', result, row);
+    //    //        //grid.refresh({ action: 'rebind', items: [row] });
+    //    //    }
+    //    //);
+    //}
+
+    function gridOrderDetailRowCellChange(grid, node, row, odetailForm) {
+        if (node.is('input, textarea, select')) {
+            if (node.valid()) {
+                var field = node.attr('data-bind').replace('_', '.'), vatCoef = 1 + row.Vat.Value, refreshGrid = false;
+                console.log('change', node.isEmptyVal(), field, node.val(), node, row);
+                if (field) {
+                    if (node.hasClass('odetail-couponcode')) {
+                        if (node.isEmptyVal()) {
+                            //changeOrderTotal(row.Quantity * row.CouponValue.Value * vatCoef);
+                            row.FinalPrice = setOMoneyVal(Math.max(0, row.FinalPrice.Value + row.CouponValue.Value * vatCoef));
+                            row.CouponValue = setOMoneyVal(0.0);
+                            refreshGrid = true;
+                        } else {
+                            var couponCode = node.val(), delta = grid.dataSource.data().filter(function (itm) { return itm.Key != row.Key && itm.CouponCode == couponCode; }).length;
+                            console.log('gridOrderDetailRowCellChange', delta + 1);
+                            @*couponGetApplyInfo(couponCode, custEmail.val(), delta + 1, orderTotal.val(), row.ProductId, row.VariantId, 'checking-couponcode-' + row.Key,
+                                function (result) {
+                                    //changeOrderTotal(row.Quantity * (row.CouponValue.Value - result.Amount) * vatCoef);
+                                    bindInputField(odetailForm, row, 'CouponValue.Text', localizeMoneyToString(result.Amount));
+                                    bindInputField(odetailForm, row, 'CouponId', result.CouponId);
+                                    row.FinalPrice = setOMoneyVal(Math.max(0, row.FinalPrice.Value + (row.CouponValue.Value - result.Amount) * vatCoef));
+                                    row.CouponValue = setOMoneyVal(result.Amount);
+                                    grid.refresh({ action: 'rebind', items: [row] });
+                                }, function (result) { formShowErrorMsg(node.attr('name'), '@StringTable.CouponContextError'); });*@
+                        }
+                    }
+                    else if (node.hasClass('odetail-quantity') || node.hasClass('odetail-priceinc') || node.hasClass('odetail-vat')) {
+                        //var newQuantity = node.clawGetFloat(0);
+                        bindInputField(odetailForm, row, field, node.val());
+
+                        var nWidth = 0, nHeight = 30;
+                        $('.orderdetail-box').each(function(){
+                            nWidth = Math.max(nWidth,$(this).width());
+                            nHeight += $(this).height();
+                        });
+                        var loadingMask = $('.orderdetail-mask').css({width: nWidth, height: nHeight});
+                        orderRefresh(null, null, function (order, result) {
+                            var rws = order.OrderDetails.filter(function (itm) { return itm.Key == row.Key; });
+                            bindInputField(odetailForm, row, 'Price.Text', rws[0].Price.Text);
+                            bindInputField(odetailForm, row, 'PriceInc.Text', rws[0].PriceInc.Text);
+                            bindInputField(odetailForm, row, 'Vat.Text', rws[0].Vat.Text);
+                            loadingMask.hide();
+                            if(result && result.Message)
+                                gridShowMessage(gridorderdetail.data('kendoGrid'), '#grid-odetail-massage', result.Message, 'Error');
+                            else $('#grid-odetail-massage a:visible').click();
+                        }, function(init){ if(init)loadingMask.show(); else loadingMask.hide(); });
+                        //changeOrderTotal(row.FinalPrice.Value * (newQuantity - row.Quantity));
+                        //changeShippingTotal(row, row.Quantity, newQuantity);
+                        //gridOrderDetailProcessDiscount(grid, newQuantity, row, odetailForm);
+                    }
+                    bindInputField(odetailForm, row, field, node.val());
+                    if (refreshGrid) grid.refresh({ action: 'rebind', items: [row] });
+                }
+            } else $(this).focus();
+        }
+    }
+
+    function gridOrderDetailCustom(grid) {
+
+        var offer = @(offer && (Model.Id == 0 || Model.OfferEmailSent == false) ? 1 :  0);
+        var viewMode = viewModeOrderDetail, orderStatus = '@Model.OrderStatus', recurringOrder = '@(Model.Recurring != null ? 1 : 0)' == '1', anyRowEditable = false;
+        var notEditStatus = recurringOrder || orderStatus != '@OrderStatus.New.Val()' && orderStatus != '@OrderStatus.RestOrder.Val()' && orderStatus != '@OrderStatus.PayBeforeDelivery.Val()';
+
+        if(!viewMode || grid.element.attr('PriceInc') == '1') {
+            grid.hideColumn('Price');  grid.showColumn('PriceInc');
+        }
+        else { grid.hideColumn('PriceInc');  grid.showColumn('Price');}
+
+        gridHideCell(grid, '.k-hierarchy-cell .k-icon.k-plus', function (row) { return row.OrderDetailGifts.length == 0; });
+
+        gridHideCell(grid, '.claw-action .k-grid-Delete', function (row) { return row.Id > 0 && offer == 0; });
+
+        //$('.preview[href=""]', grid.element).hide();
+
+        $('.k-grid-Tags input', grid.element).unbind('click').click(function () {
+            var node = $(this);
+            if(!node.data('kendoComboBox'))
+                node.kendoComboBox({
+                    dataSource: [ '@("Restnotert".ModLocalize())', '@("Bestilt".ModLocalize())', '@("Mottatt".ModLocalize())', '@("Ettersendes".ModLocalize())', '@("Sendt".ModLocalize())', '@("Fjern tag".ModLocalize())' ],
+                    change: function(e) {
+                        var row = grid.dataItem(node.closest('tr'));
+                        if(row.Id)
+                            ajaxCmdStatus('@ModuleUrl.AdminUrl(Html.GetController(), "UpdateOrderDetailTags")', { id: row.Id, tags: this.value() },
+                                function (result) { grid.showMessage(result.Message, result.Status); });
+                    }
+                });
+        });
+
+        $('.delete_big_odetail').unbind('click').click(function () {
+            var arrRws = [], rows = grid.tbody.find('input:checked').closest('tr');
+            rows.each(function () { arrRws.push(grid.dataItem($(this))); });
+
+            arrRws.forEach(function (item) {
+                odetailFormRemove(item);
+                grid.dataSource.data().remove(item);
+            });
+
+            if (arrRws.length > 0) orderRefresh();
+        });
+
+        if (viewMode && notEditStatus && offer == 0) {
+            $('.js-add-new-selector_odetail').hide();
+            $('.row-checkbox_odetail', grid.element).prop('disabled', true);
+            grid.showMessage = function (message, status) { gridShowMessage(grid, '#grid-odetail-massage', message, status); };
+        }
+
+        //$('tr', grid.element).each(function() { grid.expandRow($(this)); });
+
+        $('#orderdetail-form-list > .orderdetail-form[data-valid=1]').each(function () {
+            var odetailForm = $(this), row = gridGetRow(grid, $(this).attr('data-id'), $(this).attr('data-key'));
+            if (row) {
+                var rowEle = $('tr[data-uid=' + row.uid + ']', grid.element);
+                $('.odetail-cell', rowEle).change(function () { gridOrderDetailRowCellChange(grid, $(this), row, odetailForm); });
+                $(this).attr('data-uid', row.uid);
+                row.OrderDetailForm = odetailForm;
+                if (row.FirstInit == false) {
+                    //gridOrderDetailProcessDiscount(grid, 1, row, odetailForm);
+                    $('.orderdetail-form-field[binding=CouponId]', odetailForm).val(row.CouponId);
+                    $('.orderdetail-form-field[binding=CouponCode]', odetailForm).val(row.CouponCode);
+                    $('.orderdetail-form-field[binding=CouponValue_Text]', odetailForm).val(safeProp(row.CouponValue, 'Text'));
+                    $('.orderdetail-form-field[binding=Price_Text]', odetailForm).val(safeProp(row.Price, 'Text'));
+                    $('.orderdetail-form-field[binding=PriceInc_Text]', odetailForm).val(safeProp(row.PriceInc, 'Text'));
+                    $('.orderdetail-form-field[binding=OriginPriceInc_Text]', odetailForm).val(safeProp(row.OriginPriceInc, 'Text'));
+                    $('.orderdetail-form-field[binding=OriginSalePriceInc_Text]', odetailForm).val(safeProp(row.OriginSalePriceInc, 'Text'));
+                    row.FirstInit = true;
+                }
+                $('.odetail-couponcode,.odetail-quantity,.odetail-priceinc', rowEle).each(function () {
+                    var name = ($(this).attr('name') || '').substring(1), msg = modelState[name];
+                    if (name && msg) {
+                        $(this).closest('td').find('span.error')
+                            .removeClass('field-validation-valid')
+                            .addClass('field-validation-error').append($('<span>').html(msg));
+                        delete modelState[name];
+                        if (!firstErrorInputElement) {
+                            firstErrorInputElement = $(this);
+                            setTimeout(function () { firstErrorInputElement.focus(); }, 2000);
+                        };
+                    } else $(this).removeClass('input-validation-error');
+                });
+
+                if(row.Id && (!viewMode || !notEditStatus)) $('.row-checkbox_odetail', rowEle).prop('disabled', true);
+                if(row && rowEle && row.AllowEdit) {
+                    anyRowEditable = true;
+                    $('.odetail-edit', rowEle).show().closest('td').find('.odetail-view').hide();
+                    $('.odetail-edit .odetail-quantity', rowEle).attr('data-val-range-min', 0);
+                    if(row.ProductId > 1) $('.odetail-edit .odetail-vat', rowEle).hide().closest('td').find('.odetail-view').show();
+                }
+                if(row && !row.Id && rowEle) $('.odetail-edit .odetail-quantity', rowEle).attr('data-val-range-max', '1000000');
+            }
+        });
+
+        if(anyRowEditable || ((!viewMode || !notEditStatus) &&
+            $('input.row-checkbox_odetail:not(:disabled)', grid.element).length != 0)) $(".js-save-selector_odetail").show();
+        else $(".js-save-selector_odetail").hide();
+
+        if ($('.odetail-cell[dataid=0]', grid.element)
+            .closest('.odetail-edit').show()
+            .closest('td').find('.odetail-view').hide().length != 0 || anyRowEditable) {
+            $('#odetailcomment-box,.btn-save', '#order-details').show();
+            $('.odetail-cell[dataid=0].odetail-vat:not([productid=1])', grid.element).hide().closest('td').find('.odetail-view').show();
+        } else $('#odetailcomment-box,.btn-save', '#order-details').hide();
+
+        dropDownClone('.odetail-edit:visible .odetail-vat[productid=1]', '#temp-vat', grid.element);
+
+        $('.odetail-view a.grid-row-edit', grid.element).each(function() {
+            if (parseInt($(this).attr('productid')) < 0) $(this).unbind('mousedown').removeAttr('href').css('cursor','default');
+        });
+
+        initGridStatusAction(grid, '.k-grid-delivered',
+            function (node, row) {
+                bindInputField(row.OrderDetailForm, row, 'Delivered', row.Delivered);
+                if (viewMode) gridorderdetailSetDelivered(grid, row);
+            },
+            function (row) { return row.Delivered; }, function (row, status) { row.Delivered = status; });
+
+        initImagePreview(false, grid.element);
+        formUpdateValidRules(grid.element);
+
+        if (window.onFormUpdateValidRules) window.onFormUpdateValidRules();
+
+        //if ($('.table_all > tbody:parent').length == 0) $(".wr_table_all").css('border', 'none');
+        //else $('.wr_table_all').removeAttr("style");
+
+        $('.btn_save', '.js-save-selector_odetail').unbind('click').click(function () {
+            if (validateSubmit($('.odetail-quantity:visible', '#gridorderdetail').closest('tr')) && $('#odetailcomment').valid())
+                showConfirmDialog('@StringTable.EditOrderDetails', '@StringTable.OrderDetailSaveConfirmMsg',
+                    function (dialog, kendoWindow, scrollTop) {
+                        addEditOrderDetails();
+                        $('#input-err-msg-box').append(kendoWindow.find('#massage.show_massage'));
+                        dialog.close(); $(window).scrollTop(scrollTop);
+                    });
+        });
+
+        if($('.orderdetail-form[data-valid=1][data-key="1_0_0"]', '#orderdetail-form-list').length == 0)
+            $('.js-add-new-open-selector_odetail').show();
+        else $('.js-add-new-open-selector_odetail').hide();
+
+        if(viewMode) $('.js-add-new-open-selector_odetail').closest('ul').hide();
+        else $('.js-add-new-open-selector_odetail').closest('ul').show();
+
+        if(viewMode) $('.claw-action a.k-grid-Edit').hide();
+
+        if(offer == 1){
+            $('.wr_submit_top,.js-add-new-selector_odetail', '.orderdetail-box').show();
+            formDisableValidation($('.no-valid-fields input'), true);
+        }
+
+        if(@(offer ? 1 : 0) == 1) DisplayProfit(grid);
+    }
+
+    function updateCustomDiscount() {
+        var grid = $('#gridorderdetail').data('kendoGrid');
+        var customDiscountRate = $('#@Html.IdFor(m => m.CustomDiscountRate)');
+        var isProfitPerProd = $('#OfferProfitPerProd').prop('checked');
+
+        customDiscountRate.attr('placeholder', isProfitPerProd ? '@("profit per product rate".ModLocalize("% profit per product"))':'@Html.LocalizeNameFor(m => m.CustomDiscountRate)');
+
+        if(!customDiscountRate.is(':visible') || !customDiscountRate.valid()) return;
+
+        var rate = (localizeParseFloat(customDiscountRate.val()) || 0) / 100;
+
+        grid.dataSource.data().forEach(function (row) {
+            if (isProfitPerProd)
+                row.PriceInc.Value = /*!row.FakeCostPrice &&*/ safeProp(row.CostPriceInc, 'Value') > 0 ? safeProp(row.CostPriceInc, 'Value') * (1 + rate) : row.PriceInc.Value;
+            else row.PriceInc.Value = (safeProp(row.PriceOriginInc, 'Value') || row.OriginPriceInc.Value) * (1 - (isProfitPerProd ? 0 : rate));
+
+            row.PriceInc.Text = localizeMoneyToString(row.PriceInc.Value);
+
+            bindInputField(row.OrderDetailForm, row, 'PriceInc.Text', row.PriceInc.Text);
+        })
+
+        orderRefresh();
+    }
+
+    function gridorderdetailSetDelivered(grid, row) {
+        ajaxCmd('@ModuleUrl.AdminUrl(Html.GetController(), "OrderDetailDelivered")',
+            { Id: row.Id, Value: row.Delivered },
+            function (result) { grid.showMessage(result.Message, result.Status); },
+            function (e) { grid.showMessage('@StringTable.AjaxCommandErrorMessage', '@ActionResultStatus.Fail'); });
+    }
+
+    function gridGetRow(grid, id, key) {
+
+        if (id != null && id != 0) return grid.dataSource.get(id);
+        else return grid.dataSource.data().find(function (item) { return item.Key == key; });
+    }
+
+    function gridorderdetailOnDelete(uid, gridId) {
+        var gridDs = gridorderdetail.data('kendoGrid').dataSource, row = gridDs.getByUid(uid);
+        console.log('delete', row, uid);
+        odetailFormRemove(row); gridDs.data().remove(row);
+        orderRefresh();
+    }
+
+    function gridProdSelInitDetail(e) {
+        var gridTempl = $('#gridvariantsel');
+        var gridDiv = gridTempl.clone(), selAll = gridDiv.find('#SelectAll');
+
+        gridDiv.attr('id', 'grid-' + e.data.id);
+        gridDiv.attr('data-id', e.data.id);
+        gridDiv.attr('data-deep', parseInt(e.sender.element.attr('data-deep')) + 1);
+
+        selAll.attr('id', 'SelectAll-' + e.data.id);
+        selAll.closest('div').find('label').attr('for', 'SelectAll-' + e.data.id);
+
+        e.detailCell.append(gridDiv);
+        e.detailRow.find('.k-hierarchy-cell').remove();
+        e.detailRow.find('.k-detail-cell').attr('colspan', '7');
+
+        gridvariantselInit('#' + gridDiv.attr('id'), false);
+    }
+
+    function gridVariantSelCustom(grid) {
+        initImagePreview(false, grid.element);
+
+        var offer = @(offer ? 1 : 0);
+        var owner = $(grid.element).parent().closest('div.k-grid').data('kendoGrid');
+        var trProd = $(owner.element).find('#gridprodsel_rwcbox_' + $(grid.element).attr('data-id')).closest('tr');
+        var rowProd = owner.dataItem(trProd);
+
+        console.log('gridVariantSelCustom', owner, rowProd,trProd);
+
+        gridDisableCheckBox(grid, function (row) { return (row.Quantity <= 0 && !rowProd.AllowBackorder && offer); }, '.row-checkbox_varsel');
+
+    }
+
+    function gridVariantSelGetParams(gridOwner, e) {
+        var productid = gridOwner.element.attr('data-id'), exceptids = [];
+        var data = gridorderdetail.data('kendoGrid').dataSource.data();
+
+        data.forEach(function (row) {
+            if (row.VariantId && row.ProductId == productid) exceptids.push(row.VariantId);
+        });
+
+        return { productid: productid, exceptids: exceptids.join(','), fullMode: 'true', /*minQty: 1,*/ active: true };
+    }
+
+    function gridProdSelFirstRun() {
+        var grid = $('#gridprodsel'), headerRow = grid.find('thead > tr');
+
+        headerRow.append('<th class="k-hierarchy-cell k-header" style="display:none"></th>');
+
+        gridSwapElements(headerRow, 'th', { 0: 0, 1: 1, 2: 6, 3: 2, 4: 3, 5: 4, 6: 5 },
+            function (i, node) { if (i == 3) $(node).attr('colspan', '2'); });
+        grid.attr('data-deep', '0');
+
+        var gridTempl = grid.clone();
+
+        gridTempl.attr('id', '');
+        gridprodselInit('#gridprodsel', true);
+
+        var gridColGroup = grid.find('colgroup');
+        gridSwapElements(gridColGroup, 'col', { 0: 1, 1: 2, 2: 0 }, function (i, node) { if (i == 0) $(node).css('width', '56px'); });
+
+        var cols = gridColGroup.html(), gridData = grid.data('kendoGrid');
+
+        gridData.rowTemplate = gridGetRowTemplate(gridData, false, { 0: 1, 1: 2, 2: 0 });
+        gridData.altRowTemplate = gridGetRowTemplate(gridData, true, { 0: 1, 1: 2, 2: 0 });
+
+        grid.data({ 'clawGridTempl': gridTempl, 'clawGridCols': cols });
+    }
+
+    function openODetailAssignForm() {
+        var width = Math.max(200, Math.min(890, $(window).width() - 50));
+        var height = Math.max(200, Math.min(2048, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popTemplate = $("<div>").html($("#prodsel-popup-form-templ").html());
+        popTemplate.find('.htmlcontent .wr_table_all').html($('#gridprodsel-templ').clone().attr('id', 'gridprodsel').wrap('<p>').parent().html());
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@StringTable.AssignProduct', popTemplate.html(),
+            width, height, [], null,
+            function (modal) {
+
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+
+                $('#gridprodsel #SelectAll', modal).attr('id', 'SelectAll_prodsel').closest('div')
+                    .find('label').attr('for', 'SelectAll_prodsel');
+
+                admincommon.hideMessage();
+                gridProdSelFirstRun();
+
+                var gridProdSel = $('#gridprodsel').data('kendoGrid');
+
+                modal.find(".btn_save").click(function () {
+
+                    var selCBox = $('.row-checkbox_prosel:checked,.row-checkbox_varsel:checked', gridProdSel.element);
+                    var customDiscountRate = $('#@Html.IdFor(m => m.CustomDiscountRate)');
+                    var isProfitPerProd = $('#OfferProfitPerProd').prop('checked');
+                    var discountRate = (customDiscountRate.is(':visible') && customDiscountRate.valid() ? 1 : 0) * (localizeParseFloat(customDiscountRate.val()) || 0) / 100;
+                    var offer = @(offer ? 1 : 0);
+
+                    selCBox.each(function () {
+                        var owner = $(this).closest('div.k-grid').data('kendoGrid');
+                        var row = owner.dataItem($(this).closest('tr'));
+
+                        if (row.ProductId)
+                            orderdetailAdd(row.ProductId, row.Id, row.VariantName, row.CombinedImage, offer ? row.Price : row.CombinedSalePrice, offer ? row.PriceInc : row.CombinedSalePriceInc, row.ProdVat, null, row.ProductShippingType, row.Weight || row.ProductWeight, row.Quantity, row.BackOrderQty, discountRate, row.SalePriceInc, isProfitPerProd, row.CostPriceInc, row.CostPrice, null, row);
+                        else
+                            orderdetailAdd(row.Id, row.VariantId, row.Name, row.Image, offer ? row.Price : row.CombinedSalePrice, offer ? row.PriceInc : row.CombinedSalePriceInc, row.Vat, null, row.ShippingType, row.Weight, row.Quantity, row.BackOrderQty, discountRate, row.SalePriceInc, isProfitPerProd, row.CostPriceInc, row.CostPrice, row);//discountId
+
+                        console.log('save', row, discountRate);
+                    });
+
+                    if (selCBox.length > 0) {
+                        gridorderdetail.attr({ 'PriceInc': 1})
+                        orderRefresh();
+                    }
+
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close(); $(window).scrollTop(scrollTop);
+                });
+                modal.find(".btn_cancel").click(function () {
+
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close(); $(window).scrollTop(scrollTop);
+                });
+            });
+    }
+
+    function orderdetailAddOpen(){
+        if($('.orderdetail-form[data-valid=1][data-key="1_0_0"]', '#orderdetail-form-list').length == 0)
+            orderdetailAdd(1, null, '', null, {Text:'0', Value: 0}, {Text:'0', Value: 0}, @Html.Raw(Claw.Modules.Eshop.Product.DAL.ProductMgr.Get(new DefaultDb() ,1).SafeProp(m => m.Vat).ToJsonEx()), null, 2, 0, 1, 0);
+    }
+
+    function orderdetailAdd(id, variantId, name, image, salePrice, salePriceInc, vat, discountId, shippingType, weight, productQty, productBackQty, discountRate, originSalePriceInc, isProfitPerProd, costPriceInc, costPrice, product, variant) {
+        //(salePrice.Value - DiscountValue - CouponValue) * (1.0 + Vat)
+        var finalPrice = setOMoneyVal(1.0 * salePriceInc.Value), timestamp = Date.now();
+        var row = {
+            CategoryId: '@Model.Id', ProductId: id, VariantId: variantId,
+            Key: id + '_' + (variantId || '0') + (id == 1 ? ('_' + timestamp) : '_0'), Timestamp: timestamp,
+            ProductName: name, ProductImage: image, Quantity: 1, ProductShippingType: shippingType, ProductWeight: weight,
+            DiscountId: discountId, Delivered: false,
+            DiscountValue: setOMoneyVal(0.0), DiscountValue_Text: '0',
+            CouponValue: setOMoneyVal(0.0), CouponValue_Text: '0',
+            Vat: vat, Vat_Text: safeProp(vat, 'Text'),
+            Price: {Value: salePrice.Value, Text: salePrice.Text}, Price_Text: safeProp(salePrice, 'Text'),
+            PriceInc: {Value: salePriceInc.Value, Text: salePriceInc.Text}, PriceInc_Text: safeProp(salePriceInc, 'Text'),
+            OriginPriceInc: salePriceInc, OriginPriceInc_Text: safeProp(salePriceInc, 'Text'),
+            OriginSalePriceInc: originSalePriceInc,
+            FinalPrice: finalPrice, FinalPrice_Text: finalPrice.Text,
+            ProductQty: productQty, ProductBackQty: productBackQty,
+            FirstInit: false, 
+        };
+
+        if (discountRate) {
+            if (isProfitPerProd) {
+                row.Price.Value = safeProp(costPriceInc, 'Value') > 0 ? safeProp(costPrice, 'Value') * (1 + discountRate) : null;
+                row.FinalPrice.Value = row.PriceInc.Value = safeProp(costPriceInc, 'Value') * (1 + discountRate);
+            }
+            else {
+                row.Price.Value = row.Price.Value * (1 - discountRate);
+                row.FinalPrice.Value = row.PriceInc.Value = row.PriceInc.Value * (1 - discountRate);
+            }
+
+            row.Price.Text = row.Price_Text = localizeMoneyToString(row.Price.Value);
+            row.FinalPrice.Text = row.FinalPrice_Text = row.PriceInc.Text = row.PriceInc_Text = localizeMoneyToString(row.PriceInc.Value);
+        }
+
+        console.log('orderdetailAdd', product, variant);
+
+        if(window.odetailDataDic)
+            window.odetailDataDic[row.Key] = product 
+            ? { 
+                AllowBackorder: safeProp(product, 'AllowBackorder') || false, 
+                ProductQty: safeProp(product, 'Quantity') || 0, 
+                ProductStatusName: safeProp(product, 'ProductStatusName') || '', 
+                VisibleWeb: safeProp(product, 'VisibleWeb') == true ? '1' : ''
+            }
+            : { 
+                AllowBackorder: safeProp(variant, 'AllowBackorder') || false, 
+                ProductQty: safeProp(variant, 'Quantity') || 0, 
+                ProductStatusName: safeProp(variant, 'ProductStatusName') || '', 
+                VisibleWeb: safeProp(variant, 'ProductVisibleWeb') == true && variant.Active ? '1' : ''
+            };
+
+        var newRow = orderdetailAddRaw(row);
+
+        //itemTotal.clawChangeInt(1);
+        //console.log('orderdetailAdd', finalPrice,orderTotal.val());
+        //changeOrderTotal(finalPrice.Value);
+        //changeShippingTotal(newRow, 0, newRow.Quantity);
+    }
+
+    function orderdetailAddRaw(fieldVals) {
+
+        var gridData = gridorderdetail.data('kendoGrid');
+        var newRow = $.extend(true, {}, templOrderDetail);
+
+        for (var prop in fieldVals) {
+            var pval = fieldVals[prop];
+            newRow[prop] = pval;
+        }
+
+        console.log('orderdetailAdd', newRow);
+
+        odetailFormAdd(fieldVals, newRow);
+        gridData.dataSource.data().push(newRow);
+
+        return newRow;
+    }
+
+    function odetailFormAdd(fieldVals, newRow) {
+        var lst = $('#orderdetail-form-list'), idx = newRow.Iseq = parseInt(lst.attr('count'));
+        lst.attr('count', idx + 1);
+        var newForm = $('<div>').html($('#orderdetail-form-template').html()).find('.orderdetail-form');
+        newForm.attr('data-key', fieldVals['Key']);
+        newForm.find('input,textarea,select').each(function () {
+            $(this).attr('id', $(this).attr('id').replace('_0_', '_' + idx + '_'));
+            $(this).attr('name', $(this).attr('name').replace('[0]', '[' + idx + ']'));
+
+            if ($(this).attr('binding')) {
+                if ($(this).is('textarea')) $(this).html('');
+                else $(this).val('');
+            }
+        });
+
+        if (fieldVals)
+            for (var field in fieldVals) {
+                var fVal = fieldVals[field];//if (!fVal && field.indexOf('_') != -1) { eval('fVal = fieldVals.' + field.replace('_', '.')); }
+                var node = newForm.find('.orderdetail-form-field[binding=' + field + ']');
+                if (node.is('textarea')) $(this).html(fVal);
+                else node.val(fVal);//console.log('odetailFormAdd', node, fVal);
+            }
+
+        newForm.attr({ 'data-id': 0, 'data-valid': 1 });
+        lst.append(newForm);
+        //console.log(newForm.html());
+        return newForm;
+    }
+
+    function odetailFormRemove(row) {
+        console.log('odetailFormRemove', row, row.OrderDetailForm);
+        row.OrderDetailForm.attr('data-valid', 0);
+        row.OrderDetailForm.find('input,textarea,select').val('').attr('datavalid', 0);
+        //itemTotal.clawChangeInt(-1);
+        //changeOrderTotal(0 - row.Quantity * row.FinalPrice.Value);
+        //changeShippingTotal(row, row.Quantity, 0);
+    }
+
+    function odetailgiftFormAdd(odetailForm, fieldVals, newRow, odetailIndex) {
+        var lst = $('.orderdetailgift-form-list', odetailForm), idx = parseInt(lst.attr('count'));
+        var newForm = $('.orderdetailgift-form[data-key=' + fieldVals['Key'] + ']', lst);
+
+        if (newForm.length != 0) {
+            console.log('odetailgiftFormAdd.exist', newForm);
+        }
+        else {
+            newForm = $('<div>').html($('#orderdetailgift-form-template').html()).find('.orderdetailgift-form');
+            newRow.Iseq = idx; lst.attr('count', idx + 1);
+            newForm.attr('data-key', fieldVals['Key']);
+            newForm.find('input,textarea,select').each(function () {
+                $(this).attr('id', $(this).attr('id').replace('OrderDetails_0_', 'OrderDetails_' + odetailIndex + '_'));
+                $(this).attr('name', $(this).attr('name').replace('OrderDetails[0]', 'OrderDetails[' + odetailIndex + ']'));
+
+                $(this).attr('id', $(this).attr('id').replace('_0_', '_' + idx + '_'));
+                $(this).attr('name', $(this).attr('name').replace('[0]', '[' + idx + ']'));
+
+                if ($(this).attr('binding')) {
+                    if ($(this).is('textarea')) $(this).html('');
+                    else $(this).val('');
+                }
+            });
+
+            newForm.attr({ 'data-id': 0, 'data-valid': 1 });
+            lst.append(newForm);
+            //console.log('odetailgiftFormAdd', newForm);
+        }
+
+        if (fieldVals)
+            for (var field in fieldVals) {
+                var fVal = fieldVals[field];
+                var node = newForm.find('.orderdetailgift-form-field[binding=' + field + ']');
+                if (node.is('textarea')) $(this).html(fVal);
+                else node.val(fVal);
+            }
+
+        return newForm;
+    }
+
+    function bindInputField(odetailForm, row, field, newVal) {
+        var inputField;
+
+        if (field.indexOf('.') != -1) eval('row.' + field + ' = newVal');
+        else row[field] = newVal;
+        inputField = odetailForm.find('.orderdetail-form-field[binding=' + field.replace('.', '_') + ']');
+        inputField.val(newVal); console.log(inputField, newVal, row);
+    }
+
+    function safePropImg(obj, propName) {
+        return safeProp(obj, propName) || '@ImageModel.NoImg';
+    }
+
+    function safeProp(obj, propName) {
+        if (obj == null) return '';
+        if (typeof (obj) != 'object') return obj;
+        return obj[propName] == null ? '' : obj[propName];
+    }
+
+    $.fn.getRemoteValidArgs = function (args) {//may be used in email valid
+        //console.log('getRemoteValidArgs', args);
+        //args.data = { Id: 0, CouponCode: $(this).val() };
+        return args;
+    };
+
+</script>
+
+<div id="orderdetail-form-list" count="@Model.OrderDetails.Count" style="display: none">
+    @for (int i = 0; i < Model.OrderDetails.Count; i++)
+    {@RenderOrderDetailForm(i)}
+</div>
+<script id="orderdetail-form-template" type="text/orderdetail-form-template">
+    @{ Model.OrderDetails.Insert(0, templOrderDetail); }
+    @RenderOrderDetailForm(0)
+</script>
+<script id="orderdetailgift-form-template" type="text/orderdetailgift-form-template">
+    @{
+        var tmpGift = new OrderDetailGiftModel();
+        Model.OrderDetails[0].OrderDetailGifts.Insert(0, tmpGift);
+        @RenderOrderDetailGiftForm(0, 0)
+        Model.OrderDetails[0].OrderDetailGifts.Remove(tmpGift);
+    }
+</script>
+@Html.Raw("<script type='text/javascript'> var templOrderDetail = " + Json.Encode(templOrderDetail) + ";</script>")
+@Html.Raw("<script type='text/javascript'> var modelState = " + ViewData.ModelState.ToJson() + ";</script>")
+
+@helper RenderOrderDetailForm(int idx)
+{
+    <div class="orderdetail-form" data-id="@Model.OrderDetails[idx].Id" data-key="@Model.OrderDetails[idx].Key" data-valid="1">
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].Id, new { @class = "orderdetail-form-field" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].Timestamp, new { @class = "orderdetail-form-field", @binding = "Timestamp" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].OrderId, new { @class = "orderdetail-form-field" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].AllowEdit, new { @class = "orderdetail-form-field", @binding = "AllowEdit" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].ProductId, new { @class = "orderdetail-form-field", @binding = "ProductId" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].VariantId, new { @class = "orderdetail-form-field", @binding = "VariantId" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].ProductName, new { @class = "orderdetail-form-field", @binding = "ProductName" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].Price, new { @class = "orderdetail-form-field", @binding = "Price_Text" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].PriceBak, new { @class = "orderdetail-form-field" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].PriceInc, new { @class = "orderdetail-form-field", @binding = "PriceInc_Text" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].OriginPriceInc, new { @class = "orderdetail-form-field", @binding = "OriginPriceInc_Text" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].OriginSalePriceInc, new { @class = "orderdetail-form-field", @binding = "OriginSalePriceInc_Text" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].Quantity, new { @class = "orderdetail-form-field", @binding = "Quantity" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].QuantityBak, new { @class = "orderdetail-form-field" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].ProductShippingType, new { @class = "orderdetail-form-field", @binding = "ProductShippingType" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].ProductWeight, new { @class = "orderdetail-form-field", @binding = "ProductWeight_Text" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].Vat, new { @class = "orderdetail-form-field", @binding = "Vat_Text" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].CouponId, new { @class = "orderdetail-form-field", @binding = "CouponId" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].CouponCode, new { @class = "orderdetail-form-field", @binding = "CouponCode" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].CouponValue, new { @class = "orderdetail-form-field", @binding = "CouponValue_Text" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].DiscountId, new { @class = "orderdetail-form-field", @binding = "DiscountId" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].DiscountValue, new { @class = "orderdetail-form-field", @binding = "DiscountValue_Text" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].Delivered, new { @class = "orderdetail-form-field", @binding = "Delivered" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].FinalPrice, new { @class = "orderdetail-form-field", @binding = "FinalPrice_Text" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].Tags, new { @class = "orderdetail-form-field", @binding = "Tags" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].Manual, new { @class = "orderdetail-form-field" })
+        <div class="orderdetailgift-form-list" count="@Model.OrderDetails[idx].OrderDetailGifts.Count">
+            @for (int k = 0; k < Model.OrderDetails[idx].OrderDetailGifts.Count; k++)
+            {
+                @RenderOrderDetailGiftForm(idx, k)
+            }
+        </div>
+    </div>
+}
+
+@helper RenderOrderDetailGiftForm(int idx, int kidx)
+{
+    <div class="orderdetailgift-form" data-id="@Model.OrderDetails[idx].OrderDetailGifts[kidx].Id"
+         data-key="@Model.OrderDetails[idx].OrderDetailGifts[kidx].Key" data-valid="1">
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].OrderDetailGifts[kidx].Id, new { @class = "orderdetailgift-form-field" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].OrderDetailGifts[kidx].ProductId, new { @class = "orderdetailgift-form-field", @binding = "ProductId" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].OrderDetailGifts[kidx].VariantId, new { @class = "orderdetailgift-form-field", @binding = "VariantId" })
+        @Html.SimpleHiddenFor(m => m.OrderDetails[idx].OrderDetailGifts[kidx].Quantity, new { @class = "orderdetailgift-form-field", @binding = "Quantity" })
+    </div>
+}
+
+<script type="text/x-kendo-template" id="prodsel-popup-form-templ">
+    <style type="text/css">
+        .popupBody .k-detail-row .k-detail-cell { padding: 0 !important; }
+        .popupBody .k-detail-row .k-detail-cell .k-grid {
+            border-top: 1px solid #390f3d !important;
+            border-bottom: 1px solid #390f3d !important; }
+    </style>
+    <div class="popupBody">
+        <section id="err-message-holder" style="float: left; width: 100%;"></section>
+        <section class="row_content_box kpopup-content">
+            <section class="wr_clo1">
+                <div class="wcontent" style="margin:0 10px; color: #390F3D;line-height:2em">
+                    <div class="htmlcontent">
+                        <form id="formSearch_prodsel" style="margin-bottom:10px">
+                            <section class="wr-search-eshop" style="margin-left:0;">
+                                <input type="text" placeholder="@StringTable.SearchProducts" class="text-l" id="inputSearch_prodsel">
+                                <input type="submit" value="" class="button-l" name="button">
+                            </section>
+                        </form>
+                        <section class="clear"></section>
+                        <div class="wr_table_all"></div>
+                    </div>
+                </div>
+            </section>
+            <section class="clear"></section>
+            <ul class="wr_submit_top form-action-menu" style="position:relative; padding-bottom:5px;">
+                <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+            </ul>
+        </section>
+    </div>
+</script>

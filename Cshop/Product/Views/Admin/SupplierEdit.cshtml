@@ -1,0 +1,120 @@
+﻿@using System.Linq
+@using System.Web.UI.WebControls
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model SupplierModel
+
+@{
+    Layout = "Layout/Input.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+    ViewBag.Title = StringTable.AddEditManufacturer(Model.Id);
+    ViewBag.ShowDeleteBtn = (Model != null && Model.Id > 0);
+    ViewBag.UseCKEditor = true;
+
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/product";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Product;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var languages = (List<Language>)ViewBag.Languages;
+    var langOpt = LanguageMgr.ValidOptLang(Model.Id);
+    var langCode = langOpt.LanguageCode;
+}
+
+@if (!ViewBag.PermissionEdit)
+{
+    <style type="text/css">
+        .dz-preview-menu a {
+            display: none;
+        }
+    </style>
+}
+<style>
+    .row_content_box {margin-bottom: 10px;}
+    .txt-full {width: 100% !important;}
+</style>
+@section MainTitleSection {
+    @(StringTable.ManageSuppliers)
+}
+
+@section CurrentTitleSection {
+    <a href="/admin/modules/eshop/supplier/">
+        @(StringTable.ManageSuppliers)
+    </a>
+}
+
+@section TabTitleSection {
+    @StringTable.AddEditSupplier(Model.Id)
+}
+
+@using (@Html.BeginForm("Input", Html.GetController(), FormMethod.Post, new { @id = "editForm", enctype = "multipart/form-data" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(x => x.Id)
+
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <label>@Html.LocalizeNameFor(m => m.Name)</label>
+        </section>
+        <section class="clo_right">
+            <section class="controls">
+                <section>
+                    @Html.LocalizeTextBoxFor(x => x.Name, new { @class = "txt-full" })
+                </section>
+                <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Name)</section>
+            </section>
+        </section>
+    </section>
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <label>@Html.LocalizeNameFor(m => m.Information)</label>
+        </section>
+        <section class="clo_right">
+            <section class="controls">
+                <section>
+                    @Html.LocalizeTextAreaFor(m => m.Information,
+                        new
+                        {
+                            @style = "float:left;",
+                            @class = "ckeditor_standard"
+                        })
+                </section>
+                <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Information)</section>
+            </section>
+        </section>
+    </section>
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <label>@Html.LocalizeNameFor(m => m.Active)</label>
+        </section>
+        <section class="clo_right">
+            <section class="controls">
+                <table>
+                    <tr>
+                        <td style="vertical-align: top">
+                            @Html.LocalizeRadioButtonFor(model => model.Active, "true", new { @id = "IsActiveTrue", @class = "css-radio js-required" })
+                            <label for="IsActiveTrue" class="css-labelradio">@StringTable.Visible</label>
+                            @Html.LocalizeRadioButtonFor(model => model.Active, "false", new { @id = "IsActiveFalse", @class = "css-radio js-required" })
+                            <label for="IsActiveFalse" class="css-labelradio">@StringTable.Hidden</label>
+                        </td>
+                        <td>&nbsp;</td>
+                        <td><span class="error" style="display: none; float: left;">*</span></td>
+                    </tr>
+                </table>
+            </section>
+        </section>
+    </section>
+}
+
+<script type="text/javascript">
+    var form = $('#editForm')[0];
+
+    form.customValidFields = function () {
+        return true;
+    };
+
+</script>

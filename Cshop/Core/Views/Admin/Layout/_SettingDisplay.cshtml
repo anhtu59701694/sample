@@ -1,0 +1,879 @@
+﻿@using System.Text
+@using Claw.Core.Constants
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Core
+@model DisplayModel
+@{
+    //page size
+    IList<SelectListItem> itemsPageSize = new List<SelectListItem>();
+
+    itemsPageSize.Add(new SelectListItem() { Text = "10", Value = "10", Selected = false });
+    itemsPageSize.Add(new SelectListItem() { Text = "15", Value = "15", Selected = false });
+    itemsPageSize.Add(new SelectListItem() { Text = "20", Value = "20", Selected = false });
+    itemsPageSize.Add(new SelectListItem() { Text = "25", Value = "25", Selected = false });
+    itemsPageSize.Add(new SelectListItem() { Text = "30", Value = "30", Selected = true });
+    itemsPageSize.Add(new SelectListItem() { Text = "35", Value = "35", Selected = false });
+    itemsPageSize.Add(new SelectListItem() { Text = "40", Value = "40", Selected = false });
+    itemsPageSize.Add(new SelectListItem() { Text = "45", Value = "45", Selected = false });
+    itemsPageSize.Add(new SelectListItem() { Text = "50", Value = "50", Selected = false });
+
+    //format datime
+
+    IList<SelectListItem> itemsFormatDate = new List<SelectListItem>();
+    itemsFormatDate.Add(new SelectListItem() { Text = "dd.MM.yyyy HH:mm:ss", Value = "dd.MM.yyyy HH:mm:ss", Selected = true });
+    itemsFormatDate.Add(new SelectListItem() { Text = "dd/MM/yyyy HH:mm:ss", Value = "dd/MM/yyyy HH:mm:ss", Selected = false });
+
+    //get all font
+    var lstFont = (from item in System.Drawing.FontFamily.Families
+                   select new SelectListItem()
+                   {
+                       Value = item.Name,
+                       Text = item.Name
+                   }).ToList();
+    //barcode type
+    var barCodeType = (from Claw.Modules.Eshop.Helper.BarCodeType s in Enum.GetValues(typeof(Claw.Modules.Eshop.Helper.BarCodeType))
+                       select new SelectListItem { Value = s.ToString(), Text = s.ToString() }).OrderBy(x => x.Text);
+    var versionSetting = Claw.Modules.Eshop.Helper.VersionHelper.GetVersionSetting();
+    bool usePowerOffice = versionSetting != null ? versionSetting.PowerOffice : false;
+}
+<form action="@ModuleUrl.AdminUrl("Setting", "Display")" id="editForm" method="post">
+
+    @Html.ValidationSummary(true)
+
+    @*tab general*@
+    @*<section class="wr_clo1"></section>*@
+    @*<section class="row_content_box">
+            <section class="clo_left txt_align_r td-eshop"></section>
+        </section>*@
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@StringTable.CategorySetting</h2>
+            <label></label>
+        </section>
+        <section class="clo_right col-right-eshop">
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Category)</span>
+                <input id="IncSubCate" class="css-radio" type="radio" value="false" name="Category.IncSubCate" checked="@(!Model.Category.IncSubCate)" />
+                <label for="IncSubCate" class="css-labelradio">@StringTable.ShowProductsCategoryOnly</label>
+                <br />
+                <input id="InIncSubCate" class="css-radio" type="radio" value="true" name="Category.IncSubCate" checked="@(Model.Category.IncSubCate)" />
+                <label for="InIncSubCate" class="css-labelradio">@StringTable.ShowProductsChildrenyOnly</label>
+
+            </section>
+
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Product.GridMode)</span>
+                <input id="GridMode" class="css-radio" type="radio" value="true" name="Product.GridMode" checked="@(Model.Product.GridMode)" />
+                <label for="GridMode" class="css-labelradio">@StringTable.ShowProductsGrid</label>
+                <br />
+                <input id="InGridMode" class="css-radio" type="radio" value="false" name="Product.GridMode" checked="@(!Model.Product.GridMode)" />
+                <label for="InGridMode" class="css-labelradio">@StringTable.ShowProductsList</label>
+            </section>
+
+            <section class="controls" style="display:none">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Category.Image) (*)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Category.Image.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Category.Image.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Category.Image.Width) x @Html.LocalizeNameFor(m => m.Category.Image.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Image)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Image.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Image.Height)</section>
+                </section>
+                <div class="input-col-2"></div>
+            </section>
+
+            <section class="controls" >
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Category.Banner0)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Category.Banner0.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Category.Banner0.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Category.Banner0.Width) x @Html.LocalizeNameFor(m => m.Category.Banner0.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Banner0)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Banner0.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Banner0.Height)</section>
+                </section>
+                <div class="input-col-2"></div>
+            </section>
+
+            <section class="controls">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Category.Banner1)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Category.Banner1.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Category.Banner1.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Category.Banner1.Width) x @Html.LocalizeNameFor(m => m.Category.Banner1.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Banner1)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Banner1.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Banner1.Height)</section>
+                </section>
+                <div class="input-col-2"></div>
+            </section>
+
+            <section class="controls">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Category.Banner2)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Category.Banner2.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Category.Banner2.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Category.Banner2.Width) x @Html.LocalizeNameFor(m => m.Category.Banner2.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Banner2)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Banner2.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Banner2.Height)</section>
+                </section>
+                <div class="input-col-2"></div>
+            </section>
+
+            <section class="controls">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Category.Icon) (*)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Category.Icon.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Category.Icon.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Category.Icon.Width) x @Html.LocalizeNameFor(m => m.Category.Icon.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Icon)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Icon.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Category.Icon.Height)</section>
+                </section>
+                <div class="input-col-2"></div>
+            </section>
+
+        </section>
+    </section>
+    <section class="wr-line-eshop"></section>
+    @*<section class="row_content_box">
+            <section class="clo_left txt_align_r td-eshop"></section>
+        </section>*@
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@Html.LocalizeNameFor(m => m.Product)</h2>
+            <label></label>
+        </section>
+        <section class="clo_right col-right-eshop">
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Product.PageSize)</span>
+                @Html.LocalizeDropDownListKendoFor(x => x.Product.PageSize, itemsPageSize, null, new { @class = "select_es" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.Product.PageSize)</section>
+            </section>
+
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Product.Sorting)</span>
+                @Html.LocalizeDropDownListKendoFor(m => m.Product.Sorting, typeof(Claw.Modules.Eshop.Helper.SortingBiz).LocalizeEnumValues().OrderBy(x => x.Text), StringTable.Inherit, new { @class = "select_es" })
+            </section>
+
+            <section class="controls" style="margin-top: 10px">
+                <input type="checkbox" class="css-checkbox" value="true" name="@Html.NameFor(m => m.Product.PriceRound)" id="cb-price-round" @Html.Raw(Model.Product.PriceRound ? "checked=\"checked\"" : "") />
+                <label for="cb-price-round" class="css-labelcheck">@Html.LocalizeNameFor(m => m.Product.PriceRound)</label>
+                <input name="@Html.NameFor(m => m.Product.PriceRound)" value="false" type="hidden" id="vl-cb-price-round">
+                <div class="hintFieldInput">@StringTable.SettingAllowsRoundPrices</div>
+            </section>
+
+            <script>$('#cb-price-round').change(function () { $('#vl-cb-price-round').val($(this).is(":checked")); });</script>
+
+            <section class="controls">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Product.Image) (*)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.Image.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.Image.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Product.Image.Width) x @Html.LocalizeNameFor(m => m.Product.Image.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.Image)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.Image.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.Image.Height)</section>
+                </section>
+                <section class="input-col-2"></section>
+            </section>
+
+            <section class="controls">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Product.Thumb) (*)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.Thumb.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.Thumb.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Product.Thumb.Width) x @Html.LocalizeNameFor(m => m.Product.Thumb.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.Thumb)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.Thumb.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.Thumb.Height)</section>
+                </section>
+                <section class="input-col-2"></section>
+            </section>
+
+            <section class="controls">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Product.ThumbMobile) (*)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.ThumbMobile.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.ThumbMobile.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Product.ThumbMobile.Width) x @Html.LocalizeNameFor(m => m.Product.ThumbMobile.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.ThumbMobile)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.ThumbMobile.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.ThumbMobile.Height)</section>
+                </section>
+                <section class="input-col-2"></section>
+            </section>
+
+            <section class="controls">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Product.ThumbTablet) (*)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.ThumbTablet.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.ThumbTablet.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Product.ThumbTablet.Width) x @Html.LocalizeNameFor(m => m.Product.ThumbTablet.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.ThumbTablet)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.ThumbTablet.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.ThumbTablet.Height)</section>
+                </section>
+                <section class="input-col-2"></section>
+            </section>
+
+            <section class="controls">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Product.LogoManu) (*)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.LogoManu.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.LogoManu.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Product.LogoManu.Width) x @Html.LocalizeNameFor(m => m.Product.LogoManu.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.LogoManu)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.LogoManu.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.LogoManu.Height)</section>
+                </section>
+                <section class="input-col-2"></section>
+            </section>
+
+            <section class="controls">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Product.IconStatus) (*)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.IconStatus.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.IconStatus.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Product.IconStatus.Width) x @Html.LocalizeNameFor(m => m.Product.IconStatus.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.IconStatus)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.IconStatus.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.IconStatus.Height)</section>
+                </section>
+                <section class="input-col-2"></section>
+            </section>
+
+            <section class="controls">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Product.LogoSite) (*)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.LogoSite.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Product.LogoSite.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Product.LogoSite.Width) x @Html.LocalizeNameFor(m => m.Product.LogoSite.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.LogoSite)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.LogoSite.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Product.LogoSite.Height)</section>
+                </section>
+                <section class="input-col-2"></section>
+            </section>
+            @if (SettingsBiz.GetSettings().Hidden.ProdTechSpec)
+            {
+                <section class="controls">
+                    <section class="input-col">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Product.TechSpecIcon)</span>
+                        <table>
+                            <tr>
+                                <td>@Html.LocalizeTextBoxFor(x => x.Product.TechSpecIcon.Width, new {@class = "size-info"})</td>
+                                <td>x&nbsp;</td>
+                                <td>@Html.LocalizeTextBoxFor(x => x.Product.TechSpecIcon.Height, new {@class = "size-info"})</td>
+                                <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Product.TechSpecIcon.Width) x @Html.LocalizeNameFor(m => m.Product.TechSpecIcon.Height)</td>
+                            </tr>
+                        </table>
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Product.TechSpecIcon)</section>
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Product.TechSpecIcon.Width)</section>
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Product.TechSpecIcon.Height)</section>
+                    </section>
+                    <section class="input-col-2"></section>
+                </section>
+            }
+            @*<section class="controls">
+                    <span>@Html.LocalizeNameFor(m => m.Admin.Image.AutoResize)</span>
+                    @Html.CheckBoxFor(m => m.Admin.Image.AutoResize, new { @class = "" })
+                </section>*@
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.Image.AutoResize)</span>
+                <table>
+                    <tr>
+                        <td style="vertical-align: top">
+                            @Html.LocalizeRadioButtonFor(model => model.Admin.Image.AutoResize, "true", new { @id = "IsActiveTrue", @class = "css-radio js-required" })
+                            <label for="IsActiveTrue" class="css-labelradio">@StringTable.Yes</label>
+                            @Html.LocalizeRadioButtonFor(model => model.Admin.Image.AutoResize, "false", new { @id = "IsActiveFalse", @class = "css-radio js-required" })
+                            <label for="IsActiveFalse" class="css-labelradio">@StringTable.No</label>
+                        </td>
+                        <td>&nbsp;</td>
+                        <td><span class="error" style="display: none; float: left;">*</span></td>
+                    </tr>
+                </table>
+
+            </section>
+
+        </section>
+    </section>
+
+    <section class="wr-line-eshop"></section>
+    @*<section class="row_content_box">
+            <section class="clo_left txt_align_r td-eshop"></section>
+        </section>*@
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@Html.LocalizeNameFor(m => m.Admin)</h2>
+            <label></label>
+        </section>
+        <section class="clo_right col-right-eshop">
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.ProductPageSize)</span>
+                @Html.LocalizeDropDownListKendoFor(x => x.Admin.ProductPageSize, itemsPageSize, null, new { @class = "select_es" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.Admin.ProductPageSize)</section>
+            </section>
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.OrderPageSize)</span>
+                @Html.LocalizeDropDownListKendoFor(x => x.Admin.OrderPageSize, itemsPageSize, null, new { @class = "select_es" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.Admin.OrderPageSize)</section>
+            </section>
+
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.PageSize)</span>
+                @Html.LocalizeDropDownListKendoFor(x => x.Admin.PageSize, itemsPageSize, null, new { @class = "select_es" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.Admin.PageSize)</section>
+            </section>
+
+            <section class="controls" style="display:none;">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.IconSize) (*)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Admin.IconSize.Width, new { @class = "size-info" })</td>
+                            <td>x&nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.Admin.IconSize.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">@Html.LocalizeNameFor(m => m.Admin.IconSize.Width) x @Html.LocalizeNameFor(m => m.Admin.IconSize.Height)</td>
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Admin.IconSize)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Admin.IconSize.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Admin.IconSize.Height)</section>
+                </section>
+                <section class="input-col-2"></section>
+            </section>
+            @Html.HiddenFor(x => x.Admin.PrintLangCode)
+        </section>
+    </section>
+
+
+    <section class="wr-line-eshop"></section>
+    @*<section class="row_content_box">
+            <section class="clo_left txt_align_r td-eshop"></section>
+        </section>*@
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@Html.LocalizeNameFor(m => m.Admin.Image)</h2>
+            <label></label>
+        </section>
+        <section class="clo_right col-right-eshop">
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.Image.Extensions)</span>
+                    @Html.LocalizeTextBoxFor(m => m.Admin.Image.Extensions, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Admin.Image.Extensions)</section>
+                </section>
+                <section class="input-col-2">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.Image.Quality)</span>
+                    @Html.LocalizeTextBoxFor(x => x.Admin.Image.Quality, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Admin.Image.Quality)</section>
+                </section>
+            </section>
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.FileExtensions)</span>
+                @Html.LocalizeTextBoxFor(x => x.Admin.FileExtensions, new { @class = "" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.Admin.FileExtensions)</section>
+            </section>
+
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.Image.BackgroundColor)</span>
+                @Html.LocalizeTextBoxFor(x => x.Admin.Image.BackgroundColor, new { @class = "", @onclick = "showColorPicker($(this))" })
+                <span class="color-picker-box" style=" display:none; margin-left: 5px">
+                    @Html.LocalizeColorPickerFor(m => m.Admin.Image.BackgroundColor).Buttons(true)
+                </span>
+            </section>
+
+        </section>
+    </section>
+
+    <section class="wr-line-eshop"></section>
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@Html.LocalizeNameFor(m => m.Admin.MsTranslator)</h2>
+            <label></label>
+        </section>
+        <section class="clo_right col-right-eshop">
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.MsTranslator.ClientId)</span>
+                @Html.LocalizeTextBoxFor(m => m.Admin.MsTranslator.ClientId, new { @class = "" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.Admin.MsTranslator.ClientId)</section>
+            </section>
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.MsTranslator.ClientSecret)</span>
+                @Html.LocalizeTextBoxFor(m => m.Admin.MsTranslator.ClientSecret, new { @class = "" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.Admin.MsTranslator.ClientSecret)</section>
+            </section>
+        </section>
+    </section>
+    @if (usePowerOffice && SettingsBiz.GetSettings().Hidden.PowerOffice)
+    {
+        <section class="wr-line-eshop"></section>
+        <section class="row_content_box">
+            <section class="clo_left txt_align_r">
+                <h2>@Html.LocalizeNameFor(m => m.Admin.PowerOffice)</h2>
+                <label></label>
+            </section>
+            <section class="clo_right col-right-eshop">
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.PowerOffice.ApplicationKey)</span>
+                    @Html.LocalizeTextBoxFor(m => m.Admin.PowerOffice.ApplicationKey, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Admin.PowerOffice.ApplicationKey)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.PowerOffice.ClientKey)</span>
+                    @Html.LocalizeTextBoxFor(m => m.Admin.PowerOffice.ClientKey, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Admin.PowerOffice.ClientKey)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.PowerOffice.Mode)</span>
+                    @Html.LocalizeDropDownListKendoFor(m => m.Admin.PowerOffice.Mode, new[] { "Production", "Demo", "Test" }
+                        .Select(x => new SelectListItem() { Value = x, Text = x }), null, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Admin.PowerOffice.Mode)</section>
+                </section>
+            </section>
+        </section>
+    }
+
+    <section class="wr-line-eshop"></section>
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@Html.LocalizeNameFor(m => m.BarCode)</h2>
+            <label></label>
+        </section>
+        <section class="clo_right col-right-eshop">
+
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.BarCode.Standard)</span>
+                    @Html.LocalizeDropDownListKendoFor(x => x.BarCode.Standard, barCodeType, null, new { @class = "select_es" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.Standard)</section>
+                </section>
+                <section class="input-col-2"></section>
+            </section>
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.BarCode.FontFamily)</span>
+                    @Html.LocalizeDropDownListKendoFor(x => x.BarCode.FontFamily, lstFont, null, new { @class = "select_es" })
+                </section>
+                <section class="input-col-2">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.BarCode.FontSize)</span>
+                    @Html.LocalizeTextBoxFor(x => x.BarCode.FontSize, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.FontSize)</section>
+                </section>
+            </section>
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.BarCode.TopMargin)</span>
+                    @Html.LocalizeTextBoxFor(x => x.BarCode.TopMargin, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.TopMargin)</section>
+                </section>
+                <section class="input-col-2">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.BarCode.BottomMargin)</span>
+                    @Html.LocalizeTextBoxFor(x => x.BarCode.BottomMargin, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.BottomMargin)</section>
+                </section>
+            </section>
+
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.BarCode.LeftMargin)</span>
+                    @Html.LocalizeTextBoxFor(x => x.BarCode.LeftMargin, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.LeftMargin)</section>
+                </section>
+                <section class="input-col-2">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.BarCode.RightMargin)</span>
+                    @Html.LocalizeTextBoxFor(x => x.BarCode.RightMargin, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.RightMargin)</section>
+                </section>
+            </section>
+
+            <section class="controls">
+                <section class="input-col">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.BarCode.Image) (*)</span>
+                    <table>
+                        <tr>
+                            <td>@Html.LocalizeTextBoxFor(x => x.BarCode.Image.Width, new { @class = "size-info" })</td>
+                            <td>mm x &nbsp;</td>
+                            <td>@Html.LocalizeTextBoxFor(x => x.BarCode.Image.Height, new { @class = "size-info" })</td>
+                            <td class="size-info-hint">mm (@Html.LocalizeNameFor(m => m.BarCode.Image.Width) x @Html.LocalizeNameFor(m => m.BarCode.Image.Height))</td>
+                            <td>
+                                @{
+                                    var barcodeLabel = (new List<SelectListItem>(){
+                                        new SelectListItem(){Value="",Text="Select label size",Selected=true},
+                                        new SelectListItem(){Value="25;10",Text="25mm x 10mm"},
+                                        new SelectListItem(){Value="38;25",Text="38mm x 25mm"},
+                                        new SelectListItem(){Value="44;32",Text="44mm x 32mm"},
+                                        new SelectListItem(){Value="51;32",Text="51mm x 32mm"},
+                                        new SelectListItem(){Value="67;25",Text="67mm x 25mm"},
+                                        new SelectListItem(){Value="25;13",Text="25mm x 13mm"},
+                                        new SelectListItem(){Value="25;25",Text="25mm x 25mm"},
+                                        new SelectListItem(){Value="32;25",Text="32mm x 25mm"},
+                                        new SelectListItem(){Value="38;13",Text="38mm x 13mm"},
+                                        new SelectListItem(){Value="38;38",Text="38mm x 38mm"},
+                                        new SelectListItem(){Value="51;13",Text="51mm x 13mm"},
+                                        new SelectListItem(){Value="51;25",Text="51mm x 25mm"},
+                                        new SelectListItem(){Value="51;38",Text="51mm x 38mm"},
+                                        new SelectListItem(){Value="51;51",Text="51mm x 51mm"},
+                                        new SelectListItem(){Value="57;19",Text="57mm x 19mm"},
+                                        new SelectListItem(){Value="57;32",Text="57mm x 32mm"},
+                                        new SelectListItem(){Value="64;38",Text="64mm x 38mm"},
+                                        new SelectListItem(){Value="76;13",Text="76mm x 13mm"},
+                                        new SelectListItem(){Value="76;25",Text="76mm x 25mm"},
+                                        new SelectListItem(){Value="44;13",Text="44mm x 13mm"},
+                                        new SelectListItem(){Value="44;25",Text="44mm x 25mm"},
+                                        new SelectListItem(){Value="51;152",Text="51mm x 152mm"},
+                                        new SelectListItem(){Value="76;38",Text="76mm x 13mm"},
+                                    }).OrderBy(x => x.Value);
+
+                                }
+                                @Html.LocalizeDropDownListKendo("barcodeLable", string.Format("{0};{1}", Model.BarCode.Image.Width, Model.BarCode.Image.Height),
+                                    barcodeLabel, null, new { @style = "padding:3px 5px;" })
+                                <script type="text/javascript">
+                                    $("#barcodeLable").change(function () {
+                                        var value = $(this).val();
+                                        if (value != '') {
+                                            var sliptValue = value.split(';');
+                                            $("#@Html.IdFor(m=>m.BarCode.Image.Width)").val(sliptValue[0]);
+                                            $("#@Html.IdFor(m=>m.BarCode.Image.Height)").val(sliptValue[1]);
+                                        }
+                                    });
+                                </script>
+                            </td>
+
+                        </tr>
+                    </table>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.Image)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.Image.Width)</section>
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.Image.Height)</section>
+                </section>
+                <section class="input-col-2"></section>
+            </section>
+
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.BarCode.BarHeight)</span>
+                    @Html.LocalizeTextBoxFor(x => x.BarCode.BarHeight, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.BarHeight)</section>
+                </section>
+                <section class="input-col-2">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.BarCode.CharLength)</span>
+                    @Html.LocalizeTextBoxFor(x => x.BarCode.CharLength, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.CharLength)</section>
+                </section>
+            </section>
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.BarCode.DpiX)</span>
+                    @Html.LocalizeTextBoxFor(x => x.BarCode.DpiX, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.DpiX)</section>
+                </section>
+                <section class="input-col-2">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.BarCode.DpiY)</span>
+                    @Html.LocalizeTextBoxFor(x => x.BarCode.DpiY, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.BarCode.DpiY)</section>
+                </section>
+            </section>
+
+
+        </section>
+    </section>
+    <section class="wr-line-eshop"></section>
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@Html.LocalizeNameFor(m => m.qrCode)</h2>
+            <label></label>
+        </section>
+        <section class="clo_right col-right-eshop">
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.qrCode.DpiX)</span>
+                    @Html.LocalizeTextBoxFor(x => x.qrCode.DpiX, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.qrCode.DpiX)</section>
+                </section>
+                <section class="input-col-2">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.qrCode.DpiY)</span>
+                    @Html.LocalizeTextBoxFor(x => x.qrCode.DpiY, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.qrCode.DpiY)</section>
+                </section>
+            </section>
+        </section>
+    </section>
+
+    <section class="wr-line-eshop"></section>
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@Html.LocalizeNameFor(m => m.Admin.Social)</h2>
+            <label></label>
+        </section>
+        <section class="clo_right col-right-eshop">
+            <div class="" style="display:none">
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.Social.GoogleClientId) (*)</span>
+                    @Html.LocalizeTextBoxFor(m => m.Admin.Social.GoogleClientId, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Admin.Social.GoogleClientId)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.Social.GoogleClientSecret) (*)</span>
+                    @Html.LocalizeTextBoxFor(m => m.Admin.Social.GoogleClientSecret, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Admin.Social.GoogleClientSecret)</section>
+                </section>
+            </div>
+
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.Social.FaceAppId) (*)</span>
+                @Html.LocalizeTextBoxFor(m => m.Admin.Social.FaceAppId, new { @class = "" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.Admin.Social.FaceAppId)</section>
+            </section>
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Admin.Social.FaceAppSecret) (*)</span>
+                @Html.LocalizeTextBoxFor(m => m.Admin.Social.FaceAppSecret, new { @class = "" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.Admin.Social.FaceAppSecret)</section>
+            </section>
+
+        </section>
+    </section>
+
+    <section class="wr-line-eshop"></section>
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@Html.LocalizeNameFor(m => m.GoogleEcommerce)</h2>
+            <label></label>
+        </section>
+        <section class="clo_right col-right-eshop">
+
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.GoogleEcommerce.GoogleAccount) (*)</span>
+                @Html.LocalizeTextBoxFor(m => m.GoogleEcommerce.GoogleAccount, new { @class = "" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.GoogleEcommerce.GoogleAccount)</section>
+            </section>
+
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.GoogleEcommerce.EnableTracking)</span>
+                <table>
+                    <tr>
+                        <td style="vertical-align: top">
+                            @Html.LocalizeRadioButtonFor(model => model.GoogleEcommerce.EnableTracking, "true", new { @id = "IsEnableTrackingTrue", @class = "css-radio js-required" })
+                            <label for="IsEnableTrackingTrue" class="css-labelradio">@StringTable.Yes</label>
+                            @Html.LocalizeRadioButtonFor(model => model.GoogleEcommerce.EnableTracking, "false", new { @id = "IsEnableTrackingFalse", @class = "css-radio js-required" })
+                            <label for="IsEnableTrackingFalse" class="css-labelradio">@StringTable.No</label>
+                        </td>
+                        <td>&nbsp;</td>
+                        <td><span class="error" style="display: none; float: left;">*</span></td>
+                    </tr>
+                </table>
+            </section>
+
+        </section>
+    </section>
+
+    <section class="wr-line-eshop"></section>
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@Html.LocalizeNameFor(m => m.GoogleAnalytics4)</h2>
+            <label></label>
+        </section>
+        <section class="clo_right col-right-eshop">
+
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.GoogleAnalytics4.Code) (*)</span>
+                @Html.LocalizeTextAreaFor(m => m.GoogleAnalytics4.Code, new { @rows = "6" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.GoogleAnalytics4.Code)</section>
+            </section>
+
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.GoogleAnalytics4.Enable)</span>
+                <table>
+                    <tr>
+                        <td style="vertical-align: top">
+                            @Html.LocalizeRadioButtonFor(model => model.GoogleAnalytics4.Enable, "true", new { @id = "IsEnableGoogleAnalytics4True", @class = "css-radio js-required" })
+                            <label for="IsEnableGoogleAnalytics4True" class="css-labelradio">@StringTable.Yes</label>
+                            @Html.LocalizeRadioButtonFor(model => model.GoogleAnalytics4.Enable, "false", new { @id = "IsEnableGoogleAnalytics4False", @class = "css-radio js-required" })
+                            <label for="IsEnableGoogleAnalytics4False" class="css-labelradio">@StringTable.No</label>
+                        </td>
+                        <td>&nbsp;</td>
+                        <td><span class="error" style="display: none; float: left;">*</span></td>
+                    </tr>
+                </table>
+            </section>
+
+        </section>
+    </section>
+
+    <section class="wr-line-eshop"></section>
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@Html.LocalizeNameFor(m => m.Others)</h2>
+            <label></label>
+        </section>
+        <section class="clo_right col-right-eshop">
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Others.DateTimeFormat)</span>
+                @Html.LocalizeDropDownListKendoFor(x => x.Others.DateTimeFormat, itemsFormatDate, null, new { @class = "select_es" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.Others.DateTimeFormat)</section>
+            </section>
+
+            <section class="controls" style="display:none">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Others.PriceFormat)</span>
+                @Html.LocalizeTextBoxFor(x => x.Others.PriceFormat, new { @class = "" })
+            </section>
+
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Others.MUnit)</span>
+                @*@Html.DropDownListFor(x => x.Others.MUnit, itemsFormatDate, new { @class = "select_es" })*@
+                @Html.LocalizeDropDownListKendoFor(m => m.Others.MUnit, typeof(WeightUnit).LocalizeEnumValues<byte>().OrderBy(x => x.Text), null, new { @style = "", @class = "select_es" })
+                <section>@Html.LocalizeValidationMessageFor(x => x.Others.DateTimeFormat)</section>
+            </section>
+
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Others.GoToCart)</span>
+                <table>
+                    <tr>
+                        <td style="vertical-align: top">
+                            @Html.LocalizeRadioButtonFor(model => model.Others.GoToCart, "true", new { @id = "IsCartTrue", @class = "css-radio js-required" })
+                            <label for="IsCartTrue" class="css-labelradio">@StringTable.Yes</label>
+                            @Html.LocalizeRadioButtonFor(model => model.Others.GoToCart, "false", new { @id = "IsCartFalse", @class = "css-radio js-required" })
+                            <label for="IsCartFalse" class="css-labelradio">@StringTable.No</label>
+                        </td>
+                        <td>&nbsp;</td>
+                        <td><span class="error" style="display: none; float: left;">*</span></td>
+                    </tr>
+                </table>
+
+            </section>
+
+            <section class="controls">
+                <section class="input-col-1">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Others.ChangeStockStatus)</span>
+                    @Html.LocalizeTextBoxFor(x => x.Others.ChangeStockStatus, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Others.ChangeStockStatus)</section>
+                </section>
+
+                <section class="input-col-2"></section>
+            </section>
+
+            <div class="round-price-product" style="display: none">
+
+                <section class="controls">
+                    <section class="input-col-1">
+                        <span class="text-Eshop">@Html.LocalizeNameFor(m => m.Others.PriceRound)</span>
+                        @Html.LocalizeTextBoxFor(x => x.Others.PriceRound, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Others.PriceRound)</section>
+                    </section>
+
+                    <section class="input-col-2"></section>
+                </section>
+                <section class="controls">
+                    <section class="input-col-1">
+                        <span class="text-Eshop">@Html.LocalizeNameFor(m => m.Others.PriceFocusInc)</span>
+                        <table>
+                            <tr>
+                                <td style="vertical-align: top">
+                                    @Html.LocalizeRadioButtonFor(model => model.Others.PriceFocusInc, "true", new { @id = "IsPriceFocusIncTrue", @class = "css-radio js-required" })
+                                    <label for="IsPriceFocusIncTrue" class="css-labelradio">@StringTable.Yes</label>
+                                    @Html.LocalizeRadioButtonFor(model => model.Others.PriceFocusInc, "false", new { @id = "IsPriceFocusIncFalse", @class = "css-radio js-required" })
+                                    <label for="IsPriceFocusIncFalse" class="css-labelradio">@StringTable.No</label>
+                                </td>
+                                <td>&nbsp;</td>
+                                <td><span class="error" style="display: none; float: left;">*</span></td>
+                            </tr>
+                        </table>
+                    </section>
+
+                    <section class="input-col-2"></section>
+                </section>
+                <section class="controls">
+                    <section class="input-col-1">
+                        <span class="text-Eshop">@Html.LocalizeNameFor(m => m.Others.PriceStep)</span>
+                        @Html.LocalizeTextBoxFor(x => x.Others.PriceStep, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Others.PriceStep)</section>
+                    </section>
+
+                    <section class="input-col-2"></section>
+                </section>
+                <section class="controls">
+                    <section class="input-col-1">
+                        <span class="text-Eshop">@Html.LocalizeNameFor(m => m.Others.PriceResolution)</span>
+                        @Html.LocalizeTextBoxFor(x => x.Others.PriceResolution, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Others.PriceResolution)</section>
+                    </section>
+
+                    <section class="input-col-2"></section>
+                </section>
+
+                <section class="controls">
+                    <section class="input-col-1">
+                        <span class="text-Eshop">@Html.LocalizeNameFor(m => m.Others.TimeExpiredResetPassword)</span>
+                        @Html.LocalizeTextBoxFor(x => x.Others.TimeExpiredResetPassword, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Others.TimeExpiredResetPassword)</section>
+                    </section>
+                    <section class="input-col-2"></section>
+                </section>
+            </div>
+        </section>
+    </section>
+</form>

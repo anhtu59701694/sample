@@ -1,0 +1,1492 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model IEnumerable<OrderModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    var ctx = ClawContext.Current;
+    var pendingMailbox = QParam.GetField<bool?>("pendingMailbox", false) ?? false;
+    var bringShipping = QParam.GetField<bool?>("bringShipping", false) ?? false;
+    var shippingService = QParam.GetField<bool?>("shippingService", false);
+    var tilRegnskap = QParam.GetField<bool?>("tilRegnskap", false);
+    var renewpayment = QParam.GetField<bool?>("renewpayment", false);
+    var backorder2 = QParam.GetField<bool?>("backorder", false);
+    var dropship = QParam.GetField<bool?>("dropship", false);
+    var offer = Html.GetController().InList("Offer");
+    var cart = Html.GetController().InList("Cart");
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.OrderEdit;
+    ViewBag.Title = offer ? StringTable.ManageOffers : StringTable.ManageOrders;
+    ViewBag.AddAction = pendingMailbox || shippingService == true || QParam.GetField<int?>("status", false, true) == 3 && !offer ? null : "Add";
+    ViewBag.UseInlineEdit = true;
+    ViewBag.UseDatePicker = true;
+    ViewBag.ShowSearchBox = !Html.GetController().InList("Cart", "Offer");
+    ViewBag.ShowFilterBox = true;
+    ViewBag.SearchPlaceHolder = StringTable.SearchOrderPlaceHolder;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/order";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Order;
+    ViewBag.UseImgPreview = true;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var searchInfo = (OrderModel.AdvSearchModel)ViewBag.SearchInfo;
+    var paymentMethods = (List<PaymentMethodModel>)ViewBag.PaymentMethods;
+    var shippings = (List<ShippingModel>)ViewBag.Shippings;
+    var htmlAdvSearch = Html.GetHtmlHelper(searchInfo);
+    var backorder = (bool?)ViewBag.Backorder;
+    var backproduct = (ProductModel)ViewBag.BackProduct;
+    var backproductId = backproduct == null ? (int?)null : backproduct.Id;
+    var customer = (CustomerModel)ViewBag.Customer;
+    var customerId = customer == null ? (int?)null : customer.Id;
+
+    var companyNameText = StringTable.CompanyName;
+    var orgNumText = StringTable.OrgNumber.Replace("#", "");
+    var totalText = "eshop_adm_order_finaltotal, eshop".Localize();
+
+    if (false && Claw.Modules.Eshop.DAL.OrderMgr.FuncSaveorUpdate == null)
+    {
+        Claw.Modules.Eshop.DAL.OrderMgr.FuncSaveorUpdate = (orderModel, order, sess) => {
+
+            if (order == null) return true;
+
+            var changed = false;
+            order.OrderDetails.Action(m =>
+            {
+                var newSku = m.Product.CombinedSKU(m.Variant);
+                if (!newSku.IsNullOrEmpty() && newSku.InList(m.ProductSKU ?? "")) {
+                    m.ProductSKU = newSku; changed = true;
+                }
+            });
+
+            if (changed) sess.Update(order);
+
+            return true;
+        };
+    }
+    
+    if (false && Claw.Modules.Eshop.DAL.RecurOrderMgr.FuncRecur == null)
+    {
+        Claw.Core.Logs.LogHelper.EventLog("FuncRecur.Hook");
+
+        Claw.Modules.Eshop.DAL.RecurOrderMgr.FuncRecur = (db, order) => {
+
+            if (order == null) return;
+                                     
+            Claw.Core.Logs.LogHelper.EventLog(string.Format("FuncRecur. OrderId = {0}", order.Id));
+
+            order.OrderDetails.Action(m =>
+            {
+                var newSku = m.Product.CombinedSKU(m.Variant);
+                if (!newSku.IsNullOrEmpty() && !newSku.InList(m.ProductSKU ?? "")) {                    
+                    Claw.Core.Logs.LogHelper.EventLog(string.Format("FuncRecur. OrderId = {0}, Sku {1} -> {2}", order.Id, m.ProductSKU, newSku));
+                    m.ProductSKU = newSku; 
+                }
+            });
+
+        };
+    }
+}
+
+<script>
+    function increment(n) { return n + 1; }
+</script>
+@if (!offer)
+{
+    <style type="text/css">
+        .wr_submit_top .delete_big { display: none !important; }
+        /*.wr_submit_top .btn_add {display: none !important;}*/
+    </style>
+}
+<style type="text/css">
+    a.js-shipping-tracking {font-size: 14px; color: #390f3d; font-weight: bold; }
+    a.js-shipping-tracking:hover { color: #390f3d; }
+    .wr-txt-order-tb span.auto-hide[data-valid='0'] { display: none; }
+    .multi-select-action.advanced-search-visible { height: 23px; width: 100%; margin-top: 10px; }
+    #special-search { font-size: small; font-weight: bold; color: #390f3d; margin-top: 10px; }
+    #special-search .close-2 { color: red; font-size: small; }
+    #special-search .close-2:hover {color: red; cursor: pointer; }
+    .k-grid .td-nowrap { white-space: nowrap; }
+    #grid .wr-btn-table { margin: 0; }
+    #grid span[data-orderid='0'], #grid span[data-custid='0'] { display: none; }
+    #grid .cart-id { display: block; }
+    .k-grid .prod-name { color: brown; }
+    .wr-quick .bg-order-sum .row_content {min-height: 30px !important; }
+    .wr-quick { margin-left: 5px !important; }
+    .quick-view { padding: 15px; }
+    .quick-view .tt-total {float: left; width: 100%; }
+    .quick-view .wr-order-left, .quick-view .wr-order-right { margin-bottom: 0px; font-size: 14px; }
+    .quick-view img { max-width: 25px; padding: 3px; float: left; margin-top: -5px; }
+    .quick-view tr:last-child {border: none; }
+    .quick-view tr td { padding: 10px; }
+    .k-detail-row.quick-view-row { position: static !important; }
+
+    .btn_expand {
+        cursor: pointer;
+        display: inline-block;
+        font-size: 12px;
+        height: 28px;
+        line-height: 28px;
+        color: #3d3d3d;
+        background: url("/claw/sites/Default/Modules/Eshop/Images/admin/icon_btn.png?v=0220") 0px -579px no-repeat scroll;
+        border: none;
+        outline: 0;
+        padding: 0px 10px 0px 35px;
+    }
+
+    .out-btn-table .k-grid-Comments {
+        width: 16px;
+        height: 16px;
+        display: inline-block;
+        margin-left: 3px;
+        margin-top: 5px;
+        position: absolute;
+        background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAQCAYAAAAf8/9hAAACRElEQVQ4jc2ST0jTcRjG337fKdOQpVZiUhJ1kcCDJzvOrgbhQSL4DWQMkSGb1pDB1G0JXZSFSG6EwmLq2AwPmpMcBYYXZwMb+OegTqduv+W2km32G8rTZS1mCkGXHnjggfd9P5f3IfqvNN9VKpvrlMg9Gqb0aDidR8vpPVpO79FwOo+GKec6JfL5rlLZuccz2sIar6FSv+k1zaYP/SGIuyIyB0BmHxB3xHTUF9p83zPrNVTqZ7SFNXnH0x1FVV7jHXMqsrSL420guQEk1894AzjeRGr/067XeNs83VFUlQNMqRkvfJnwI7UBHAWwszyBj2+e/ZFxFACSaxA+j/in1IzPASbbuJ7T76spJPxAwg97byNOYgtIRpyw9zZCCPYhvGVAeMsAIdiHWMiWmmzjenIAZ6vEdJJYSSO+jJPDBQzrGuC2NEEImjGsa4DL8ghC0JxzZOtF2tkqMeUADhVThZZeBzIxL77tDWFAXY8BdT3iIUtejocsSOy9xPqH1oBDxVQ5wJhSWv326a3B6OpwOCU4kDwYudDhledhd2fF4JhSWp33idGWgjpH+1WLz8kvfl17JRxHnBkx6oYYdeFH1AUx6oJv/PGio73MMtpSUHduF+yKknIrz5psCq7byrMhK89sv3wam4WVZza7oqT8Lzr5W0ajkVM/kNzvb2bj/c1s/KK9S0RUQETFRHSFiK4T0U0iuktENURUK7/HnnQ/lLwjotrsrPgsgGUhUiK6TEQyIiojomtEVEFElUR0I5tl2d1/10/i/WTAnb9bdAAAAABJRU5ErkJggg==)
+    }
+    .wr-summary { line-height: 35px; font-size:14px; display: inline-block; }
+    .email_sent { color: #F00; }
+</style>
+
+@if (ClawContext.Current.IsSuperAdmin())
+{
+    <style type="text/css">
+        #grid .cart-id {
+            display: block !important;
+        }
+    </style>
+}
+
+<style>
+    .wr_table_all .table_all > tbody > tr:nth-child(even) td {background: #FFF !important;}    
+    .wr_table_all .table_all tbody td { border: none; vertical-align: top; }
+    .wr_table_all .table_all tbody td.td-center {padding: 6px 10px  !important;}
+    .wr_table_all .k-grid table.table-noborder {width: calc(100% - 15px);}
+    .wr_table_all .k-grid table.table-noborder tr {border: none !important;}
+    .wr_table_all .k-grid table.table-noborder tr td {border: none !important; padding: 2px 0; }
+    .wr_table_all .k-grid table.table-noborder tr td.col-2 {width: 30px; text-align: right;}
+    .wr_table_all .k-grid table.table-noborder tr td.col-2 .qty-stock {color: #F00;}
+    .wr_table_all .k-grid table.table-noborder tr td.col-3 {width: 30px; text-align: right;}
+    .wr_table_all .k-grid table.table-noborder tr td.col-4 {width: 25px; text-align: center;}
+    .wr_table_all .k-grid table.table-noborder tr td.col-5 {width: 70px; text-align: right;}
+    .wr-ship-booking { float:left; clear:both; }
+    .wr-ship-booking li{display:inline-block;float:left;}
+    .wr-ship-booking button{margin: 3px 0 0 0px;}
+    
+    .btn_shipping_booking_bundle {
+        cursor: pointer; display: inline-block; font-size: 12px; height: 28px; line-height: 28px;
+        color: #3d3d3d; background: url('/areas/admin/styles/images/icon_btn.png') 0px -412px no-repeat scroll;
+        border: none; outline: 0; padding: 0px 10px 0px 35px;
+    }
+          
+    .btn_dropship {
+        cursor: pointer; display: inline-block; font-size: 12px; height: 28px; line-height: 28px;
+        color: #3d3d3d; background: url('/areas/admin/styles/images/icon_btn.png') 0px -412px no-repeat scroll;
+        border: none; outline: 0; padding: 0px 10px 0px 35px;
+    }
+
+    #grid .lastview[data-valid="0"],#grid .emailview[data-valid="0"],#grid .orderid[data-valid="0"]{display:none;} 
+</style>
+
+<style type="text/css">
+    .wr-ship-booking .bring { display: @(settings.Hidden.ListOrderBookingBring && !(dropship??false) ? "block" : "none") !important; }
+    .wr-ship-booking .logistra { display: @(settings.Hidden.ListOrderBookingLogistra && !(dropship??false) ? "block" : "none") !important; }
+    .wr-ship-booking .proteria { display: @(settings.Hidden.ListOrderBookingProteria && !(dropship??false) ? "block" : "none") !important; }
+</style>
+
+@section MainTitleSection {
+    @(offer ? StringTable.ManageOffers : StringTable.ManageOrders)
+}
+
+@section CurrentTitleSection {
+    @(offer ? StringTable.ManageOffers : StringTable.ManageOrders)
+}
+
+@section FilterMenuSection {
+    <section class="row_content" style="min-height: initial; width: 70%;@(Html.GetController().InList("Cart", "Offer") ? "display:none" : "")">
+        @using (Html.BeginForm(null, null, FormMethod.Post, new { @id = "search-form" }))
+        {
+            <fieldset>
+                <legend class="scheduler-border adv-search" style="cursor: pointer;">@StringTable.AdvancedSearch</legend>
+                <section class="wr-search-adv" style="display: none;">
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.RefId)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeTextBoxFor(m => m.RefId, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.RefId)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.Email)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeTextBoxFor(m => m.Email, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.Email)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.Name)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeTextBoxFor(m => m.Name, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.Name)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.ProductName)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeTextBoxFor(m => m.ProductName, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.ProductName)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.SerialNumber)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeTextBoxFor(m => m.SerialNumber, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.SerialNumber)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.FromDate)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeDateTextBoxFor(m => m.FromDate, -1, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.FromDate)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.PaymentMethodId)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeDropDownListKendoFor(m => m.PaymentMethodId, paymentMethods
+                                .Select(x => new SelectListItem() { Value = x.Id.ToString(), Text = x.Name, }),
+                                Claw.Modules.Eshop.Payment.StringTable.SelectPaymentMethod, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.PaymentMethodId)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.ShippingId)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeDropDownListKendoFor(m => m.ShippingId, shippings
+                                .Select(x => new SelectListItem() { Value = x.Id.ToString(), Text = x.Name, }),
+                                Claw.Modules.Eshop.Shipping.StringTable.SelectShipping, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.ShippingId)</div>
+                        </div>
+                    </section>
+                    @if (settings.Hidden.OrderFlagCustom0)
+                    {
+                        <section class="row_content_box">
+                            <section class="clo_left txt_align_r">
+                                <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.FlagCustom0)</label>
+                            </section>
+                            <div class="clo_right">
+                                @htmlAdvSearch.HiddenFor(m => m.FlagCustom0)
+                                <input id="FlagCustom0_Yes" checked="@(searchInfo.FlagCustom0 == true)" class="css-checkbox" type="checkbox" />
+                                <label for="FlagCustom0_Yes" class="css-labelcheck">@StringTable.Yes</label>
+                                <input id="FlagCustom0_No" checked="@(searchInfo.FlagCustom0 == false)" class="css-checkbox" type="checkbox" />
+                                <label for="FlagCustom0_No" class="css-labelcheck">@StringTable.No</label>
+                            </div>
+                        </section>
+                    }
+                    @if (settings.Hidden.OrderFlagCustom1)
+                    {
+                        <section class="row_content_box">
+                            <section class="clo_left txt_align_r">
+                                <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.FlagCustom1)</label>
+                            </section>
+                            <div class="clo_right">
+                                @htmlAdvSearch.HiddenFor(m => m.FlagCustom1)
+                                <input id="FlagCustom1_Yes" checked="@(searchInfo.FlagCustom1 == true)" class="css-checkbox" type="checkbox" />
+                                <label for="FlagCustom1_Yes" class="css-labelcheck">@StringTable.Yes</label>
+                                <input id="FlagCustom1_No" checked="@(searchInfo.FlagCustom1 == false)" class="css-checkbox" type="checkbox" />
+                                <label for="FlagCustom1_No" class="css-labelcheck">@StringTable.No</label>
+                            </div>
+                        </section>
+                    } 
+                    @if (settings.Hidden.DropShip)
+                    {
+                        <section class="row_content_box">
+                            <section class="clo_left txt_align_r">
+                                <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.FlagDropShip)</label>
+                            </section>
+                            <div class="clo_right">
+                                @htmlAdvSearch.HiddenFor(m => m.FlagDropShip)
+                                <input id="FlagDropShip_Yes" checked="@(searchInfo.FlagDropShip == true)" class="css-checkbox" type="checkbox" />
+                                <label for="FlagDropShip_Yes" class="css-labelcheck">@StringTable.Yes</label>
+                                <input id="FlagDropShip_No" checked="@(searchInfo.FlagDropShip == false)" class="css-checkbox" type="checkbox" />
+                                <label for="FlagDropShip_No" class="css-labelcheck">@StringTable.No</label>
+                            </div>
+                        </section>
+                    }        
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r"><label class="fl_r"> </label></section>
+                        <div class="clo_right">
+                            <ul class="wr_submit_top">
+                                <li> <input type="submit" value="@StringTable.Search" class="btn_search_t"></li>
+                                <li> <input type="button" value="@StringTable.Cancel" class="btn_cancel adv-search"></li>
+                            </ul>
+                        </div>
+                    </section>
+                </section>
+
+
+
+            </fieldset>
+        }
+        @if (customer != null || ViewBag.RecurOrderId != null)
+        {
+            <div id="special-search">
+                @if (customer != null)
+                {
+                    <span class="text">@StringTable.OrderFilterByCustomerHint: @(customer.ContactName) [@(customer.Email)]</span>
+                }
+                @if (ViewBag.RecurOrderId != null)
+                {
+                    <span class="text">@StringTable.RecurOrder#: @ViewBag.RecurOrderId</span>
+                }
+                <span class="close-2" title="@StringTable.Close"> X </span>
+            </div>
+        }
+    </section>
+    @if (!offer)
+    {
+        <section class="btn-allprint multi-select-action" style="float: right;">
+            <ul class="wr_submit_top" style="margin-top: -5px; @(ViewBag.PermissionEdit ? "" : "display:none;")">
+                @if (pendingMailbox)
+                {
+                    <li> <input type="button" value="@StringTable.BringMailBoxSubmit" class="btn_add btn_submit_mailbox"></li>
+                }
+                else
+                {   
+                    if (settings.Hidden.DropShip && !(dropship??false))
+                    {
+                        <li><input type="button" value="@StringTable.DropShip" class="btn_dropship" onclick="markDropShip()"></li>
+                    }
+                    if (settings.Display.Admin.Shipping.ShippingBundleBookingProvider > 0 && !(dropship??false))
+                    {
+                        <li><input type="button" value="@StringTable.ShippingBookingBundle" class="btn_shipping_booking_bundle" onclick="openShippingBookingBundle()"></li>
+                    }
+                    <li><input type="button" value="@StringTable.SendOrder" class="btn_sent"></li>
+                    <li> <input type="button" value="@StringTable.PrintEDI" class="btn_print btn_print_EDI"></li>
+                    <li> <input type="button" value="@StringTable.PrintProteria" class="btn_print btn_print_Proteria"></li>
+                    <li> <input type="button" value="@StringTable.PrintPackingslip" class="btn_print btn_print_Packingslips"></li>
+                    <li style="display: none;"> <input type="button" value="@StringTable.ExportExcel" class="btn_export btn_export_excel"></li>
+                }
+            </ul>
+        </section>
+    }
+}
+
+@{
+    var idTemp = string.Format(@" 
+<span class='cart-id'>{3}\#\: <strong>#:ifnull(CartOrderId)#</strong> #: CartNotified ? '&#128231;' : '' #</span>
+<span>{2}\#\: <strong>#:ifnull(ReservationId)#</strong></span>
+<div class='out-btn-table'>
+<div class='wr-btn-table'><a class='btn_detail k-grid-View' actfield='{4}' action='Input'>{0}</a></div>
+<ul class='wr-ship-booking'>
+    <li><button class='btn bring' onclick='openBringShippingBookingForm(#:Id#)'>{7}</button></li>
+    <li><button class='btn logistra' onclick='openLogistraBookingForm(#:Id#)'>{8}</button></li>
+    <li><button class='btn proteria' onclick='openProteriaBookingForm(false, #:Id#)'>{9}</button></li>
+</ul>
+<div style='display: none;' class='wr-btn-table wr-quick'><a href='javascript:void(0)' onclick='quickViewDetail(this, #:Id#)' class='btn_expand k-grid-View' data-expand='{5}' data-collapse='{6}'>{5}</a></div>
+# if (Comments) {{#<a class='k-grid-Comments' title='#:Comments#'></a>#}}#
+</div>", StringTable.Detail, StringTable.Order, StringTable.Res, Html.LocalizeNameFor(m => m.CartOrderId), 
+       Html.GetController().InList("Cart", "Offer") ? "CartOrderId" : "Id", StringTable.DetailExpand, StringTable.DetailCollapse,
+       StringTable.BringBooking, StringTable.ShippingBooking, StringTable.ProteriaBooking);
+@*<div class='wr-btn-table mr0'><a class='btn_edit k-grid-Edit' actfield='Id' action='Edit'>{1}</a></div>*@
+
+var customerTempl = string.Format(@"
+<table class='table-noborder'>
+  <tr>
+        <td>
+#: Customer.ContactName ? Customer.ContactName : ifnull(DeliverName) #  {3} 
+ # if (Customer.CompanyName) {{ # -  #:Customer.CompanyName # ({0}\: #:ifnull(Customer.OrgNumber) #) # }} # 
+        </td>
+        <td colspan='4' style='text-align: right;'>
+            {1}:
+            <b>
+            #: FinalTotal.Text #            
+            </b>
+        </td>
+    </tr>
+# if (OrderDetails != null && OrderDetails.length > 0) {{ #    
+    # for (var i = 0; i < OrderDetails.length; i = increment(i)) {{ #
+        <tr>
+            <td class='col-1'>
+            - #: OrderDetails[i].ProductName # 
+             # if (OrderDetails[i].ProductSKU) {{ #
+                [#: OrderDetails[i].ProductSKU #] 
+            # }} #
+            </td>
+            <td class='col-2'>
+                # if (OrderDetails[i].ProductQty <= 0) {{ #
+                <div class='qty-stock'>
+                    #: (-1*OrderDetails[i].ProductBackQty) #  
+                </div>
+                # }} #
+            </td>
+            <td class='col-3'>#: OrderDetails[i].Quantity #</td>
+            <td class='col-4'> x </td>          
+            <td class='col-5'>#: OrderDetails[i].FinalPrice.Text #</td> 
+        </tr>
+    # }} #
+# }} #
+ </table>
+<br/>
+ #:ifnull(PaymentName)#<br/>
+ #:ifnull(ShippingName)#
+ # if (ShippingTrackingId || ShippingTrackingUrl) {{ #
+    <br/>{2}\\#: <a data-id='#:Id#' target='_blank' class='js-shipping-tracking' href='#: ShippingTrackingUrl #'>#:ifnull(ShippingTrackingId, ShippingTrackingUrl)#</a>
+ # }} #
+", orgNumText, totalText, StringTable.ShippingTracking, offer ? "(#: Customer.Email #)" : "");
+
+var deliverTempl = string.Format(@"
+<span>#:DeliverName#</span>
+<span>#:DeliverInfo#</span>
+<span><h3>{0}:</h3></span>
+<span>#:BillingInfo#</span>", Html.LocalizeNameFor(m => m.BillingInfo));
+
+var orderedDateTempl = string.Format(@"# if (false && DeliveredDate && DeliveredDate.Value) {{ # 
+<div>#:safeProp(CreatedDate,'TextF')#</div><br/>
+<div>{1}: #:safeProp(DeliveredDate,'TextF')#</div> 
+#}}  else {{# 
+<div>#:safeProp(CreatedDate,'TextF')#</div> 
+#}}#", StringTable.Date, StringTable.SentOn);
+
+var offerDateTempl = string.Format(@"
+<span>#:safeProp(CreatedDate,'TextF')#</span><br/>
+<div class='lastview' data-valid='#:OfferLastView ? 1 : 0 #'>{0}: #:safeProp(OfferLastView,'TextF')#</div>
+<div class='emailview' data-valid='#:OfferEmailView ? 1 : 0 #'>{3}: #:safeProp(OfferEmailView,'TextF')#</div>
+<div class='orderid' data-valid='#:OfferOrderId > 0 ? 1 : 0 #'>{1}: <a class='k-grid-link' href='{2}/#:OfferOrderId#'>#:OfferOrderId#</a></div>
+ ", Html.LocalizeNameFor(m => m.OfferLastView), Html.LocalizeNameFor(m => m.OfferOrderId), ModuleUrl.AdminUrl("Order", "Input"), Html.LocalizeNameFor(m => m.OfferEmailView));
+
+var payShipTempl = string.Format(@"
+<span>#:PaymentName#</span>
+<span style='display: none;' class='auto-hide' data-valid='#:(CombinedTransactionId?1:0)#'>{0}\#\: #:ifnull(CombinedTransactionId)#</span>
+<span>#:ifnull(ShippingName)#</span>
+<span></span>
+<span style='display: none;' class='auto-hide' data-valid='#:(ShippingTrackingId?1:0)#'>{1}\#\: <a target='_blank'  href='#:ShippingTrackingUrl#'>#:ifnull(ShippingTrackingId)#</a></span><br>", StringTable.Transaction, StringTable.Track);
+}
+@Html.AntiForgeryToken()
+@{ KendoGrid<OrderModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete2", null, null, null, @settings.Display.Admin.OrderPageSize)
+    .DataSource(m => m.Key, "List", null, null, "gridGetParams")
+    .Paging(10, new[] { 10, 20, 30, 50, 100 }, offer ? StringTable.Offers : StringTable.Orders)
+    .ColumnCheckBox(m => m.Key)
+    .Columns(grid => new[]
+    {
+        offer ? grid.Col(m => m.CartOrderId,"Input", m => m.CartOrderId, false, 120)
+                .SetCssClass("td-center") 
+           : grid.Col(m => m.Id, StringTable.OrderNo, false, 90)
+            .SetCssClass("td-center")
+            .SetTemplate("<a class='grid-row-edit'>#:Id#</a>"),
+        offer ? null : grid.Col(m => m.InvoiceId, StringTable.InvoiceNo, false, 90)
+           .SetCssClass("td-center"),
+        offer ? null : grid.Col(m => m.Id, StringTable.OrderNo, false, 210)
+            .SetCssClass("wr-txt-order-tb")
+            .SetTemplate(idTemp),
+        grid.Col(m => m.Id, StringTable.Customer, false)
+            .SetCssClass("wr-txt-order-tb")
+            .SetTemplate(customerTempl),
+        //grid.Col(m => m.DeliverInfo)
+        //    .SetCssClass("wr-txt-order-tb")
+        //    .SetTemplate(deliverTempl),
+        //grid.Col(m => m.FinalTotal, false, 120)
+        //    .SetCssClass("td-right td-nowrap")
+        //    .SetTemplate("#:localizeCurrencyToString(safeProp(FinalTotal,'Value') || 0, Currency)#"),
+       offer ? grid.Col(m => m.CreatedDate, StringTable.CreatedDate, true, 120)
+            .SetCssClass("td-center")
+            .SetTemplate(offerDateTempl)
+            : grid.Col(m => m.CreatedDate, true, 90)
+                .SetCssClass("td-center")
+                .SetTemplate(orderedDateTempl),
+       offer || cart || backorder2 != null ? null : grid.Col(m => m.DeliveredDate, true, 90)
+        .SetTemplate("#:safeProp(DeliveredDate, 'TextF')#"),
+        offer ? grid.Col(m => m.OfferExpiredDate, "View", m => m.CartOrderId, true, 90)
+            .SetCssClass("td-center")
+            .SetTemplate("#:safeProp(OfferExpiredDate, 'Text')#<br/><a class='grid-row-edit' target='_blank'>" + ("Preview").ModLocalize() + "</a><div class='email_sent'>#:(OfferEmailSent == null || OfferEmailSent ? '&#9993;':'')#</div>") : null,
+        grid.Col(m => m.OrderStatusTxt, false, 90)
+            .SetCssClass("td-center"),
+        //grid.Col(m => m.Id, StringTable.PaymentAndShipping, false, 250)
+        //    .SetCssClass("wr-txt-order-tb last")
+        //    .SetTemplate(payShipTempl),
+    }.Where(m => m != null).ToArray())
+    .ColumnCommand(grid => new[]
+    {
+        offer ? grid.Cmd(m => m.CartOrderId, "Input", "Edit", "edit_fr") : null,
+        offer ? grid.Cmd(m => m.CartOrderId, "Delete2", "Delete", "delete_fr", true) : null
+    }.Where(x => x != null).ToArray(), 90)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<div style="display: none">
+    @Html.LocalizeDropDownListKendo("status-ddlist-templ", null,
+        typeof(OrderStatus).LocalizeEnumValues<byte>(null, x => x.ToString()),
+        StringTable.SelectStatus, new { })
+</div>
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type='text/javascript'> var currencies = @Html.Raw(Json.Encode(ViewBag.Currencies)); </script>
+
+<script type="text/javascript">
+    var dateInput = $('#@htmlAdvSearch.IdFor(m => m.FromDate.Value)');
+    var advSearchFrm = $('#search-form .wr-search-adv');
+
+    function adjustPrintButtons() {
+        setTimeout(function() {
+            if (advSearchFrm.is(':visible')) {
+                $('.multi-select-action').addClass('advanced-search-visible');
+                var obj = $("#search-form").find("fieldset");
+                if (!obj.hasClass("scheduler-border")) obj.addClass("scheduler-border");
+            }
+            else $('.multi-select-action').removeClass('advanced-search-visible');
+        }, 600);
+    }
+
+    if ('@(searchInfo.IsDataModelEmpty ? 1 : 0)' == '1') {
+        advSearchFrm.show(); $('#formSearch').hide();
+        adjustPrintButtons();
+    }
+
+    var grid = $('#grid');
+
+    initCurrencies(currencies);
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function gridCustom(grid) {
+        $('input.row-checkbox', grid.element).each(function(){
+            var rw = grid.dataItem($(this).closest('tr'));
+            if(rw && [@(OrderStatus.Cancelled.Val()), @(OrderStatus.Credit.Val()), @(OrderStatus.PaymentWaiting.Val())].includes(rw.OrderStatus))
+                $(this).prop('disabled', true);
+        })
+    }
+
+    function gridDoBigCmd(url, type, cmdAction) {
+        var ids = '', idx = 0, gridData = grid.data('kendoGrid');
+        var rows = gridData.tbody.find('input:checked').closest('tr');
+        rows.each(function () {
+            var datarw = gridData.dataItem($(this));
+            ids += (idx == 0 ? '?' : '&') + 'ids[' + idx + ']=' + datarw.id; idx++;
+        });
+        if (type)ids = ids + "&type=" + type;
+        if (ids) {
+            if (cmdAction) ajaxCmd(url + ids, {}, function(result) {grid.data('kendoGrid').dataSource.page(1);});
+            else location.href = url + ids;
+        }
+    }
+
+    function safeProp(obj, propName) {
+        if (obj == null) return '';
+        return obj[propName] || '';
+    }
+
+    @{
+        string sortField;
+        System.ComponentModel.ListSortDirection sortDir;
+        QParam.GetGridSort<OrderModel>(out sortField, out sortDir);
+    }
+
+    function gridGetParams(grid, e) {
+        var backorder = '@backorder'.toLowerCase(), backproductId = '@backproductId', customerId = '@customerId', recurOrderId='@ViewBag.RecurOrderId';
+        var pendingMailbox = @(pendingMailbox ? "true" : "false");
+        var bringShipping = @(bringShipping ? "true" : "false");
+        var porterbuddy = '@(QParam.GetField<string>("porterbuddy", false))';
+        var tilRegnskap = '@(tilRegnskap == null ? "" : (tilRegnskap == true ? "true" : "false"))';
+        var renewpayment = '@(renewpayment == null ? "" : (renewpayment == true ? "true" : "false"))';   
+        var dropship = '@(dropship == null ? "" : (dropship == true ? "true" : "false"))';
+        var sortField = '@sortField', sortDir = '@(sortDir == System.ComponentModel.ListSortDirection.Ascending ? "asc" : "desc")';
+
+        if (advSearchFrm.is(':visible')) {
+            return urlToJSON('?' + advSearchFrm.closest('form').serialize() + '&backorder=' + backorder + '&backproductid=' + backproductId + '&customerid=' + customerId + '&recurOrderId=' + recurOrderId + '&status=@searchInfo.Status' + '&pendingMailbox=' + pendingMailbox + '&bringShipping=' + bringShipping + '&tilRegnskap=' + tilRegnskap + '&dropship=' + dropship +'&sort=' + sortField + '&dir=' + sortDir + '&porterbuddy=' + porterbuddy + '&renewpayment=' + renewpayment);
+        }
+        else return { refid: $('#inputSearch').val(), status: '@searchInfo.Status', backorder: backorder, backproductid: backproductId, customerid: customerId, recurOrderId: recurOrderId, pendingMailbox: pendingMailbox, bringShipping: bringShipping, tilRegnskap: tilRegnskap, sort: sortField, dir: sortDir, porterbuddy: porterbuddy, renewpayment: renewpayment, dropship: dropship };
+    }
+
+    $(".adv-search").click(function () {
+        var obj = $("#search-form").find("fieldset");
+        if (obj.hasClass("scheduler-border")) obj.removeClass("scheduler-border");
+        else obj.addClass("scheduler-border");
+
+        advSearchFrm.slideToggle(500);
+        $('#formSearch').slideToggle(500);
+        adjustPrintButtons();
+    });
+
+    $('#search-form').submit(function () {
+        if ($(this).valid()) grid.data('kendoGrid').dataSource.page(1);
+        return false;
+    });
+
+    $('#special-search .close-2').click(function () {
+        location.href = '@ModuleUrl.AdminUrl(Html.GetController(), "Index")';
+    });
+
+    //print EDI
+    $('.btn_print_EDI').unbind('click').click(function () {
+        var theUrl = "@ModuleUrl.AdminUrl("Order", "PrintListEDIOrProteria")";
+        gridDoBigCmd(theUrl, "EDI");
+    });
+
+    $('#FlagCustom0_Yes,#FlagCustom0_No').change(function () {
+        var flagCustom = $('#@htmlAdvSearch.IdFor(m => m.FlagCustom0)');
+        if ($(this).prop('checked')) {
+            if ($(this).is('#FlagCustom0_Yes')) {
+                flagCustom.val('true');
+                $('#FlagCustom0_No').prop('checked', false);
+            } else {
+                flagCustom.val('false');
+                $('#FlagCustom0_Yes').prop('checked', false);
+            }
+        } else flagCustom.val('');
+    }).change();
+
+    $('#FlagCustom1_Yes,#FlagCustom1_No').change(function () {
+        var flagCustom = $('#@htmlAdvSearch.IdFor(m => m.FlagCustom1)');
+        if ($(this).prop('checked')) {
+            if ($(this).is('#FlagCustom1_Yes')) {
+                flagCustom.val('true');
+                $('#FlagCustom1_No').prop('checked', false);
+            } else {
+                flagCustom.val('false');
+                $('#FlagCustom1_Yes').prop('checked', false);
+            }
+        } else flagCustom.val('');
+    }).change();
+
+    $('#FlagDropShip_Yes,#FlagDropShip_No').change(function () {
+        var flagDropShip = $('#@htmlAdvSearch.IdFor(m => m.FlagDropShip)');
+        if ($(this).prop('checked')) {
+            if ($(this).is('#FlagDropShip_Yes')) {
+                flagDropShip.val('true');
+                $('#FlagDropShip_No').prop('checked', false);
+            } else {
+                flagDropShip.val('false');
+                $('#FlagDropShip_Yes').prop('checked', false);
+            }
+        } else flagDropShip.val('');
+    }).change();
+
+    //print Proteria
+    $('.btn_print_Proteria').unbind('click').click(function () {
+        var theUrl = "@ModuleUrl.AdminUrl("Order", "PrintListEDIOrProteria")";
+        gridDoBigCmd(theUrl, "Proteria");
+    });
+
+    //print list PackingSlips
+    $('.btn_print_Packingslips').unbind('click').click(function () {
+        var theUrl = "@ModuleUrl.FrontUrl("Pdf",0, "PackingSlips")";
+        gridDoBigCmd(theUrl, null);
+    });
+
+    $('.btn_export_excel').unbind('click').click(function () {
+        gridDoBigCmd('@ModuleUrl.AdminUrl("Order", "Export")');
+    });
+
+    $('.btn_submit_mailbox').unbind('click').click(function () {
+        gridDoBigCmd('@ModuleUrl.AdminUrl("BringShipping", "MailBoxCommit")', null, true);
+    });
+
+    $('.btn_sent').unbind('click').click(function() {
+        showSendDlg();
+    });
+
+    $(function () { initDatePicker(dateInput); if (window.showSummary) window.showSummary(); });
+
+    //function onFilterChange() {
+    //    grid.data('kendoGrid').dataSource.page(1);
+    //}
+
+</script>
+
+@if (searchInfo != null && (searchInfo.Status ?? 0).InList(OrderStatus.New)) 
+{
+    <script>
+        function showSummary()
+        {
+            var holder = $('.wr_breadcrumb').append('<div class="wr-summary">').find('.wr-summary');
+            ajaxREST('@ModuleUrl.AdminUrl("dashboardreport","summary")?orderstatuses=1,6',  'GET', {}, 'loading', function (result) {
+                if (result.Data && result.Data.Statuses)
+                {
+                    holder.html('(<span>@("order_summary_count".ModLocalize("Totalt antall nye ordre")): ' + (result.Data.Count || 0)
+                        + '</span>. [<span>@(typeof(OrderStatus).LocalizeEnumValue((byte)OrderStatus.New)): ' + (safeProp(result.Data.Statuses[1],'Count') || 0) + ' (' + (safeProp(safeProp(result.Data.Statuses[1], 'Total'), 'Text') || 0) + ')'
+                        + '</span> / <span>@(typeof(OrderStatus).LocalizeEnumValue((byte)OrderStatus.RestOrder)): '
+                        + (safeProp(result.Data.Statuses[6],'Count') || 0) + ' (' + (safeProp(safeProp(result.Data.Statuses[6], 'Total'), 'Text') || 0) + ')</span>])');
+                }
+            });
+        }
+    </script>
+}
+
+<script type="text/javascript">
+
+    function showSendDlg(ids) {
+
+        var scrollTop = $(window).scrollTop();
+        var dialog = new ClawDialog('modal-mask');
+        var content = $('<div>').html($("#confirm-dialog-templ").html());
+
+        content.find('.prompt-mess').html('@StringTable.OrderSendConfirmMsg'.replace('&lt;br&gt;', '<br>'));
+        content.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var kendoWindow = dialog.showDialog('@StringTable.SendOrder', content.html(), 550, 200);
+        var promptMsg = kendoWindow.find('.prompt-mess'), orderList = kendoWindow.find('.order-list');
+
+        admincommon.hideMessage();
+
+        var cmdUrl = '@ModuleUrl.AdminUrl(Html.GetController(), "Send")/';
+        var items = [], itemsForced = [], results = [], gridData = grid.data('kendoGrid');
+
+        if(ids && ids.length != 0) {
+            ids.forEach(function(id){
+                items.push({ order: gridData.dataItem($('#grid_rwcbox_' + id, grid).closest('tr')), checkResult: null});
+            });
+        }
+        else
+            gridData.tbody.find('input:checked').closest('tr').each(function () {
+                items.push({ order: gridData.dataItem($(this)), checkResult: null});
+            });
+
+        kendoWindow.find('.btn_yes').click(function () {
+            $(this).closest('.wr_btn_pp').hide(); promptMsg.hide(); orderList.show();
+            kendoWindow.find('.btn_no').html('@StringTable.Cancel');
+            checkOrder();
+        });
+
+        kendoWindow.find('.btn_no').click(function () {
+            $('#input-err-msg-box').append(kendoWindow.find('#massage.show_massage'));
+            $(window).scrollTop(scrollTop); admincommon.hideMessage();
+            dialog.close();
+        });
+
+        function checkOrder() {
+
+            if (items.length == 0) {
+                var itemsErr = results.filter(function(ord) { return !ord.statusResult || !(ord.statusResult.Status == 0); });
+
+                console.log('checkOrder done', itemsErr, results);
+
+                if (itemsErr.length != 0) {
+                    itemsForced = results.filter(function(ord) { return ord.captureResult && !(ord.captureResult.Status == 0); });
+                    if (itemsForced.length != 0) {
+                        kendoWindow.find('.btn_yes').click(function() {
+                            $(this).closest('.wr_btn_pp').hide();
+                            itemsForced.forEach(function(item) { doStatus(null, item.element, true); });
+                        }).html('@StringTable.ForceSendOrder').closest('.wr_btn_pp').show();
+                    }
+                }
+
+                doComplete(results.length - itemsErr.length, results.length, itemsErr.length == 0);
+
+                return;
+            }
+
+            var itm = items.pop();
+            var iEle = itm.element = $('<tr><td>' + itm.order.id + '</td><td class="msg">@StringTable.OrderCheckTransactionMsg</td></tr>')
+                .attr({ id: 'order-msg-' + itm.order.id })
+                .data('clawData', itm);
+
+            orderList.append(iEle);
+
+            adjustPopup( $('#modal').closest('.k-window'), '.order-list', '.dlg_body', null, null, 60, 45);
+            
+            if((itm.order.Flags & (@(Claw.Modules.Eshop.Domain.Interfaces.OrderFlagType.Custom0.Val()) | @(Claw.Modules.Eshop.Domain.Interfaces.OrderFlagType.Custom1.Val()))))
+            {
+                var result = {Status: 2, Message: '@("no send for order flag custom".ModLocalize("Send is disabled for custom flags"))'};
+
+                iEle.find('.msg').append($('<div class="error">').html(result.Message));
+                itm.checkResult = result;
+                results.push(itm);
+                setTimeout( checkOrder, 10);
+            }
+            else ajaxCmd(cmdUrl + itm.order.id, { action: 'check' }, function (result) {
+                itm.checkResult = result; results.push(itm);
+
+                if (result.Status == 0) {
+                    if (result.NeedCapture) doCapture(itm.order.id, iEle);
+                    else doStatus(itm.order.id, iEle);
+                } else {
+                    checkOrder();
+
+                    if (result.Message)
+                        iEle.find('.msg').append($('<div class="error">').html(result.Message));
+                }
+
+                $('.dlg_body', kendoWindow).scrollTop($('.order-list', kendoWindow).height());
+            }, false, false);
+        };
+
+        function doCapture(orderId, iEle) {
+            iEle.find('.msg').html('@StringTable.OrderCaptureTransactionMsg');
+        ajaxCmd(cmdUrl + orderId, { action: 'capture' }, function (result) {
+            iEle.data('clawData').captureResult = result;
+
+            if (result.Status == 0) doStatus(orderId, iEle);
+            else {
+                iEle.find('.msg').append($('<div class="error">').html('@StringTable.ErrMsgOrderCaptureFailed'.replace('&lt;br&gt;', '<br>').replace('{0}', result.Message)));
+
+                checkOrder();
+            }
+        }, false, false);
+    };
+
+    function doStatus(orderId, iEle, force) {
+
+        if (force && itemsForced.length == 0) {
+            var itemsErr = results.filter(function(ord) { return !ord.statusResult || !(ord.statusResult.Status == 0); });
+
+            console.log('doStatus forced done', results);
+
+            doComplete(results.length - itemsErr.length, results.length, itemsErr.length == 0);
+
+            return;
+        }
+
+        var itm = force ? itemsForced.pop() : { order: { id: orderId }, captureResult: { Message: null} };
+
+        iEle.find('.msg').html('@StringTable.OrderChangeStatusMsg');
+        ajaxCmd(cmdUrl + itm.order.id, { action: 'status', force: force, message: itm.captureResult.Message },
+            function(result) {
+                iEle.data('clawData').statusResult = result;
+
+                if (force) doStatus(null, iEle, true); //next
+                else checkOrder();
+
+                if (result.Message)
+                    iEle.find('.msg').append($('<div class="' + (result.Status == 0 ? 'succeeded' : 'error') + '">').html(result.Message));
+
+            }, false, false);
+    };
+
+    function doComplete(nSucceeded, nTotal, closeDlg) {
+
+        if (closeDlg) {
+            $('#input-err-msg-box').append(kendoWindow.find('#massage.show_massage'));
+            $(window).scrollTop(scrollTop);
+            dialog.close();
+        }
+        else kendoWindow.find('.btn_no').html('@StringTable.Close');
+
+        if (nSucceeded == nTotal)admincommon.showMessage('@StringTable.SendOrdersResult(true)'.replace('{0}', nTotal));
+        else admincommon.showMessage('@StringTable.SendOrdersResult(false)'.replace('{0}', nTotal).replace('{1}', nSucceeded), 2);
+
+        grid.data('kendoGrid').clawSkipHideMsg = true;
+        grid.data('kendoGrid').dataSource.read();
+    }
+    }
+
+    //adjustPopup( $('#modal').closest('.k-window'), '.order-list', '.dlg_body', null, null, 60, 45);
+    function adjustPopup(kendoWindow, holder, scrollBox, minHeight, maxHeight, cmdBoxHeight, adjustY) {
+
+        cmdBoxHeight = cmdBoxHeight || 30; adjustY = adjustY || 10;
+        minHeight = minHeight || 200; maxHeight = maxHeight || 2048;
+
+        var holderNode = kendoWindow.find(holder), scrollNode = holderNode.closest(scrollBox);
+        var recHeight = Math.max(minHeight, Math.min(maxHeight, $(window).height() - 50));
+        var height = Math.min(recHeight, Math.max(minHeight, holderNode.height() + cmdBoxHeight + 30 + adjustY));
+
+        scrollNode.closest('.k-widget.k-window').css({
+            'height': height + 'px',
+            'top': ($(window).height() - height - 30) / 2 + 'px',
+        });
+        scrollNode.css({ 'max-height': (height - cmdBoxHeight - 30) + 'px', 'overflow': 'auto' });
+    }
+
+</script>
+
+@{ var optLang = LanguageMgr.OptLang(0);}
+
+<script type="text/javascript">
+
+    function ajaxCmd2(actionUrl, params, resultHandler, tag, method) {
+        $.ajax({
+            url: (params && params['lang'] ? actionUrl : urlInjectFocusLang(actionUrl)),
+            type: method || 'POST',
+            data: params,
+            beforeSend: function () { admincommon.hideMessage(); admincommon.showMask(); },
+            success: function (result) {
+                resultHandler(result, tag);
+            },
+            error: function (e) { 
+				var errMsg = e.responseText ? $(e.responseText).find('.wr_content_error .error_message').html() : null;
+				admincommon.showMessageDefault(errMsg || '@StringTable.AjaxCommandErrorMessage', 'Fail'); 
+			},
+            complete: function () { admincommon.hideMask(); }
+        });
+    }
+
+    function ajaxREST(actionUrl, type, params, imgLoading, resultHandler, errorHandler, tag, dataType, contentType) {
+        $.ajax({
+            url: urlInjectFocusLang(actionUrl),
+            type: type,
+            data: params,
+            dataType: dataType || 'json',
+            contentType: contentType || 'application/x-www-form-urlencoded; charset=UTF-8',
+            beforeSend: function () {
+                if (imgLoading) $('#' + imgLoading).show();
+                else { admincommon.hideMessage(); admincommon.showMask(); }
+            },
+            success: function (result) {
+                resultHandler(result, tag);
+            },
+            error: function (e) {
+                if (errorHandler) errorHandler(e);
+                else admincommon.showMessageDefault('@(StringTable.AjaxCommandErrorMessage)', '@(ActionResultStatus.Fail)');
+            },
+            complete: function () { if (imgLoading) $('#' + imgLoading).hide(); else admincommon.hideMask(); }
+        });
+    }
+
+    function formDisableValidation(inputs, isDisabled) {
+        inputs.each(function () {
+            var dataKey = 'backupValidRule';
+            var dataVal = $(this).data(dataKey);
+            if (isDisabled) {
+                formShowErrorMsg($(this).attr('name'), null);
+                //$(this).closest('section').find('.error').hide();
+                var rule = $(this).rules('remove');
+                if (Object.keys(rule).length != 0 || !dataVal) $(this).data(dataKey, rule);
+            } else if (dataVal && Object.keys(dataVal).length != 0) $(this).rules('add', dataVal);
+        });
+    }
+
+    function formShowErrorMsg(fieldName, errMessage, form) {
+        var validObj = $(form || '#popup-form').validate();
+
+        if (!validObj.settings.rules[fieldName]) {
+            console.log(fieldName + ' not found!'); return;
+        }
+        else {
+            var errors = {}; errors[fieldName] = errMessage;
+            validObj.showErrors(errors);
+        }
+    }
+
+    $.validator.methods.number = function (value, element) {
+        if (!value || $.trim(value) == '') return this.optional(element);
+        var regex = new RegExp('@(LanguageMgr.GetNumberRegex(optLang).Replace("\\", "\\\\"))');
+        return regex.test(value);
+    };
+
+    $.validator.methods.range = (function (value, element, param) {
+        param[0] = localizeParseFloat($(element).attr('data-val-range-min'));
+        param[1] = localizeParseFloat($(element).attr('data-val-range-max'));
+        var newval = localizeParseFloat(value);
+        //console.log('range', value, element, param, newval, value);
+        return this.optional(element) || (newval >= param[0] && newval <= param[1]);
+    });
+
+    $.fn.getFormFields = function (selector) {
+        if ($(this).is('form')) {
+            if (selector) return $(this).find(selector);
+            var fields = [], form = $(this)[0];
+            for (var i = 0; i < form.length; i++) {
+                fields.push(form[i]);
+            }
+            return $(fields);
+        }
+        else return $(this).find('input,select,textarea');
+    };
+
+    function validateSubmit(formNode) {
+
+        $('.field-validation-error:parent', formNode || $('#popup-form')).html('');
+
+        firstErrorInputElement = null;
+
+        var editForm = $('#popup-form');
+        var arrInputs = (formNode ? formNode.find('input:text,textarea') : editForm.getFormFields('input:text,textarea'));
+
+        arrInputs.each(function () {
+            trimInputVal($(this));
+            inputCopyValid($(this), true);
+        });
+
+        var langFormValid = null, activeForm = null, dataForm = null, emptyLangForms = [];
+        var arrForms = (formNode ? formNode : $('#lang-form-list .lang_form'));
+        arrForms.each(function () {
+            var zeroId = $(this).find('.lang_form_id').val() == '0'; var count = 0;
+            var isActiveForm = ($(this).attr('active-lang') == '1');
+
+            $(this).find('.js-required').each(function () {
+                $(this).attr('datavalid', count == 0 && !isActiveForm && !formNode ? 0 : (zeroId ? 2 : 1));
+            });
+
+            if ($(this).is(':visible')) activeForm = $(this);
+
+            if (count != 0) {
+                if (zeroId) dataForm = $(this);
+                else langFormValid = $(this);
+            } else {
+                $(this).find('.field-validation-error:parent').html('');
+                if (!formNode) emptyLangForms.push(this);
+            }
+        });
+
+        if (!langFormValid && (dataForm || activeForm)) {
+            (dataForm ? dataForm : activeForm).find('.js-required').each(function () {
+                $(this).attr('datavalid', 2);
+            });
+        }
+
+        var valid = true; var form = editForm[0]; var lastErrInput = null, lastErrRequiredField = false, firstErrInput = null;
+        var arrRequire = (formNode ? formNode.find('.js-required') : editForm.getFormFields('.js-required'));
+        arrRequire.each(function () {
+            var datavalid = $(this).attr('datavalid');
+            if (getInputVal($(this)).length == 0 && (!datavalid || datavalid != '0')) {
+                //showRequireAsterisk($(this), true, false);
+                lastErrRequiredField = true; valid = false;
+                if (!lastErrInput || $(this).closest('.lang_form').css('display') != 'none') {
+                    lastErrInput = $(this); if (!firstErrInput) firstErrInput = $(this);
+                }
+            } //else showRequireAsterisk($(this), false);
+        });
+
+        if (!formNode && form.customValidFields) valid = form.customValidFields() && valid;
+
+        var chkForm = (formNode ? formNode : $(form));
+        var arrFValidPar = (formNode ? formNode.find('.field-validation-error:parent') : $('.field-validation-error:parent'));
+
+        if (chkForm.length != 0) {
+            var fields = chkForm.getFormFields();
+            for (var i = 0; i < fields.length; i++) {
+                var element = $(fields[i]), datavalid = element.attr('datavalid');
+                var optField = !element.hasClass('js-required') && element.is('input:text,textarea,input[type=number]');
+                var optFHasVal = optField && element.val().length > 0;
+                if (!element.is('form') && (!datavalid || datavalid != '0' || optFHasVal) && !element.valid()) {
+                    valid = false; //showRequireAsterisk(element, true, false);
+                    if (!lastErrInput || element.closest('.lang_form').css('display') != 'none') {
+                        lastErrInput = element; if (!firstErrInput) firstErrInput = element;
+                    }
+                }
+            }
+        }
+
+        arrInputs.each(function () { inputCopyValid($(this), false); });
+
+        enableRemoteValidate = true;
+
+        if (valid && arrFValidPar.find('span').length == 0) {
+            return 1; //true
+        }
+        else {
+            showFailedValidMsg(lastErrRequiredField);
+            if (!lastErrInput && arrFValidPar.length > 0) {
+                lastErrInput = inputFromErrSpan($(arrFValidPar[0]));
+            }
+            console.log('valid-failed', lastErrRequiredField, lastErrInput);
+
+            firstErrorInputElement = lastErrInput = firstErrInput || lastErrInput;
+
+            //if (lastErrInput) setTimeout(function () { focusInput(lastErrInput); }, 2000);
+
+            return 0;//false;
+        }
+    }
+
+    function showFailedValidMsg(requiredField) {
+        admincommon.showMessageDefault(requiredField ? '@(StringTable.ErrValidateRequireFieldMsg)' : '@StringTable.ErrValidateFailedMessage', '@(ActionResultStatus.Fail)');
+    }
+
+    function inputFromErrSpan(node) {
+        return $('#' + node.attr('data-valmsg-id'));
+    }
+
+    function trimInputVal(node) {
+
+        if (node.is('input:text,textarea')) {
+            node.val($.trim(node.val()));
+        }
+    }
+
+    function inputCopyValid(node, isCopy) {
+        if (node.is('textarea') && isNodeCKEditor(node)) {
+            if (isCopy) {
+                node.attr('valid-origin-val', node.val());
+                node.val(getInputVal(node));
+            } else node.val(node.attr('valid-origin-val'));
+        }
+    }
+
+</script>
+
+<script type="text/javascript">
+
+    function markDropShip() {
+        var ids = '', idx = 0, gridData = grid.data('kendoGrid');
+        var rows = gridData.tbody.find('input:checked').closest('tr');
+        rows.each(function () {
+            var datarw = gridData.dataItem($(this));
+            ids += (idx == 0 ? '?' : '&') + 'ids[' + idx + ']=' + datarw.id; idx++;
+        });
+
+        if(!ids) return;
+
+        //console.log('markDropShip', ids);
+
+        ajaxCmd('@ModuleUrl.AdminUrl(Html.GetController(), "UpdateDropShip")' + (ids || ''), { id: (ids && ids.length ? 0 : id), value: true, checkPostalCode: true },
+            function (result) { grid.data('kendoGrid').dataSource.read(); }, null, "POST");
+    }
+
+    function openShippingBookingBundle(){
+        var ids = '', idx = 0, gridData = grid.data('kendoGrid');
+        var rows = gridData.tbody.find('input:checked').closest('tr');
+        rows.each(function () {
+            var datarw = gridData.dataItem($(this));
+            ids += (idx == 0 ? '?' : '&') + 'ids[' + idx + ']=' + datarw.id; idx++;
+        });
+
+        if(!ids) return;
+
+        //console.log('openBringShippingBookingForm', ids);
+
+        switch('@settings.Display.Admin.Shipping.ShippingBundleBookingProvider') {
+            case '@ShippingServiceType.Bring.Val()':
+                openBringShippingBookingForm(0, ids);
+                break;
+            case '@ShippingServiceType.Logistra.Val()':
+                openLogistraBookingForm(0, ids);
+                break;
+            case '@ShippingServiceType.Proteria.Val()':
+                alert('Not implemented');
+                break;
+            default:
+                alert('No provider');
+        }
+    }
+
+    function openBringShippingBookingForm(id, ids) {
+        ajaxCmd2('@ModuleUrl.AdminUrl("BringShipping", "Booking")' + (ids || ''), { id: (ids && ids.length ? 0 : id) },
+            function (result) { doOpenBringShippingBookingForm(result, false, id); }, null, "GET");
+    }
+
+    function doOpenBringShippingBookingForm(html, mailbox, id) {
+        var width = Math.max(200, Math.min(700, $(window).width() - 50));
+        var height = Math.max(200, Math.min(450, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popTemplate = $("<div>").html($("#booking-popup-form-templ").html());
+        popTemplate.find('.htmlcontent').html(html);
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+        
+        window.refreshGrid = null;
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@StringTable.BringBooking ' + (id > 0  ? '- @Html.Raw(StringTable.Order) ' + id : '- @Html.Raw(StringTable.Bundle)'), popTemplate.html(),
+            width, height, [], null,
+            function(modal) {
+
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+                var popupForm = $('#popup-form', modal), btnSave = modal.find(".btn_save");
+                var fDone = function(saveTracking) {
+                    var trackingNumber = modal.find("#ConsignmentNumber").val();
+                    var mailboxId = modal.find("#MailboxId").val();
+                    var isbundle = modal.find('.order-item-list:visible').length != 0;
+                    if (trackingNumber || mailboxId || isbundle) {
+                        btnSave.closest('li').hide();
+                        modal.find(".btn_cancel").val('@StringTable.Close');
+                        
+                        var ids = getBookingOrderIds(modal, true);
+                        if(isbundle && ids && ids.length)
+                            modal.find('.btn_sent,.btn_print_Packingslips').closest('li').show();
+                    }
+                    else btnSave.prop('disabled', false);
+                };
+
+                fDone(false);
+                admincommon.hideMessage();
+
+                modal.find(".btn_save").click(function() {
+
+                    if (validateSubmit(popupForm)) {
+                        admincommon.hideMessage();
+                        btnSave.prop('disabled', true);
+                        ajaxCmdHtml(mailbox ? '@ModuleUrl.AdminUrl("BringShipping", "MailBox")/' + id :'@ModuleUrl.AdminUrl("BringShipping", "Booking")/' + id, popupForm.serialize(),
+                            function (result) {
+                                $('.htmlcontent', modal).html(result);
+                                fDone(true && !mailbox);
+                            });
+                    }
+                });
+
+                modal.find(".btn_print_Packingslips").click(function () {
+                    var ids = getBookingOrderIds(modal);
+                    if(ids) location.href = "@ModuleUrl.FrontUrl("Pdf",0, "PackingSlips")?" + getBookingOrderIds(modal);
+                    else console.log(ids);
+                });
+                
+                modal.find(".btn_sent").click(function () {
+                    var ids = getBookingOrderIds(modal, true);
+                    if(ids.length != 0){
+                        inputErrBox.append(msgBox); admincommon.hideMessage();
+                        popup.close(); $(window).scrollTop(scrollTop);
+
+                        showSendDlg(ids);
+                    }
+                });
+
+                modal.find(".btn_cancel").click(function () {
+                    inputErrBox.append(msgBox); admincommon.hideMessage();
+                    popup.close(); $(window).scrollTop(scrollTop);
+                    if(window.refreshGrid) window.refreshGrid();
+                });
+            });
+    }
+    
+    function getBookingOrderIds(modal, returnArray){
+        var ids = '', ret = [], idx = 0;
+        var rows = modal.find('input.order-item-orderid[data-consignment=1]');
+        rows.each(function () {
+            ids += (idx == 0 ? '' : '&') + 'ids[' + idx + ']=' + $(this).val(); 
+            ret.push($(this).val()); idx++;
+        });
+        return returnArray ? ret : ids;
+    }
+
+</script>
+
+<script type="text/javascript">
+
+    function openLogistraBookingForm(id, ids) {
+        ajaxCmd2('@ModuleUrl.AdminUrl("Logistra", "Booking")' + (ids || ''), { id: (ids && ids.length ? 0 : id), transportName: 'PostNord' },
+            function (result) { doOpenLogistraBookingForm(result, id, ids); }, null, "GET");
+    }
+
+    function doOpenLogistraBookingForm(html, id, ids) {
+        var width = Math.max(200, Math.min(700, $(window).width() - 50));
+        var height = Math.max(200, Math.min(400, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popTemplate = $("<div>").html($("#booking-popup-form-templ").html());
+        popTemplate.find('.htmlcontent').html(html);
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@StringTable.ShippingBooking ' + (id > 0  ? '- @Html.Raw(StringTable.Order) ' + id : '- @Html.Raw(StringTable.Bundle)'), popTemplate.html(),
+            width, height, [], null,
+            function(modal) {
+
+                window.LogistraBookingForm = modal;
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+                var popupForm = $('#popup-form', modal), btnSave = modal.find(".btn_save");
+                var fDone = function(saveTracking) {
+                    var trackingNumber = modal.find("#BookingNumber").val();
+                    var isbundle = modal.find('.order-item-list:visible').length != 0;
+                    if (trackingNumber || isbundle) {
+                        btnSave.closest('li').hide();
+                        modal.find(".btn_cancel").val('@StringTable.Close');
+                        
+                        var ids = getBookingOrderIds(modal, true);
+                        if(isbundle && ids && ids.length) {
+                            modal.find('.btn_sent,.btn_print_Packingslips').closest('li').show();
+                            modal.find('.printer-box').show();
+                        
+                            if(window.printBooking && $('#BookingPrinter', modal).length)
+                                modal.find('.btn_print_label').closest('li').show();
+                        }
+                    }
+                    else btnSave.prop('disabled', false);
+                };
+
+                var fCarrier = function() {
+                    ajaxCmd2('@ModuleUrl.AdminUrl("Logistra", "Booking")' + (ids || ''), { id: (ids && ids.length ? 0 : id), transportName: $('#CarrierName', modal).val() },
+                        function (result) {
+                            modal.find('.htmlcontent').html(result);
+                            $('#CarrierName', modal).change(fCarrier);
+                        }, null, "GET");
+                };
+
+                fDone(false); admincommon.hideMessage();
+
+                $('#CarrierName', modal).change(fCarrier);
+
+                modal.find(".btn_save").click(function() {
+
+                    if (validateSubmit(popupForm)) {
+                        admincommon.hideMessage();
+                        btnSave.prop('disabled', true);
+                        ajaxCmdHtml('@ModuleUrl.AdminUrl("Logistra", "Booking")/' + id, popupForm.serialize(),
+                            function (result) {
+                                $('.htmlcontent', modal).html(result);
+                                fDone(true);
+                                //inputErrBox.append(msgBox); popup.close(); $(window).scrollTop(scrollTop);
+                            });
+                    }
+                });
+
+                modal.find(".btn_print_Packingslips").click(function () {
+                    var ids = getBookingOrderIds(modal);
+                    if(ids) location.href = "@ModuleUrl.FrontUrl("Pdf",0, "PackingSlips")?" + getBookingOrderIds(modal);
+                    else console.log(ids);
+                });
+
+                modal.find(".btn_sent").click(function () {
+                    var ids = getBookingOrderIds(modal, true);
+                    if(ids.length != 0){
+                        inputErrBox.append(msgBox); admincommon.hideMessage();
+                        popup.close(); $(window).scrollTop(scrollTop);
+
+                        showSendDlg(ids);
+                    }
+                });
+
+                modal.find(".btn_print_label").click(function () {
+                    var bookingNumbers = getBookingNumbers(modal);
+                    if(window.printBooking && bookingNumbers && bookingNumbers.length) window.printBooking(bookingNumbers, function(result) {
+                        if(result.Message) admincommon.showMessageDefault(result.Message, result.Status);
+                    });
+                });
+
+                modal.find(".btn_cancel").click(function () {
+                    inputErrBox.append(msgBox); admincommon.hideMessage();
+                    popup.close(); $(window).scrollTop(scrollTop);
+                    if(window.refreshGrid) window.refreshGrid();
+                });
+            });
+    }
+
+</script>
+
+<script type="text/javascript">
+
+    function openProteriaBookingForm(reload, id) {
+
+        var carrierName = $('#CarrierName').val();
+
+        if(reload && window.ProteriaBookingForm)
+            window.ProteriaBookingForm.find(".btn_cancel").click();
+
+        ajaxCmd2('@ModuleUrl.AdminUrl("Proteria", "Booking")', { id: id, transportName: carrierName || 'BringV2' },
+            function (result) { doOpenProteriaBookingForm(result, reload, id); }, null, "GET");
+    }
+
+    function doOpenProteriaBookingForm(html, reload, id) {
+        var width = Math.max(200, Math.min(700, $(window).width() - 50));
+        var height = Math.max(200, Math.min(500, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popTemplate = $("<div>").html($("#booking-popup-form-templ").html());
+        popTemplate.find('.htmlcontent').html(html);
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@StringTable.ProteriaBooking - @Html.Raw(StringTable.Order) ' + id, popTemplate.html(),
+            width, height, [], null,
+            function(modal) {
+                window.ProteriaBookingForm = modal;
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+                var popupForm = $('#popup-form', modal), btnSave = modal.find(".btn_save");
+                var fDone = function(saveTracking) {
+                    var trackingNumber = modal.find("#BookingTrackingNumber").val();
+                    var oldTrackingUrl = $('input.txt-show-tracking').val();
+                    if (trackingNumber && !oldTrackingUrl) {
+                        $('input.txt-show-tracking').attr('data-service', '@ShippingServiceType.Proteria.Val()').val(trackingNumber);
+                        if(saveTracking) $('input.update-tracking').click();
+                        btnSave.closest('li').hide();
+                        modal.find(".btn_cancel").val('@StringTable.Close');
+                    }
+                    else {
+                        if(modal.find("#BookingTrackingNumber").length == 0) btnSave.prop('disabled', false);
+                        else {
+                            btnSave.closest('li').hide();
+                            modal.find(".btn_cancel").val('@StringTable.Close');
+                        }
+                    }
+                };
+
+                fDone(true); admincommon.hideMessage();
+
+                $('#CarrierName', modal).change(function() {
+                    openProteriaBookingForm(true);
+                });
+
+                modal.find(".btn_save").click(function() {
+
+                    if (validateSubmit(popupForm)) {
+                        admincommon.hideMessage();
+                        btnSave.prop('disabled', true);
+                        ajaxCmdHtml('@ModuleUrl.AdminUrl("Proteria", "Booking")/' + id +'?checkbooking=true', popupForm.serialize(),
+                            function (result) {
+                                $('.htmlcontent', modal).html(result);fDone(false);
+                                //inputErrBox.append(msgBox); popup.close(); $(window).scrollTop(scrollTop);
+                            });
+                    }
+                });
+                modal.find(".btn_cancel").click(function () {
+                    inputErrBox.append(msgBox); admincommon.hideMessage();
+                    popup.close(); $(window).scrollTop(scrollTop);
+                    window.ProteriaBookingForm = null;
+                });
+            });
+    }
+
+</script>
+
+<script type="text/x-kendo-template" id="booking-popup-form-templ">
+    <style type="text/css">
+        .popupBody #err-message-holder {float: none !important;}
+        .popupBody .show_massage .nNote {text-indent: 0px !important;padding-left: 15px !important;}
+    </style>
+    <form id="popup-form">
+        <div class="popupBody">
+            <section id="err-message-holder" style="float: left; width: 100%;"></section>
+            <section class="row_content_box kpopup-content">
+                <section class="wr_clo1">
+                    <div class="wcontent" style="margin: 10px;color: #390F3D;line-height:2em">
+                        <div class="htmlcontent"></div>
+                    </div>
+                </section>
+                <section class="clear"></section>
+                <ul class="wr_submit_top form-action-menu" style="position:relative; padding:0;">
+                    <li id="booking-loading" style="display:none;padding: 6px 10px 3px 10px;height: auto;border: none;background-image: none;margin: 0;">
+                        <img src="/Areas/admin/styles/images/loading_input.gif" />
+                    </li>
+                    <li style="display:none;"><input type="button" value="@StringTable.Send" class="btn_sent"></li>
+                    <li style="display:none;"><input type="button" value="@StringTable.PrintBookingLabel" class="btn_print btn_print_label"></li>
+                    <li style="display:none;"><input type="button" value="@StringTable.PrintPackingslip" class="btn_print btn_print_Packingslips"></li>
+                    <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                    <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+                </ul>
+            </section>
+        </div>
+    </form>
+</script>
+
+<script type="text/x-kendo-template" id="confirm-dialog-templ">
+    <style type="text/css">
+        #modal .show_massage .close, #modal .show_massage.nSuccess {display: none;}
+        #modal .show_massage {margin-bottom: 0px !important;}
+        #modal .nNote {padding: 0 0 0 5% !important;text-indent: 0 !important;width: 95% !important;}
+        #modal { width: auto !important;height: auto !important;}
+        #modal .succeeded {color: #33D10C;}
+        #modal td { border-right: 1px solid #ccc; color: #390f3d;padding: 3px 5px; border-bottom: 1px solid #ccc;}
+        #modal td:first-child {font-weight: bold;vertical-align: middle;text-align: center;}
+    </style>
+    <div id='modal'>
+        <section id="err-message-holder" style="float: left; width: 100%;"></section>
+        <div class="dlg_body" style="margin-top: 10px;float: left;width: 100%;">
+            <p class='prompt-mess'></p>
+            <table class="order-list" style="margin: 0 5%;width: 88%;border-collapse: separate;border-spacing: 0;border-left: 1px solid #ccc;border-top: 1px solid #ccc;" cellpadding="5"></table>
+        </div>
+        <div class='wr_bottom_popup_s'>
+            <section class='wr_btn_pp'>
+                <button class='btn_yes' type='button'>@StringTable.Yes</button>
+            </section>
+            <section class='wr_btn_pp'>
+                <button class='btn_no' type='button'>@StringTable.No</button>
+            </section>
+        </div>
+    </div>
+</script>

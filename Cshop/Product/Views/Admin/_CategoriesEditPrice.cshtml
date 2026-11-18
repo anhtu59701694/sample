@@ -1,0 +1,333 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model CategoryModel
+@{
+    var langCode = (string)ViewData["LangCode"];
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+<style type="text/css">
+    #gridprodeditprice td.td-center.image img { float: none;}
+    #gridprodeditprice td.td-error { color: red !important;}
+    #gridprodeditprice.k-grid .field-validation-error { min-width: 270px;}
+    #gridprodeditprice td span.erase { text-decoration: line-through; color: #CCC;}
+</style>
+
+@{
+    var imgTemplate = "<a href='#:safePropImg(ProductImage,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(ProductImage,\"Thumb\")#'/></a>";
+}
+
+<div id="prodeditprice-templ" style="display: none">
+    @(Html.LocalizeGridFor<CategoryProductModel>("gridprodeditprice", "Product", null, null, null, null, 5, null, grid =>
+        {
+            grid.ButtonDelBigClass += "_proeditprice";
+            grid.CheckBoxSelAllCss += "_proeditprice";
+            grid.CheckBoxRowCssClass += "_proeditprice";
+        })
+        .DataSource(m => m.Id, new List<CategoryProductModel>())
+        .Paging(5, new[] { 5, 10, 20, 30, 50, 100 }, StringTable.Products)
+        .Columns(grid => new[]
+        {
+            grid.Col(m => m.ProductImage, false, 50)
+                .SetTemplate(imgTemplate)
+                .SetCssClass("td-center image compact"),
+            grid.Col(m => m.ProductName, "Edit", m => m.ProductId)
+                .SetTemplate(StringTable.NewWinEditTempl(Html, "ProductName"))
+                .SetDefaultSort(true)
+                .SetCssClass("name-pro2"),
+            grid.Col(m => m.ProductCostPriceInc)
+                .SetCssClass("td-right")
+                .SetTemplate("#:safeProp(ProductCostPriceInc,'Text')#"),
+            grid.Col(m => m.ProductPriceInc)
+                .SetCssClass("td-right")
+                .SetTemplate("#:safeProp(ProductPriceInc,'Text')#"),
+            grid.Col(m => m.ProductNewPriceInc, false, 140)
+                .SetCssClass("td-right")
+                .SetTemplate("#:newPriceInc(ProductPriceInc,null,Id)#<span class='error field-validation-error' id='new-price-errmsg-#:ProductId#'></span>"),
+            grid.Col(m => m.ProductSalePriceInc, false, 140)
+                .SetCssClass("td-right")
+                .SetTemplate("#=newSalePriceInc(ProductSalePriceInc,ProductPriceInc,Id)#"),
+        })
+        .Sortable(true)
+        .Config(grid => { grid.CustomScript = "gridProdEditPriceCustom"; })
+        .ToMvcHtmlString())
+</div>
+
+<script type="text/javascript">
+
+    var changePriceInfo = {};
+
+    $(function () {
+        $('#gridprodeditprice').attr('id', 'gridprodeditprice-templ');
+    });
+
+    function gridProdEditPriceCustom(grid) {
+
+        //$('.preview[href=""]', grid.element).hide();
+
+        initImagePreview(false, grid.element);
+
+        if ($('.table_all > tbody:parent').length == 0) $(".wr_table_all").hide();
+        else $('.wr_table_all').show();
+    }
+
+    function gridprodcateUpdatePrice() {
+        var gridData = $('#gridprodcate').data('kendoGrid').dataSource;
+
+        gridData.transport.data = [];
+        gridData.data().forEach(function (row) {
+            row.ProductPriceInc = newPriceInc(row.ProductPriceInc, true, row.Id);
+            row.ProductPrice = newPrice(row.ProductPriceInc, row.ProductVat);
+            if (row.ProductSalePriceInc && row.ProductPriceInc.Value <= row.ProductSalePriceInc.Value) {
+                row.ProductSalePriceInc = row.ProductSalePrice = { Text: 0, Value: 0 };
+            }
+            gridData.transport.data.push(row);
+        });
+
+        changePriceInfo = {};
+    }
+
+    function newPriceInc(priceInc, objVal, id) {
+
+        var info = $.extend({ Increase: true, Percent: false, Value: 0 }, changePriceInfo);
+
+        if (!info.Value || id == 0) return '';
+
+        var dir = info.Increase ? 1 : -1;
+        var newVal = Math.max(0, priceInc.Value + dir * info.Value * (info.Percent ? priceInc.Value : 1));
+        var txtVal = localizeMoneyToString(newVal);
+
+        return objVal ? { Value: newVal, Text: txtVal } : txtVal;
+    }
+
+    function newPrice(priceInc, vat) {
+        var newVal = priceInc.Value / (1 + vat.Value);
+
+        return { Value: newVal, Text: localizeMoneyToString(newVal) };
+    }
+
+    function newSalePriceInc(salepriceInc, priceInc, id) {
+        var newprice = newPriceInc(priceInc, true, id);
+        return newprice.Value <= (salepriceInc.Value || 0) ? '<span class="erase">' + salepriceInc.Text + '</span>' : salepriceInc.Text;
+    }
+
+    function gridGetRow(grid, id, productid) {
+
+        if (id != null && id != 0) return grid.dataSource.get(id);
+        else return grid.dataSource.data().find(function (item) { return item.ProductId == productid; });
+    }
+
+    function safePropImg(obj, propName) {
+        return safeProp(obj, propName) || '@ImageModel.NoImg';
+    }
+
+</script>
+
+<script type="text/javascript">
+    function openUpdateProductPrice() {
+        var width = Math.max(200, Math.min(850, $(window).width() - 50));
+        var height = Math.max(200, Math.min(630, $(window).height() - 50));
+
+        var popTemplate = $("<div>").html($("#update-product-price-popup-templ").html());
+        popTemplate.find('.htmlcontent .wr_table_all').html($('#gridprodeditprice-templ').clone().attr('id', 'gridprodeditprice').wrap('<p>').parent().html());
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@StringTable.UpdateProductPrice', popTemplate.html(),
+            width, height, [], null,
+            function (modal) {
+
+                $('.popupBody .wr_clo1', modal).css({ 'height': height - 90 + 'px' });
+
+                formUpdateValidRules(modal.find('.wr-form-update-price'));
+
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box'),
+                    inputValue = modal.find('input.kendo-numeric'), changeType = modal.find("#ChangeTypeTrue"), changePrice = modal.find("#ChangePriceTrue")
+                    , lblTypeChangePrice = modal.find("#lblTypeChangePrice"),
+                    popupForm = $('#formUpdateProductPrice', modal);
+
+                initKendoNumeric(inputValue, { value: 0 });
+                admincommon.hideMessage();
+
+                gridprodeditpriceInit('#gridprodeditprice', true);
+
+                $('#gridprodeditprice thead th.k-header .k-link').each(function () {
+                    $(this).html($(this).html().replace('(', '<br>('));
+                });
+
+                var gridData = $('#gridprodeditprice').data('kendoGrid').dataSource;
+                gridData.transport.data = [];
+                $('#gridprodcate').data('kendoGrid').dataSource.data().forEach(function (itm) {
+                    gridData.transport.data.push(itm);
+                });
+
+                $('input[name=ChangePrice],input[name=ChangeType],#inputValueChangePrice', modal).change(function () {
+                    if (inputValue.valid()) {
+                        var percent = !changeType.prop("checked");
+                        changePriceInfo = {
+                            Increase: changePrice.prop("checked"), Percent: percent,
+                            Value: inputValue.data('kendoNumericTextBox').value() / (percent ? 100 : 1)
+                        };
+                        if (changePriceInfo.Value == null) changePriceInfo = {};
+                        if (changePriceInfo.Value != null) gridData.read();
+                    }
+                });
+
+                gridData.read();
+
+                modal.find(".btn_save").click(function () {
+
+                    if (!inputValue.valid()) return;
+
+                    if (!inputValue.clawGetFloat(0)) {
+                        inputErrBox.append(msgBox);
+                        admincommon.hideMessage();
+                        popup.close();
+                        return;
+                    }
+
+                    var cmdUrl = '@ModuleUrl.AdminUrl(Html.GetController(), "ChangePrice")';
+                    var cmdArgs = { id: '@Model.Id', langCode: '@langCode', increase: changePriceInfo.Increase, percent: changePriceInfo.Percent, value: localizeFloatToString(changePriceInfo.Value, 'n8') };
+                    ajaxCmd(cmdUrl, cmdArgs,
+                        function (result) {
+                            if (result) {
+                                if (result.Status == 0) {
+                                    inputErrBox.append(msgBox); popup.close();
+                                    if (changePriceInfo.Value) gridprodcateUpdatePrice();
+                                }
+                                if (result.Errors) {
+                                    gridData.data().forEach(function (row) {
+                                        row.ErrorMsg = result.Errors[row.ProductId];
+                                    });
+
+                                    gridData.sort({ dir: 'desc', field: 'ErrorMsg' });
+                                    gridData.data().forEach(function (row) { row.ErrorMsg = null; });
+
+                                    for (id in result.Errors) {
+                                        $('#new-price-errmsg-' + id, '#gridprodeditprice')
+                                            .html(kendo.htmlEncode(result.Errors[id]))
+                                            .closest('td').addClass('td-error');
+                                    }
+                                }
+                                admincommon.showMessage(result.Message, result.Status);
+                                admincommon.clickHideMessage();
+                            }
+                        }, null);
+                });
+
+                modal.find(".btn_cancel").click(function () {
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close();
+                    changePriceInfo = {};
+                });
+
+                modal.find(".changeType").change(function () {
+                    var node = $(inputValue).data("kendoNumericTextBox");
+                    var rangeMsg = $(inputValue).attr('data-val-range');
+                    if ($(changeType).prop("checked")) {
+                        node.options.format = '@settings.Display.Others.GetPriceFormat()';
+                        node.options.step = parseInt('@settings.Display.Others.PriceStep');
+                        $(inputValue).attr('data-val-range-max', '1000000000');
+                        rangeMsg = rangeMsg.replace('{0}', '1000000000');
+                        lblTypeChangePrice.html("@settings.General.Currency");
+                    } else {
+                        if (node.value() > 100) node.value(100);
+                        $(inputValue).attr('data-val-range-max', '100');
+                        node.options.format = 'n0';
+                        node.options.step = 1;
+                        rangeMsg = rangeMsg.replace('{0}', '100');
+                        lblTypeChangePrice.html("%");
+                    }
+                    node._update(node.value());
+                    formSetRuleMsg($(inputValue).attr('name'), 'range', rangeMsg, popupForm);
+                    $(inputValue).valid();
+                });
+
+                $(function () { $(changeType).change(); });
+            });
+    }
+
+</script>
+
+<script type="text/x-kendo-template" id="update-product-price-popup-templ">
+    <style type="text/css">
+        .popupBody .wr_table_all {margin-bottom:0 !important; margin-top: 15px;}
+        .popupBody .wr_clo1 {overflow: auto;}
+        .popupBody .k-widget.k-numerictextbox .k-numeric-wrap {float: left;width: 90%;}
+        .popupBody #inputValueChangePrice-error {padding-left:0 !important;}
+    </style>
+    <div class="popupBody">
+        <section id="err-message-holder" style="float: left; width: 100%;"></section>
+        <section class="row_content_box kpopup-content">
+            <section class="wr_clo1">
+                <div class="wcontent" style="margin: 0 20px; color: #390F3D; line-height: 2em">
+                    <div class="htmlcontent">
+                        <form id="formUpdateProductPrice" style="margin-bottom:10px">
+                            <section class="wr-form-update-price" style="margin-left:0;">
+                                <section class="controls">
+                                    <table>
+                                        <colgroup><col style="width:180px"><col style="width:180px"><col style="width:200px"></colgroup>
+                                        <tr>
+                                            <td colspan="3">
+                                                <strong>@StringTable.ChangePrice</strong>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                @Html.RadioButton("ChangePrice", "true", new { @id = "ChangePriceTrue", @checked = "True", @class = "css-radio js-required changePrice" })
+                                                <label for="ChangePriceTrue" class="css-labelradio">@StringTable.ChangePriceIncreased</label>
+                                            </td>
+                                            <td>
+                                                @Html.RadioButton("ChangePrice", "false", new { @id = "ChangePriceFalse", @class = "css-radio js-required changePrice" })
+                                                <label for="ChangePriceFalse" class="css-labelradio">@StringTable.ChangePriceDescreased</label>
+                                            </td>
+                                            <td></td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="3">
+                                                <strong>@StringTable.ChangeType</strong>
+                                            </td>
+                                        </tr>
+                                        <tr>
+                                            <td>
+                                                @Html.RadioButton("ChangeType", "true", new { @id = "ChangeTypeTrue", @checked = "True", @class = "css-radio js-required changeType" })
+                                                <label for="ChangeTypeTrue" class="css-labelradio">@StringTable.ChangeTypeFixAmount</label>
+                                            </td>
+                                            <td>
+                                                @Html.RadioButton("ChangeType", "false", new { @id = "ChangeTypeFalse", @class = "css-radio js-required changeType" })
+                                                <label for="ChangeTypeFalse" class="css-labelradio">@StringTable.ChangeTypeFixPercentage</label>
+                                            </td>
+                                            <td></td>
+                                        </tr>
+                                        <tr>
+                                            <td colspan="3">
+                                                <strong>@StringTable.ChangeValue</strong><br />
+                                                <input id="inputValueChangePrice" name="ValueChange" style="float:left;width:250px"
+                                                       class="custom-price-number kendo-numeric" data-val="true" type="text"
+                                                       data-val-number="@StringTable.ErrMsgRequireNumber.ModErrLocalize()"
+                                                       data-val-range="@string.Format(StringTable.ErrMsgRangeLimit.ModErrLocalize(), "", "{0}", 0)"
+                                                       data-val-range-max="1000000000" data-val-range-min="0" data-validate="false">
+                                                <span>&nbsp;<label id="lblTypeChangePrice" style="font-weight:bold;"></label></span>
+                                                <div class="field-valid-msg"><span class="error" data-validate="false" data-valmsg-for="ValueChange" data-valmsg-id="inputValueChangePrice" data-valmsg-replace="true"></span></div>
+                                           </td>
+                                        </tr>
+                                    </table>
+                                </section>
+                            </section>
+                        </form>
+                        <section class="clear"></section>
+                        <div class="wr_table_all" style="overflow:visible;"></div>
+                    </div>
+                </div>
+            </section>
+            <section class="clear"></section>
+            <ul class="wr_submit_top form-action-menu" style="position: relative; padding: 10px 0px;">
+                <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+            </ul>
+        </section>
+    </div>
+</script>

@@ -1,0 +1,57 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Core
+@model IEnumerable<TraceModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.Title = StringTable.ManageTraces;
+    //ViewBag.AddAction = "Add";
+    //ViewBag.UseInlineEdit = true;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/Eshop/trace";
+    ViewBag.ParentBreadcrumbTitle = StringTable.ManageTraces;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+
+<style type="text/css">
+
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageTraces)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageTraces)
+}
+
+@Html.AntiForgeryToken()
+@(Html.LocalizeGridFor("grid", Html.GetController())
+    .DataSource(m => m.Id, "List")
+    .Paging(10, new [] { 10, 20, 30, 50, 100 })
+    //.ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Id),
+        grid.Col(m => m.Data),
+        grid.Col(m => m.CreatedDate, true)
+            .SetTemplate("#:safeProp(CreatedDate,'TextF')#"),
+    })
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; })
+    .ToMvcHtmlString())
+
+<script type="text/javascript">
+
+    var grid = $('#grid'); 
+    
+    gridInit('#grid', true);
+
+    function gridCustom(grid) {
+
+    }
+
+</script>

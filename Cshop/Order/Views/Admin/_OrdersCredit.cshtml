@@ -1,0 +1,173 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model List<CreditOrderDetailModel>
+@{
+    var settings = (SettingsBiz)ViewBag.Settings;
+
+    Model.Action(m =>
+    {
+        var raw = m.GetRaw();
+        if (raw != null)
+        {
+            var dataExp = (IDictionary<string, object>)raw.Data.ToExpando();
+            if (dataExp != null && dataExp.Count != 0)
+            {
+                var tmp = dataExp.Where(x => !x.Key.InList("bundlevariantids", "bundleAccessoryids")).ToList();
+                if (tmp.Count != 0)
+                {
+                    m.ProductName += "[";
+                    m.ProductName += tmp.Select(x => string.Format("{0}: {1}", ("odetail_datajson_" + x.Key).ModLocalize(), x.Value)).ToString(", ");
+                    m.ProductName += "]";
+                }
+            }
+        }
+    });    
+}
+<style type="text/css">
+    #gridcreditodetail .k-grid-quantity{white-space: nowrap !important}
+    #gridcreditodetail .creditorder-quantity{padding-left: 7px;margin: 0;width:50px !important}
+    #gridcreditodetail .k-pager-wrap.k-widget{border-top: 1px solid #CCC !important;}
+	#gridcreditodetail .k-grid-SKU {overflow: hidden;max-width: 120px;}    
+	#gridcreditodetail .k-grid-Name {overflow: hidden;max-width: 200px;}
+</style>
+
+@{
+    var qtyTempl = Model.Count == 0 ? "" : "- " + Html.LocalizeTextBoxFor(m => m[0].Quantity, new
+    {
+        @id = "qty-#:Iseq#",
+        @class = "creditorder-cell creditorder-quantity",
+        @data_bind = "Quantity",
+        @type = "number",
+    }).Replace(new { @name = "_[#:Iseq#].Quantity", @value = "#:Quantity#" })
+    + "<span class='error' data-valmsg-for='_[#:Iseq#].Quantity' data-valmsg-replace='true'></span>";
+
+    var imgTemplate = "<a href='#:safePropImg(ProductImage,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(ProductImage,\"Thumb\")#'/></a>";
+}
+<div class="wr_table_all" style="margin: 0;">
+    @(Html.LocalizeGridFor<CreditOrderDetailModel>("gridcreditodetail", "None", null, null, null, null, int.MaxValue, null, grid =>
+    {
+        grid.ButtonDelBigClass += "_creditod";
+        grid.CheckBoxSelAllCss += "_creditod";
+        grid.CheckBoxRowCssClass += "_creditod";
+        grid.InputSearchId += "_creditod";
+        grid.FormSearchId += "_creditod";
+    })
+    .DataSource(m => m.Id, Model)
+    //.ColumnCheckBox("Key", "_creditod")
+    //.Paging(4, new int[] { 10, 20, 30, 50, 100 })
+    .Columns(grid => new[]
+    {
+        //grid.Col(m => m.ProductImage, false, 100)
+        //    .SetTemplate(imgTemplate)
+        //    .SetCssClass("txt_align_c image"),
+        grid.Col(m => m.ProductSKU)
+            .SetCssClass("k-grid-SKU"),
+        grid.Col(m => m.ProductName)
+            .SetDefaultSort(true)
+            .SetTemplate("#:ProductName#")
+            .SetCssClass("name-pro2 k-grid-Name"),
+        grid.Col(m => m.PriceInc, false, 120)
+            .SetCssClass("td-right")
+            .SetTemplate("#:safeProp(PriceInc,'Text')#"),
+        grid.Col(m => m.OriginQty, false, 120)
+            .SetCssClass("td-right"),
+        grid.Col(m => m.Quantity, false, 100)
+            .SetTemplate(qtyTempl)
+            .SetCssClass("td-right k-grid-quantity"),
+        grid.Col(m => m.TotalInc, false, 120)
+            .SetCssClass("td-right")
+            .SetTemplate("#:returnTotal(PriceInc, Quantity)#"),
+    })
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCreditODetailCustom"; })
+    .ToMvcHtmlString())
+</div>
+
+<script type="text/javascript">
+
+    $('.k-grid-header span.k-link', '#gridcreditodetail').each(function () { $(this).html($(this).html().replace('(', '<br>(')); });
+
+    function returnTotal(priceInc, quantity) {
+        var newVal = -1 * priceInc.Value * quantity;
+
+        return newVal ? localizeMoneyToString(newVal) : '';
+    }
+
+    function gridCreditODetailCustom(grid) {
+
+        $('#creditorder-form-list > .creditorder-form[data-valid=1]').each(function () {
+            var creditodForm = $(this), row = creditodGridGetRow(grid, 0, $(this).attr('data-key'));
+            if (row) {
+                var trNode = $('tr[data-uid=' + row.uid + ']', grid.element);
+
+                $('.creditorder-cell', trNode).change(function () {
+                    if ($(this).is('input,textarea,select')) {
+                        if ($(this).valid()) {
+                            var field = $(this).attr('data-bind');
+                            if (field) {
+                                creditodBindInputField(creditodForm, row, field, $(this).val());
+                                grid.refresh({ action: 'rebind', items: [row] });
+                            }
+                        } else $(this).focus();
+                    }
+                });
+
+                $('.creditorder-quantity', trNode).attr({
+                    'data-val-range-max': row.OriginQty,
+                    'data-val-range': '@StringTable.ErrMsgRangeLimit.ModErrLocalize().Replace("{1}","0")'.replace('{2}', row.OriginQty)
+                });
+
+                $(this).attr('data-uid', row.uid);
+                row.CreditODForm = creditodForm;
+            } else console.log('databound: row is null', $(this).attr('data-key'), creditodForm);
+        });
+
+        //initImagePreview();
+
+        formUpdateValidRules(grid.element);
+
+        var commentboxHeight = grid.element.closest('.htmlcontent').find('.credit-comment').height() || 0;
+        var skiprefundboxHeight = grid.element.closest('.htmlcontent').find('.skip-refund').height() || 0;
+        gridAdjustPopup(grid, '.credit-grid .wr_table_all', '.credit-grid', null, null, null, 55 + commentboxHeight + skiprefundboxHeight);
+        //console.log('commentboxHeight', commentboxHeight);
+        if (grid.dataSource.total() == 0) $(".wr_table_all").hide();
+        else $(".wr_table_all").show();
+    }
+
+    function creditodBindInputField(form, row, field, newVal) {
+
+        row[field] = newVal;
+        var inputField = form.find('.creditorder-form-field[binding=' + field + ']');
+        inputField.val(newVal); console.log(inputField);
+    }
+
+    function creditodGridGetRow(grid, id, key) {
+
+        if (id != null && id != 0) return grid.dataSource.get(id);
+        else return grid.dataSource.data().find(function (item) { return item.Key == key; });
+    }
+
+    function safePropImg(obj, propName) {
+        if (obj == null) return '@ImageModel.NoImg';
+        return obj[propName] || '';
+    }
+
+</script>
+
+<div id="creditorder-form-list" style="display: none">
+    @for (int i = 0; i < Model.Count; i++)
+    {@RenderCreditODetailForm(i)}
+</div>
+
+@helper RenderCreditODetailForm(int idx)
+{
+    <div class="creditorder-form" data-id="@Model[idx].Id" data-key="@Model[idx].Key" data-valid="1">
+        @Html.SimpleHiddenFor(m => m[idx].Id, new { @class = "creditorder-form-field" })
+        @Html.SimpleHiddenFor(m => m[idx].OrderDetailId, new { @class = "creditorder-form-field" })
+        @Html.SimpleHiddenFor(m => m[idx].Quantity, new { @class = "creditorder-form-field", @binding = "Quantity" })
+    </div>
+}

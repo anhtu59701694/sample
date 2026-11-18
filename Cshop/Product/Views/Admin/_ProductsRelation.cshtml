@@ -1,0 +1,173 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.DAL;
+@using Claw.Modules.Eshop.Helper;
+@using Claw.Modules.Eshop.Models;
+@using Claw.Modules.Eshop.Product
+@model ProductModel
+
+@{
+    var isSelectOne = Html.GetController().InList("Category", "ReportSupplier");
+}
+<style type="text/css">
+    #catetree { max-height: none; width: 100%; max-width: inherit; margin: auto; }
+</style>
+<script type="text/javascript">
+
+    eval('var categoryIds = [@(Model.CategoryIds)]');
+    eval('var categoryJsons = @Html.Raw((Model.CategoryJsons ?? "").Replace("\\", "\\\\").Replace("'", "\'"))');
+    eval('var parents = [@(Model.CParentIds)]');
+    eval('var dicCates = {}, dicParents = {}');
+
+    parents.forEach(function (item) { dicParents[item.Id] = { visible: true, count: item.Count }; });
+
+    var colorChildSel = '#6C0B7E';
+
+    function cateTreeDataBound() {
+        var kendoTree = this, kendoEle = this.element, total = this.dataSource.total();
+        var items = kendoEle.find('.k-item:not([data-id])');
+
+        items.each(function () {
+            var row = kendoTree.dataItem($(this));
+            $(this).attr('data-id', row.id);
+            $(this).attr('data-name', row.Name);
+            $(this).attr('data-hierorder', row.HierOrder);
+            $(this).attr('data-uppath', '');
+
+            dicCates[row.id] = row;
+
+            setNodeColor($(this), dicParents[row.id] && dicParents[row.id].visible);
+
+            $(this).find(':checkbox').bind('change', function () {
+                setNodeUpPathColor($(this).closest('.k-item', kendoEle), $(this).prop('checked'), kendoEle, true);
+            });
+
+            //if (total >= 30) { if (row.Deep > 0) kendoTree.expand($(this)); }
+            //else if (row.Deep < 3) kendoTree.expand($(this));
+        });
+
+        categoryJsons.forEach(function (item) {
+            var node = kendoEle.find('.k-item[data-id=' + item.Id + ']');
+            if (node.attr('data-uppath') == '') {
+                setNodeUpPathColor(node, true, kendoEle, false);
+                node.attr('data-uppath', 'true');
+                node.find(':checkbox').prop('checked', true);
+                node.attr('data-hierorder', item.HierOrder);
+            }
+        });
+
+        var kinTxt = kendoEle.find('.k-item .k-in');
+
+        kinTxt.unbind('click').click(function (ein) {
+            var cbox = $(ein.currentTarget).parent().find(':checkbox');
+            if (!cbox.prop('disabled')) {
+                cbox.prop('checked', !cbox.prop('checked')).change();
+                setTimeout(function () { setNodeUpPathColor(cbox.closest('.k-item', kendoEle), cbox.prop('checked'), kendoEle, true); }, 200);
+            }
+        });
+
+        kinTxt.each(function () {
+            var row = kendoTree.dataItem($(this).closest('.k-item'));
+            var status = row.LangVisible && row.Active;
+            $(this).parent().find(':checkbox').attr('disabled', status && row.AncestorActive && row.AncestorLangVisible ? null : 'disabled')
+                .change(function () {
+                    if ('@(isSelectOne ? "1" : "0")' == '1' && $(this).prop('checked')) {
+                        $('#catetree input[type=checkbox]:checked').prop('checked', false).each(function () {
+                            setNodeUpPathColor($(this).closest('.k-item', kendoEle), false, kendoEle, true);
+                        });
+                        $(this).prop('checked', true);
+                    }
+                });
+
+            $(this).attr('title', row.Active ? (row.LangVisible ? '' : '@StringTable.ItemLanguageDisabled') : '@StringTable.ItemDeactivated');
+            if (!status) {
+                $(this).unbind('click');
+                $(this).css({ 'font-style': 'italic', 'text-decoration': row.Active ? 'underline' : '', 'color': 'gray' });
+            }
+        });
+
+        treeAdjustPopup(kendoTree, '.wcontent', '.wr_clo1', 300);
+    }
+
+    function cateTreeItemSelect(e) {
+        //var row = e.sender.dataItem(e.node);
+        //console.log('cateTreeItemSelect', e, row);
+    }
+
+    function setNodeUpPathColor(kitem, checked, kendoEle, followUp) {
+
+        while (kitem.length > 0) {
+            var id = parseInt(kitem.attr('data-id'));
+
+            if (!dicParents[id]) dicParents[id] = {};
+
+            var cnt = dicParents[id].count;
+
+            if (!cnt) cnt = checked ? 1 : 0;
+            else cnt += checked ? 1 : -1;
+
+            dicParents[id].count = cnt;
+            setNodeColor(kitem, cnt > 0);
+            //console.log(id + ':' + type + ':' + cnt);
+
+            dicParents[id].visible = (cnt > 0);
+
+            if (!followUp) break;
+            else kitem = kitem.closest('ul', kendoEle).closest('.k-item', kendoEle);
+        }
+    }
+
+    function setNodeColor(node, show) {
+        var parent = node.find('div');
+        if (parent.length > 0) {
+            $(parent[0]).find('.k-in').css('color', show ? colorChildSel : 'inherit');
+            //console.log(node.attr('data-id') + ':setNodeColor:' + node.attr('data-type') + ':' + show);
+        }
+    }
+
+    function getSelectedIds(kendoTree) {
+        var arrIds = [], arrJsons = [];
+
+        kendoTree.find('.k-item').each(function () {
+            if ($(this).find(":checkbox").prop("checked")) {
+                arrIds.push(parseInt($(this).attr('data-id')));
+                arrJsons.push({ Id: parseInt($(this).attr('data-id')), Name: $(this).attr('data-name'), HierOrder: $(this).attr('data-hierorder') });
+            }
+        });
+
+        categoryIds.forEach(function (item) {
+            if (!dicCates[item]) arrIds.push(item);
+        });
+
+        categoryJsons.forEach(function (item) {
+            if (!dicCates[item.Id]) arrJsons.push(item);
+        });
+
+        categoryIds = arrIds; categoryJsons = arrJsons;
+
+        return { Ids: arrIds, Jsons: arrJsons };
+    }
+
+    function getSelected(kendoTree){
+        var ret = getSelectedIds(kendoTree);
+        var cateid = ret.Ids.length == 0 ? null : ret.Ids[0];
+        categoryIds = categoryIds.filter(function (itm) { return itm == cateid; });
+        categoryJsons = categoryJsons.filter(function (itm) { return itm.Id == cateid; });
+        return { id: cateid, hierOrder: categoryJsons.length == 0 ? '' : categoryJsons[0].HierOrder };
+    }
+
+    function getCurrentId() {
+        return '@(isSelectOne ? QParam.GetField<int>("id", false).ToString() : "")';
+    }
+
+</script>
+
+@(Html.LocalizeTree<CategoryModel>("catetree", isSelectOne ? "Category" : "Product")
+    .DataSource(m => m.Id, m => m.AnyChild, "ListCate", null,
+        "function() { return { lang: getFocusLang(), currentId: getCurrentId() }; }")
+    .DataTextField(m => m.Name)
+    .Checkboxes(true, false)
+    .OnDataBound("cateTreeDataBound")
+    .OnSelect("cateTreeItemSelect")
+    //.HtmlAttributes(new { @style = "display: inline-block; min-width: 300px; max-height: 350px; text-align: left; border-width:1px" })
+    .ToMvcHtmlString())

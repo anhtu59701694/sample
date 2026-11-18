@@ -1,0 +1,120 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model IEnumerable<RecurOrderModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.OrderEdit;
+    
+    ViewBag.Title = StringTable.ManageRecurOrders;
+    //ViewBag.AddAction = "Add";
+    //ViewBag.UseInlineEdit = true;
+    //ViewBag.AutoAddNewHandler = false;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/RecurOrder";
+    ViewBag.ParentBreadcrumbTitle = StringTable.RecurOrders;
+    
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageRecurOrders)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageRecurOrders)
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<RecurOrderModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", "Input", "Input",
+    "(function(e){gridOnInlineEditCustom(e);gridOnInlineEdit(e, null, gridRefreshRow);})")
+    .DataSource(m => m.Id, "List", null, null, null)
+    .Paging(10, new [] { 10, 20, 30, 50, 100 })
+    //.ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Id, "Edit", m => m.Id, true),
+        grid.Col(m => m.CreatedDate, true)
+            .SetTemplate("#:safeProp(CreatedDate,'Text')#"),
+        grid.Col(m => m.BillingName)
+            .SetTemplate("#:BillingName#<br>#:BillingInfo#<br>#:PaymentName# - #:ShippingName#"),
+        grid.Col(m => m.FromDate, true)
+            .SetTemplate("#:safeProp(FromDate,'Text')#"),
+        grid.Col(m => m.Recurring)
+            .SetTemplate("#:RecurringTxt#<br>#:RecurEachTxt#<br>#:safeProp(NextRunning,'TextF')#"),
+        grid.Col(m => m.Status)
+            .SetTemplate("#:StatusTxt#"),
+        grid.Col(m => m.LastRunOk, "EditOrder", m => m.LastRunOrderId)
+            .SetTemplate("<div>#:safeProp(LastRunTime,'TextF')#</div><div style='color: #:LastRunOk == false ? 'red' : '' #'>#:LastRunMsg||''#</div><div><a class='grid-row-edit'>#:LastRunOrderId||''#</a></div>"),
+        grid.Col(m => m.OrderNum, "ListOrder", m => m.Id),
+        grid.Col(m => m.OrderId, "EditOrder", m => m.OrderId, true),
+    })
+    .ColumnCommand(grid => new[]
+    {
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Edit", "Edit", "edit_fr") : null
+    }.Where(x => x != null).ToArray())
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid'), permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    grid.data("kendoGrid").bind("save", function(e) {
+        if (!e.model.id && e.model.Default) setTimeout(function () { e.sender.dataSource.read(); }, 1000);
+    });
+
+    function gridOnInlineEditCustom(e) {
+        e.model.InlineEdit = e.model.QuickAdd = true;
+    }
+
+    function gridCustom(grid) {
+
+        //gridMarkLangDisabled(grid, '.k-grid-name', function (row) { return !row.LangVisible; });
+
+        gridHideCell(grid, '.k-grid-Delete', function (row) { return row.AnyDepend; });
+
+        gridDisableCheckBox(grid, function (row) { return row.AnyDepend; });
+
+        if (permEdit)
+            $('tr', grid.element).each(function() {
+                $(this).dblclick(function(e) {
+                    if (!grid.editable) grid.editRow($(this));
+                });
+            });
+
+        setTimeout(function() {
+            $('.js-add-new-selector').unbind('click').click(function() {
+                grid.addRow();
+            }).attr('type', 'button');
+        }, 1);
+    }
+
+    function gridRefreshRow(grid, rowEle) {
+
+        gridHideCell(grid, rowEle.find('.k-grid-Delete'), function (row) { return row.AnyDepend; });
+
+        gridDisableCheckBox(grid, function (row) { return row.AnyDepend; }, rowEle.find('.row-checkbox'));
+
+        if (permEdit)
+            rowEle.dblclick(function(e) {
+                if (!grid.editable) grid.editRow($(this));
+            });
+    }
+
+    //function gridGetParams(grid, e) {
+    //    return { propertyid: $('#propertyid').val() };
+    //}
+
+    //function onFilterChange() {
+    //    grid.data('kendoGrid').dataSource.page(1);
+    //}
+
+</script>

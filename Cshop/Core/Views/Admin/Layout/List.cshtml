@@ -1,0 +1,1398 @@
+﻿@using System.Web.Mvc
+@using System.Web.Mvc.Html
+@using Claw.Core.Extensions
+@using Claw.Core.Enumerations
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Core
+
+@{
+    Layout = QParam.IsFontEnd ? "~/Areas/Admin/Layout/admin.front.cshtml" : "~/Areas/Admin/Layout/admin.default.cshtml";
+    ViewBag.Controller = Html.GetController();
+    var ctx = ClawContext.Current;
+
+    var lang = LanguageMgr.FocusLangCode;
+    var langObj = LanguageMgr.FocusLang;
+    var listLang = LanguageMgr.GetAll();
+
+    var isFrontEnd = QParam.IsFontEnd;
+    var controller = ViewBag.Controller as string;
+}
+
+@section Styles {
+
+    <style type="text/css">
+        .wr_name_es {
+            margin: 16px 0 5px !important;
+        }
+
+        .wr_usertop_colLeft {
+            height: 60px !important;
+        }
+
+        /*.wr-menu-top-eshop {width: 100% !important;padding: 15px 0px !important;margin-bottom: 14px !important;}*/
+
+        .wr_submit_top.wr_btn_no_icon {
+            float: none;
+            position: static;
+        }
+
+            .wr_submit_top.wr_btn_no_icon li {
+                height: auto;
+            }
+
+                .wr_submit_top.wr_btn_no_icon li input.btn {
+                    border-width: 0;
+                    height: 24px;
+                    margin: 0;
+                    line-height: 1em;
+                }
+
+        #menuTopFE {
+            float: left;
+            margin-left: 10px;
+            color: #333;
+            font-size: small;
+        }
+
+            #menuTopFE li {
+                float: left;
+                margin-left: 2px;
+                margin-right: 2px;
+            }
+
+            #menuTopFE a {
+                color: #333;
+            }
+
+                #menuTopFE a.selected {
+                    color: #6C0B7E;
+                }
+
+        .wr_table_all thead.k-grid-header th.k-header .k-link {
+            line-height: 1.7em !important;
+        }
+
+        .k-treeview {
+            background-color: transparent;
+            padding: 2px 2px;
+        }
+
+            .k-treeview .k-in.k-state-selected, .k-calendar .k-state-selected {
+                background-color: #60ADFF;
+            }
+
+                .k-treeview .k-in.k-state-selected.k-state-focused, .k-calendar .k-state-selected.k-state-focused {
+                    box-shadow: 0px 0px 3px 4px #60ADFF inset;
+                }
+
+        .item-lang-disabled, .grid-row-edit.item-lang-disabled {
+            font-style: italic;
+            color: gray !important;
+        }
+
+        .numeric-text-box.k-input.sort-order {
+            width: 100%;
+            text-align: right;
+            box-shadow: none;
+            margin-bottom: 0px !important;
+            height: 26px;
+        }
+
+        .k-numerictextbox.sort-order {
+            width: 70px;
+        }
+
+        .k-grid-edit-row .text-box {
+            box-shadow: initial;
+            height: 28px;
+        }
+
+        .k-grid-header a.k-link:hover {
+            text-decoration: underline;
+        }
+
+        .filter-dropdown {
+            min-width: 100px;
+            font-size: small;
+            font-weight: normal;
+        }
+
+        .k-popup .k-list .k-item {
+            white-space: nowrap;
+        }
+
+        .k-list-container.k-popup {
+            max-width: 550px;
+        }
+
+        .k-grid .error {
+            position: absolute;
+            margin-top: -3px;
+            line-height: 1.1em;
+            background-color: rgb(224, 224, 224);
+            padding: 1px 7px;
+            border: 0px solid white;
+            z-index: 9999;
+        }
+
+        .k-grid .image .preview {
+            line-height: 0;
+            vertical-align: bottom;
+        }
+
+            .k-grid .image .preview img {
+                float: none;
+            }
+
+        .k-grid .input-validation-error {
+            border: none !important;
+        }
+
+        .k-grid .error:empty {
+            display: none !important;
+        }
+
+        .k-grid-link {
+            color: #390F3D;
+            cursor: pointer;
+            display: block;
+        }
+
+            .k-grid-link:link {
+                text-decoration: none;
+            }
+
+            .k-grid-link:hover {
+                text-decoration: underline;
+            }
+
+        a.grid-row-edit {
+            color: #390F3D;
+        }
+
+        .k-detail-cell {
+            padding: 0px 0px !important;
+        }
+
+            .k-detail-cell thead {
+                display: none !important;
+            }
+
+        .show_massage .nNote {
+            width: 90% !important;
+            float: left;
+        }
+
+        .show_massage .close {
+            position: relative;
+            float: right;
+            font-size: 14px !important;
+            padding-right: 10px;
+            margin: 0;
+            color: #333;
+            line-height: 2.1em !important;
+        }
+
+            .show_massage .close:hover {
+                color: red;
+            }
+
+        a.delete_fr.inline-cancel {
+            background-position: 0px -89px !important;
+        }
+
+        a.edit_fr.inline-save {
+            background-position: 0px -31px !important;
+        }
+
+        td.td-right {
+            text-align: right !important;
+        }
+
+        td.td-center.image.compact a.preview img {
+            float: none;
+            padding: 0;
+            margin: 3px;
+            vertical-align: bottom;
+        }
+
+        .k-grid td .preview img[src=''] {
+            display: none;
+        }
+
+        .wr-search-adv .row_content_box .clo_right .k-datepicker .k-picker-wrap input.k-input[type="text"] {
+            min-width: 0 !important;
+            width: 100% !important;
+            padding: 0 !important;
+        }
+
+        .wr-search-adv .k-datepicker .k-picker-wrap {
+            height: 24px;
+        }
+    </style>
+
+    @Html.CssBundle("~/style/leftmenu.css", MediaDeviceType.Screen, "~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Css/eshop-style.css", "~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Css/eshop-style-custom.css")
+}
+
+<script type="text/javascript">
+
+    if (!location.origin) location.origin = location.protocol + '//' + location.host;
+
+    $(document).ready(function () {
+        //active menu in tab product
+        var patchName = window.location.pathname;
+        var obj = $('.wr-menu-icon').find('ul.clo-5').find('a');
+        obj.removeClass('active');
+        $(obj).each(function () {
+            var ahref = $(this).attr("href");
+            var arr = ahref.split(/[\s/]+/);
+            var outPut = "/" + arr[arr.length - 2];
+            if(outPut != null){
+                if (patchName.toLowerCase().indexOf(outPut.toLowerCase()) != -1) {
+                    $(this).addClass('active');  return false;
+                }
+            }
+        });
+    });
+
+    function gridEagerLoadConfig(options, data) {
+
+        var asyncTrans = $.extend(true, {}, options.dataSource.transport);
+
+        options.autoBind = false;
+        options.dataSource.transport.clawOffline = true;
+        options.dataSource.transport.read.url = null;
+        options.dataSource.transport.data = data;
+
+        return {
+            transport: asyncTrans,
+            dataEvent: {
+                skip: 0,
+                group: [],
+                aggregate: null,
+                take: options.dataSource.pageSize,
+                page: options.dataSource.page,
+                pageSize: options.dataSource.pageSize,
+                sort: options.dataSource.sort,
+                filter: options.dataSource.filter,
+            }
+        };
+    }
+
+    function localizeCurrencyToString(value, code) {
+        if (value == null || value === '') value = 0;
+        if (!code) code = '@CurrencyMgr.Default.Code';
+        var formatInfo = kendo.currencies[code.toLowerCase()] || {};
+        var txtVal = kendo.toString(value, 'n', formatInfo);
+        return formatInfo.location ? ((formatInfo.token || '') + ' ' + txtVal) : (txtVal + ' ' + (formatInfo.token || ''));
+    }
+
+    function initCurrencies(currencies) {
+
+        kendo.currencies = kendo.currencies || {};
+
+        currencies.forEach(function (itm) {
+            var formatInfo = $.extend(true, {}, kendo.cultures.current);
+
+            formatInfo.name = itm.Code;
+            formatInfo.location = itm.Location;
+            formatInfo.token = itm.Token;
+            formatInfo.numberFormat[','] = itm.ThousandSep;
+            formatInfo.numberFormat['.'] = itm.DecimalSep;
+            formatInfo.numberFormat.decimals = itm.DecimalPlaces;
+
+            kendo.currencies[itm.Code.toLowerCase()] = formatInfo;
+        });
+
+    }
+
+    function gridMarkLangDisabled(grid, selector, cond) {
+        $(selector, grid.element).each(function () {
+            var row = grid.dataItem($(this).closest("tr"));
+            if (cond(row)) {
+                $(this).addClass('item-lang-disabled');
+                var title = $(this).attr('title');
+                $(this).attr('title', (title ? title + ', ' : '') + '@(StringTable.ItemLanguageDisabled)');
+            }
+        });
+    }
+
+    function gridDisableCheckBox(grid, cond, selector) {
+        $(selector || '.row-checkbox', grid.element).each(function () {
+            if (cond(grid.dataItem($(this).closest("tr")))) {
+                $(this).removeClass("row-checkbox");
+                $(this).closest("div").find('input[type=checkbox]').prop('disabled',true);
+            }
+
+            $(this).closest("td").css({ 'padding': '0px', 'min-width': '35px' });
+        });
+    }
+
+    function gridHideCell(grid, selector, cond) {
+        $(selector, grid.element).each(function () {
+            var rw = grid.dataItem($(this).closest("tr"));
+            if (cond(rw)) $(this).hide();
+        });
+    }
+
+    function initGridStatusAction(grid, selector, actionUrl, getterStatus, setterStatus, getterCmdParams) {
+
+        var titleEnable = '@(StringTable.ItemEnableTitle)';
+        var titleDisable = '@(StringTable.ItemDisableTitle)';
+
+        $(selector, grid.element).each(function () {
+
+            var rdata = grid.dataItem($(this).closest("tr"));
+            var ritmA = $(this).find('a');
+            var status = getterStatus(rdata);
+
+            ritmA.addClass(status ? 'enable' : 'disable');
+            ritmA.attr('title', status ? titleDisable : titleEnable);
+
+            if(actionUrl) {
+                $(this).unbind('click').click(function (e) {
+                    var row = grid.dataItem($(this).closest("tr"));
+                    var itm = $(this).find('a');
+
+                    setterStatus(row, !getterStatus(row));
+
+                    if (row.id > 0) ajaxCmd(actionUrl, getterCmdParams(row));
+
+                    if (getterStatus(row)) {
+                        itm.removeClass("disable");
+                        itm.addClass("enable");
+                        itm.attr('title', titleDisable);
+                    } else {
+                        itm.removeClass("enable");
+                        itm.addClass("disable");
+                        itm.attr('title', titleEnable);
+                    }
+                });
+            }
+        });
+    }
+
+    function initGridDisplayOrderBox(grid, selector, actionUrl) {
+        $(selector, grid.element).kendoNumericTextBox({
+            format: '####',
+            decimals: 0,
+            upArrowText: '@StringTable.NumTxtBoxUpArrow',
+            downArrowText: '@StringTable.NumTxtBoxDownArrow',
+            change: function () {
+                var row = grid.dataItem(this.element.closest("tr"));
+                ajaxCmd(actionUrl, { id: row.Id, value: this.value() });
+            }
+        });
+
+        $(selector).change(function() {
+            if ($.trim($(this).val()) == '') $(this).val($(this).attr('value'));
+        });
+    }
+
+    function initGridTextAreaBox(grid, selector, actionUrl) {
+        $(selector, grid.element).change(function() {
+            var row = grid.dataItem($(this).closest("tr"));
+            ajaxCmd(actionUrl, { id: row.Id, value: $(this).val(), lang: getFocusLang() });
+        });
+    }
+
+    function initGridTextInlineEditBox(grid, selector, member, txtSelector, inputSelector, actionUrl) {
+        $(selector, grid.element).each(function() {
+            var node = $(this), row = grid.dataItem($(this).closest("tr"));
+            var txtNode = node.find(txtSelector), inputNode = node.find(inputSelector);
+
+            $(this).dblclick(function() {
+                inputNode.show(); inputNode.val(row[member]); inputNode.focus();
+                txtNode.hide(); txtNode.val(row[member]);
+            });
+
+            $(this).find(inputSelector).change(function() {
+                ajaxCmdHtml(actionUrl, { id: row.Id, value: $(this).val(), lang: getFocusLang() },
+                    function(result) {
+                        if (result.Status == 0) {
+                            row[member] = inputNode.val(); txtNode.html(row[member]);
+                        }
+                        inputNode.hide(); txtNode.show();
+                        if (result.Message != null) admincommon.showMessageDefault(result.Message, result.Status);
+                    });
+            });
+
+            $(this).focusout(function () { inputNode.hide(); txtNode.show(); });
+        });
+    }
+
+    function initDatePicker(node, options) {
+        (node ? node : $("input.datepicker")).each(function () {
+
+            if (!$(this).hasClass('setKendoDatepicker')) {
+                $(this).kendoDatePicker($.extend({
+                    culture: '@(langObj.LanguageCode)',
+                    format: '@(SettingsBiz.GetSettings().Display.Others.GetDateFormat())',
+                    animation: {
+                        close: { effects: "fadeOut zoom:out", duration: 300 },
+                        open: { effects: "fadeIn zoom:in", duration: 300 }
+                    }
+                }, options || {}));
+
+                $(this).addClass('setKendoDatepicker');
+            }
+        });
+    }
+
+    function initKendoNumeric(selector, options) {
+
+        var nodes = $(selector);
+
+        nodes.each(function () {
+            $(this).kendoNumericTextBox($.extend({
+                culture: getFocusLang(),
+            }, options || {}));
+
+            var nodeKd = $(this).data('kendoNumericTextBox');
+
+            if (nodeKd) nodeKd.options.originValue = nodeKd.value();
+
+            if ($(this).hasClass('js-required'))
+                $(this).closest('.k-numerictextbox')
+                    .removeClass('js-required')
+                    .find('.js-required:visible').removeClass('js-required');
+        });
+
+        return nodes;
+    }
+
+    function gridStringifyAttributes(attributes) {
+        var attr, result = " ";
+
+        if (attributes) {
+            if (typeof attributes === 'string') {
+                return attributes;
+            }
+
+            for (attr in attributes) {
+                result += attr + '="' + attributes[attr] + '"';
+            }
+        }
+        return result;
+    }
+
+    function gridGetRowTemplate(grid, alt, map) {
+        var that = grid,
+            columns = that.columns,
+            settings = $.extend({}, kendo.Template, that.options.templateSettings),
+            idx,
+            length = columns.length,
+            template,
+            state = { storage: {}, count: 0 },
+            column,
+            type,
+            hasDetails = that._hasDetails(),
+            className = [],
+            groups = that._groups(),
+            skipGroupCells;
+
+        var rowTemplate = "<tr";
+
+        if (alt) className.push("k-alt");
+
+        if (hasDetails) className.push("k-master-row");
+
+        if (className.length) rowTemplate += ' class="' + className.join(" ") + '"';
+
+        if (length) rowTemplate += ' ' + kendo.attr("uid") + '="#=' + kendo.expr("uid", settings.paramName) + '#"';
+
+        rowTemplate += " role='row'>";
+
+        if (groups > 0 && !skipGroupCells) rowTemplate += groupCells(groups);
+
+        var colTempls = [];
+
+        if (hasDetails) colTempls.push('<td class="k-hierarchy-cell"><a class="k-icon k-plus" href="\\#" tabindex="-1"></a></td>');
+
+        for (idx = 0; idx < length; idx++) {
+            column = columns[idx];
+
+            var colTempl = "<td" + gridStringifyAttributes(column.attributes) + " role='gridcell'>";
+            colTempl += that._cellTmpl(column, state);
+            colTempl += "</td>";
+            colTempls.push(colTempl);
+        }
+
+        for (var i = 0; i < colTempls.length; i++) {
+            if (map && map[i] != null) {
+                rowTemplate += colTempls[map[i]];
+            } else rowTemplate += colTempls[i];
+        }
+
+        rowTemplate += "</tr>";
+
+        return kendo.template(rowTemplate, settings);
+    }
+
+    function gridSwapElements(holder, selector, map, transformHandler) {
+        var nodes = holder.find(selector), lst = [];
+
+        for (var i = 0; i < nodes.length; i++) {
+            if (map[i] != null) {
+                var node = nodes[map[i]];
+                if (transformHandler) transformHandler(i, node);
+                lst.push({ node: node, html: $(node).html() });
+            } else lst.push({ node: nodes[i], html: $(nodes[i]).html() });
+        }
+
+        holder.html('');
+        lst.forEach(function (itm) { holder.append($(itm.node).html(itm.html));});
+    }
+
+    function initImagePreview(fancybox, holder, autoPreview) {
+        $(function() {initImagePreviewRaw(fancybox, holder, autoPreview);});
+    }
+
+    function urlToJSON(url, skipEmpty) {
+        if (!url || url.indexOf('?') == -1) return {};
+
+        var result = {}, pairs = url.slice(url.indexOf('?') + 1).split('&');
+
+        pairs.forEach(function(item) {
+            var pair = item.split('=');
+            if (pair.length > 0 && (pair[1] || !skipEmpty))
+                result[pair[0].toLowerCase()] = decodeURIComponent(pair[1] || '');
+        });
+
+        return result;
+    }
+
+    function urlMergeParams(url, params) {
+        if (!url || !params) return url;
+
+        if (typeof (params) == 'string') params = urlToJSON('?' + params, false);
+
+        var idx = url.indexOf('?');
+
+        if (idx == -1) url += '?';
+        else {
+            params = $.extend(urlToJSON(url, true), params);
+            url = url.substr(0, idx + 1);
+        }
+
+        for(var key in Object.keys(params)) {
+            if (!params[key]) delete params[key];
+        }
+
+        return url + $.param(params);
+    }
+
+    function urlInjectFocusLang(url) {
+        if (!url || /^http(s?):\/\//i.test(url) || /[?&]lang=/i.test(url)) return url;
+        return urlMergeParams(url, { lang: getFocusLang() });
+    }
+
+    function urlReplaceAction(url, action) {
+        if (!url || !action) return url;
+
+        var iE = url.indexOf('?'), len = url.length;
+        if (iE == -1)iE = len - 1;
+        var iB = url.lastIndexOf('/', iE);
+
+        if (iB >= 0 && iB < iE)return url.substr(0, iB + 1) + action + (iE < len - 1 ? url.substr(iE) : '');
+        else return url;
+    }
+
+    function gridAdjustPopup(grid, holder, scrollBox, minHeight, maxHeight, cmdBoxHeight, adjustY) {
+
+        cmdBoxHeight = cmdBoxHeight || 30; adjustY = adjustY || 10;
+        minHeight = minHeight || 200; maxHeight = maxHeight || 2048;
+
+        var holderNode = grid.element.closest(holder), scrollNode = holderNode.closest(scrollBox);
+        var recHeight = Math.max(minHeight, Math.min(maxHeight, $(window).height() - 50));
+        var height = Math.min(recHeight, Math.max(minHeight, holderNode.height() + cmdBoxHeight + 30 + adjustY));
+
+        scrollNode.closest('.k-widget.k-window').css({
+            'height': height + 'px',
+            'top': ($(window).height() - height - 30) / 2 + 'px',
+        });
+        scrollNode.css({ 'max-height': (height - cmdBoxHeight - 30) + 'px', 'overflow': 'auto' });
+    }
+
+    function treeAdjustPopup(tree, holder, scrollBox, minHeight, maxHeight, cmdBoxHeight, adjustY) {
+        if (tree.adjustPopupTimer) clearTimeout(tree.adjustPopupTimer);
+        tree.adjustPopupTimer = setTimeout(function () {
+            tree.adjustPopupTimer = null;
+            gridAdjustPopup(tree, holder, scrollBox, minHeight, maxHeight, cmdBoxHeight, adjustY);
+        }, 500);
+    }
+
+    function ifnull(obj, def) {
+        if (obj == null) return def || '';
+        return obj;
+    }
+
+    function ifnullImg(obj) {
+        if (!obj) return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+        return obj;
+    }
+
+    function safeProp(obj, propName) {
+        if (obj == null) return '';
+        if (typeof (obj) != 'object')return obj;
+        return (obj[propName] || '').replace(/(<([^>]+)>)/ig,"");
+    }
+
+    admincommon.showMessageDefault = function (message, status, scrollTo) {
+        //clearTimeout(timer);
+        var msg = $("#massage");
+        if (msg.is(":visible")) msg.hide();
+        this.resetMessageClass(msg);
+        this.addMessageClass(msg, status);
+        $("span#show_error", msg).html(message);
+        msg.slideDown("slow", function () {
+            if (scrollTo != null && $.scrollTo) {
+                var scrollToOffset = $(scrollTo).offset();
+                $.scrollTo(scrollToOffset.left, scrollToOffset.top, { duration: 1000 });
+            }
+        }); //timer = setTimeout(this.slideUpMessage, 10000);
+
+        msg.unbind('click').click(function () {
+            if (timer)clearTimeout(timer);
+            $("span#show_error", msg).html('');
+            $(this).slideUp(700);
+        });
+    };
+
+    admincommon.showMessage = function (message, status, timeout) {
+        this.showMessageDefault(message, status);
+        if (timeout) timer = setTimeout(function () { admincommon.slideUpMessage(); }, timeout);
+    };
+
+</script>
+
+<section class="out_main bg_col_left_eshop">
+    <section class="wr_top_action">
+        <section class="top_breadcrumb">
+            @if (isFrontEnd)
+            {
+                var queryArgs = QParam.Args(true, true, true);
+                var arrMenus = BaseController.Names;
+                CInfo selItem = null;
+
+                <ul id="menuTopFE">
+                    <li>[</li>
+                    @foreach (var menu in arrMenus)
+                    {
+                        if (menu.Controller.EqualsIgCase(controller))
+                        {
+                            <li><a href="@(ModuleUrl.AdminUrl(menu.Controller, "index") + queryArgs)" class="selected">@menu.Name.ModLocalize()</a></li>
+                            selItem = menu;
+                        }
+                        else
+                        {
+                            <li><a href="@(ModuleUrl.AdminUrl(menu.Controller, "index") + queryArgs)">@menu.Name.ModLocalize()</a></li>
+                        }
+                        if (!menu.Term)
+                        {
+                        <li>|</li> }
+                    }
+                    <li>]</li>
+                </ul>
+                if (selItem != null)
+                {
+                    <script type="text/javascript">$('#admin-home-title').html('@("Manage".ModLocalize() + " " + selItem.Name.ModLocalize().ToLower())');</script>
+                }
+            }
+        </section>
+        @if (!isFrontEnd)
+        {
+            <div class="exshrink click_full full" data-expand-title="@("Expand".Localize("Expand"))" data-shrink-title="@("Shrink".Localize("Shrink"))" title="@("Expand".Localize("Expand"))">&nbsp;</div>
+        }
+    </section>
+    <!--end wr_top_action-->
+    <section class="wr_content_all">
+        <section class="wr_left eshop_Left" style="float: left;@(isFrontEnd ? "display:none" : "")">
+            @{ Html.RenderPartial("~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Admin/Layout/_MenuLeftControl.cshtml", StringTable.MenuLeftKey); }
+        </section>
+        <section class="wr_right eshop_Right" style="@(isFrontEnd ? "margin-left:0px" : "")">
+            @if (ViewBag.ControlSetting != null)
+            {
+                Html.RenderPartial("~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Admin/Layout/_MenuSetting.cshtml");
+            }
+            else if (ViewBag.MenuReport != null && ViewBag.MenuReport == true)
+            {
+                Html.RenderPartial("~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Admin/Layout/_MenuReport.cshtml");
+            }
+            else
+            {
+                Html.RenderPartial("~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Admin/Layout/_MenuListing.cshtml");
+            }
+
+            <section style="min-width: 600px; float: left; height: 45px;">
+                <h2 class="title_top" style="float: left; margin-top: 5px;@(isFrontEnd ? "display:none" : "")">
+                    @RenderSection("MainTitleSection", false)
+                </h2>
+
+                <ul class="wr_submit_top">
+                    @RenderSection("ExtraTopActionMenuSection", false)
+                    @if (ViewBag.Controller != null && ViewBag.AddAction != null)
+                    {
+                        <li> <input type="submit" value="@(StringTable.AddNew)" class="btn_add js-add-new-selector" title="@(StringTable.AddNew)"></li>
+                    }
+                    <li style="display: none;" class="delete_big btn-clear">
+                        <input type="submit" onclick="javascript:void(0);" value="@(StringTable.DeleteSelected)" title="@(StringTable.DeleteSelected)" class="btn-delete">
+                    </li>
+                </ul>
+
+                <section class="wr_flag_top" style="right: 10px; margin-top: 5px; float: right;display: none">
+                    <p class="text_flag_no" style="line-height: 26px;">@(StringTable.FilterLanguage)</p>
+                    <select id="filterLanguage" style="width:240px;" data-selected="@lang.ToLower()"></select>
+                </section>
+            </section>
+
+            <section class="wr_breadcrumb" style="@(isFrontEnd ? "display:none" : "")">
+                @*margin-bottom:5px;*@
+                <a href="/" class="home"></a><i class="dot_bre"></i>
+                <a href="@(ViewBag.ParentBreadcrumbLink ?? Html.Claw().SiteUrls().DefaultAdminUrl())">
+                    @(ViewBag.ParentBreadcrumbTitle ?? StringTable.Admin)
+                </a>
+                <i class="dot_bre"></i>
+                <a id="aroles" class="current">@RenderSection("CurrentTitleSection", false)</a>
+            </section>
+
+            <section class="row_content mb_15" style="min-height:inherit;">
+                @{ var bFilterBox = ViewBag.ShowFilterBox != null && ViewBag.ShowFilterBox; }
+                <section>
+                    @*<section class="wr_clo1">
+                            @if (ViewBag.Controller != null && ViewBag.AddAction != null)
+                            {
+                                <span class="add_big click_popup_form btn-add js-add-new-selector" title="@(StringTable.AddNew)">@(StringTable.AddNew)</span>
+                            }
+                            <a href="javascript:void(0);" class="delete_big click_popup" style="display: none;" title="@(StringTable.DeleteSelected)">
+                                @(StringTable.DeleteSelected)
+                            </a>
+                        </section>*@
+                    @if (ViewBag.ShowSearchBox != null && ViewBag.ShowSearchBox)
+                    {
+                        using (Html.BeginForm(null, null, FormMethod.Post, new { @id = "formSearch" }))
+                        {
+                            <section class="wr_clo1" style="margin-top: 5px;margin-left:0px">
+                                <section style="margin-left: 0px;" class="wr-search-eshop">
+                                    <input id="inputSearch" name="textsearch" maxlength="50" class="text-l valid" placeholder="@ViewBag.SearchPlaceHolder" type="text" aria-invalid="false">
+                                    <input name="button" class="button-l" value="" type="submit">
+                                </section>
+                            </section>
+                        }
+                    }
+                    @RenderSection("CustomActionMenuSection", false)
+                </section>
+                @if (bFilterBox)
+                {
+                    @*<style type="text/css">
+                            ul.filter-box li {
+                                float: left;
+                                margin-top: 5px;
+                                margin-right: 10px;
+                                vertical-align: middle;
+                                white-space: nowrap;
+                            }
+                        </style>
+                        <section>
+                            <section class="wr_clo1" style="font-size: medium; font-weight: bold; color: #6C0B7E">
+                                <ul class="filter-box"> </ul>
+                            </section>
+                        </section>*@
+                    @RenderSection("FilterMenuSection", false)
+                }
+            </section>
+
+            <section class="row_content">
+                <section class="wr_clo1">
+                    <section class="row_content">
+                        @*<section style="float: left; height: 18px; margin: 2px 0px; width: 100%">
+                                <section style="position: absolute;">
+                                    <section id="massage" class="show_massage" style="display:none;" data-status="">
+                                        <span id="show_error" class="nNote"></span>
+                                    </section>
+                                </section>
+                            </section>*@
+                        <section id="input-err-msg-box">
+                            <section id="massage" class="show_massage" style="display:none;" data-status="">
+                                <span id="show_error" class="nNote"></span><a title="@StringTable.Close" class="close" href="javascript:void(0)">X</a>
+                            </section>
+                        </section>
+                        @if (ViewBag.Prisguide != null)
+                        {
+                            @RenderSection("RenderPrisguideSetting", false)                          
+                        }
+                        @if (ViewBag.Prisjakt != null)
+                        {
+                            @RenderSection("RenderPrisjaktSetting", false)
+                          
+                        }
+                        @if (ViewBag.FBMarketing != null)
+                        {
+                            @RenderSection("RenderFBMarketingSetting", false)
+                           
+                        }
+                        @if (ViewBag.GoogleShopping != null)
+                        {
+                            @RenderSection("RenderGoogleShoppingSetting", false)
+                        }
+                        <section class="wr_clo1">
+                            <section class="wr_table_all" style="border-bottom: 0px none">
+                                @RenderBody()
+                            </section>
+                        </section>
+                    </section>
+                </section>
+            </section>
+
+            <section class="clear_fix"></section>
+        </section>
+        <!--end wr_content-->
+        <section class="clear_fix"></section>
+    </section>
+    <!--end wr_content-->
+    <section class="clear_fix"></section>
+</section>
+
+@if (ViewBag.ParentBreadcrumbLink != null)
+{
+    <script type="text/javascript">
+        $(function() {
+            $('.eshop_Left ul.eshop_menu a.pro').each(function(){
+                $(this).attr('href', $(this).attr('href') + '?noload=true');
+            });
+
+            if ($('li a.active', '.eshop_Left ul.eshop_menu').length == 0)
+                $('li a[href="@ViewBag.ParentBreadcrumbLink"]', '.eshop_Left ul.eshop_menu').addClass('active');
+        });
+
+    </script>
+}
+
+@if (!PermissionMgr.CurrentUser.IsAdmin())
+{
+    var perm = PermissionMgr.CurrentPerm;
+    <script type="text/javascript">
+        var catalogView = @(perm.CatalogView ? 1 : 0), promotionView = @(perm.PromotionView ? 1 : 0), orderView = @(perm.OrderView ? 1 : 0);
+        $('li a.set,li a.act-log', '.eshop_menu').closest('li').hide();
+        if (!catalogView)$('li a.pro,li a.emarket', '.eshop_menu').closest('li').hide();
+        if (!promotionView)$('li a.dis', '.eshop_menu').closest('li').hide();
+        if (!orderView)$('li a.oder,li a.cus', '.eshop_menu').closest('li').hide();
+
+        $('li a[href="/admin"]', '#adTopMenu').closest('li').hide();
+    </script>
+
+    if (!PermissionMgr.CurrentUser.HasUserPermission())
+    {
+        <script type="text/javascript">
+            $('a[href="/admin/users/updateprofile"],a[href="/admin/users/changepw"]', '.top-nav .sub.sub_user').closest('li').hide();
+        </script>
+    }
+}
+
+<script type="text/javascript">
+
+    var prevActionStatus = '@TempData["ActionStatus"]';
+    var prevActionMsg = '@Html.Raw((ViewBag.Message ?? (TempData["ActionMessage"] ?? "")).ToString().Replace("'", @"\'"))';
+
+    if (prevActionStatus && prevActionMsg)setTimeout(function() { admincommon.showMessage(prevActionMsg, prevActionStatus); }, 2000);
+
+    function languageFilterInit() {
+        $("#filterLanguage").kendoDropDownList({
+            dataTextField: "LanguageName",
+            dataValueField: "LanguageCode",
+            value: '@lang.ToLower()',
+            headerTemplate: "",
+            valueTemplate: '<img class="selected-value" src="/content/common/flags/lang_#:data.LanguageCode#.gif" /><span>#:data.LanguageName#</span>',
+            template: '<span class="k-state-default"><img src="/content/common/flags/lang_#:data.LanguageCode#.gif" /></span>' +
+                '<span class="k-state-default">#:data.LanguageName#</span>',
+            dataSource: @Html.Raw(Json.Encode(listLang.Select(x => new { LanguageCode = x.LanguageCode.ToLower(), LanguageName = x.LanguageName }))),
+            change: function (e) {
+                var params = urlToJSON('?' + (e.sender.element.attr('actionargs') || ''), false);
+                params['lang'] = this.value();
+
+                admincommon.showMask();
+
+                window.location = urlMergeParams(window.location.href, params);
+            }
+        });
+    }
+
+</script>
+
+<script type="text/x-kendo-template" id="select-input-language-confirmation">
+    <div id="modal" style="margin:auto;text-align:center">
+        <div style="height: @(isFrontEnd?10:20)px"></div>
+        <div class="wr_flag selectLangBox" style="@(isFrontEnd ? "" : "display:none")">
+            <div class="prompt-mess" style="margin-top: 0px; margin-bottom: 0px;text-align:left">@(StringTable.AddNewItem)</div>
+            @{
+                var qparam = new QParam() { ReController = controller };
+                var qArgs = qparam.ToString(false, false);
+            }
+            @(Html.DropDownList("controllerAdd", BaseController.Names
+                  .Select(x => new SelectListItem()
+                  {
+                      Value = ModuleUrl.AdminUrl(x.Controller, ViewBag.AddAction) + qArgs,
+                      Text = x.SName.ModLocalize(),
+                      Selected = (x.Controller.EqualsIgCase(controller))
+                  }), new { @class = "valid", @style = "min-width:100px;text-align: left;" }))
+        </div>
+        <div style="height:1px"></div>
+        <p class="prompt-mess" style="margin-top: 5px; margin-bottom: 0px;">@(StringTable.PromptSelectLanguage)</p>
+        <div class="wr_flag selectLangBox" style="display: inline-block; margin-top: @(isFrontEnd?0:5)px;">
+            @foreach (var langItem in listLang)
+            {
+                <a href="javascript:void(0);" class="langItem add-new-select-lang"
+                   data-lang="@langItem.LanguageCode.ToLower()" title="@langItem.LanguageName" data-id="@langItem.Id" data-hasvalue="@(langItem.Id > 0 ? "1" : "0")">
+                    <img src="@ModuleUrl.LangIcon(langItem.LanguageCode, true)" alt="@langItem.LanguageCode" />
+                </a>
+            }
+        </div>
+    </div>
+</script>
+
+<script type="text/javascript">
+
+    function ajaxCmdStatus(actionUrl, params, resultHandler) {
+        ajaxCmd(actionUrl, params, resultHandler);
+    }
+
+    function ajaxCmd(actionUrl, params, resultHandler, showMask, statusMode) {
+        $.ajax({
+            url: (params && params['lang'] ? actionUrl : urlInjectFocusLang(actionUrl)),
+            type: 'POST',
+            //contentType: 'application/json; charset=utf-8',
+            data: params,
+            beforeSend: function() {
+                if(showMask || showMask == undefined){ admincommon.hideMessage(); admincommon.showMask(); }
+            },
+            success: function (result) {
+                if(statusMode || statusMode == undefined) {
+                    if (result.Status == 0) {
+                        if(resultHandler) resultHandler(result);
+                    }
+                    if (result.Message != null) admincommon.showMessageDefault(result.Message, result.Status);
+                }
+                else resultHandler(result);
+            },
+            error: function (e) { admincommon.showMessageDefault('@(StringTable.AjaxCommandErrorMessage)', '@(ActionResultStatus.Fail.ToString())'); },
+            complete: function () { admincommon.hideMask(); }
+        });
+    }
+
+    function ajaxCmdHtml(actionUrl, params, resultHandler, tag) {
+        $.ajax({
+            url: (params && params['lang'] ? actionUrl : urlInjectFocusLang(actionUrl)),
+            type: 'POST',
+            data: params,
+            beforeSend: function () { admincommon.hideMessage(); admincommon.showMask(); },
+            success: function (result) {
+                resultHandler(result, tag);
+            },
+            error: function (e) { admincommon.showMessageDefault('@(StringTable.AjaxCommandErrorMessage)', '@(ActionResultStatus.Fail)'); },
+            complete: function () { admincommon.hideMask(); }
+        });
+    }
+
+</script>
+
+<script type="text/javascript">
+    function getFocusLang() {
+        return $('#filterLanguage').val();
+    }
+
+    function doNavigate(url, optlang, args) {
+        var actionargs = $('.js-add-new-selector').attr('actionargs');
+        var params = urlToJSON('?' + (actionargs || ''), false);
+
+        if (args) {
+            if (typeof(args) == 'string') args = urlToJSON('?' + args, false);
+            if (args['action']) {
+                url = urlReplaceAction(url, args['action']);
+                delete args['action'];
+            }
+            params = $.extend(params, args);
+        }
+        params['optlang'] = optlang;
+
+        admincommon.showMask();
+
+        window.location = urlMergeParams(url, params);
+    }
+
+    function doAddNew(bChangeItem, controllerName, args) {
+
+        doNavigate('@Html.Raw(ModuleUrl.AdminUrl(controller, (ViewBag.AddAction ?? "").ToString().Equals("Add") ? "Input" : ViewBag.AddAction, 0) + qArgs)', '@lang', args);
+        return;
+
+        if ('@listLang.Count' != '0') {
+
+            var popup = new ClawModal("", "modal-mask");
+            var formContent = $("#select-input-language-confirmation");
+            var formTitle = '@Html.Raw(StringTable.AddNew) ' + controllerName;
+            var width = 400;
+            if (window.innerWidth <= width) { width = window.innerWidth - 100; }
+            var height = 300;
+            if (window.innerHeight <= height) { height = window.innerHeight - 100; }
+            var windowModal = popup.showModal("#window", formTitle, formContent.html(), 350, 150,
+                function (modal) {
+
+                    if ('@(isFrontEnd ? 1 : 0)' == '1') {
+                        if (bChangeItem) $("#controllerAdd").kendoDropDownList();
+                        else $('#controllerAdd').parent().hide();
+                    }
+
+                    modal.find(".add-new-select-lang").click(function () {
+                        doNavigate($("#controllerAdd").val(), $(this).data("lang"), args);
+                        popup.close(true);
+                    });
+                });
+
+        }
+    }
+
+    $(function() {
+        languageFilterInit();
+    });
+
+</script>
+
+@if (ViewBag.AutoAddNewHandler ?? true)
+{
+    var cName = BaseController.Names.FirstOrDefault(x => x.Controller.EqualsIgCase(controller));
+    <script type="text/javascript">
+        $(function() {
+            $('.js-add-new-selector').click(function() {
+                doAddNew(true, '@Html.Raw(cName == null ? "" :cName.SName.ModLocalize().ToLower())');
+            });
+        });
+    </script>
+}
+
+@if (ViewBag.UseInlineEdit != null && ViewBag.UseInlineEdit)
+{
+    <script type="text/javascript">
+
+        function gridOnInlineEdit(event, displayOrder, refreshRowHandler) {
+
+            var grid = event.sender, validatable = grid.editable.validatable, row = event.container, rwuid = row.attr('data-uid');
+
+            grid.select(row);
+
+            row.find('input:visible')
+                .focus(function() {
+                    validatable.hideMessages();
+                    validatable.validateInput($(this));
+                })
+                .keyup(function() {
+                    validatable.validateInput($(this));
+                });
+
+            row.find('.k-grid-Edit')
+                .addClass('inline-save')
+                .attr('title', '@StringTable.Save')
+                .unbind('click').click(function(e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    //console.log('save',e);
+                    gridSaveChanges(grid);
+                });;
+
+            row.find('.k-grid-Delete')
+                .addClass('inline-cancel')
+                .attr('title', '@StringTable.Cancel')
+                .show()
+                .unbind('click').click(function(e) {
+                    grid.cancelRow(); admincommon.hideMessage();
+
+                    var newRw = $('tr[data-uid=' + rwuid + ']', grid.element);
+
+                    newRw.find('.k-grid-Edit').removeClass('inline-save')
+                        .addClass('edit_fr').attr('title', '@StringTable.Edit');
+
+                    newRw.find('.k-grid-Delete').removeClass('inline-cancel')
+                        .addClass('delete_fr').attr('title', '@StringTable.Delete');
+
+                    newRw.dblclick(function() {
+                        if (!grid.editable) grid.editRow($(this));
+                    });
+
+                    //console.log('cancel', newRw, row.selector,grid.dataItem(newRw));
+                    if (refreshRowHandler)refreshRowHandler(grid, newRw);//gridRefreshRow(grid, rowEle)
+                    //grid.refresh({ action: 'rebind', items: [grid.dataItem(newRw)] });
+                    if (grid.clawRowEditEventHandler)grid.clawRowEditEventHandler(grid, newRw);
+                });
+
+            if (displayOrder) {
+                var dorder = row.find(displayOrder);
+                dorder.kendoNumericTextBox({
+                    format: '####',
+                    decimals: 0,
+                    upArrowText: '@StringTable.NumTxtBoxUpArrow',
+                    downArrowText: '@StringTable.NumTxtBoxDownArrow',
+                });
+
+                var numTxtBox = dorder.closest('.k-numerictextbox').find('input');
+                numTxtBox.removeClass('text-box');
+                numTxtBox.addClass('numeric-text-box sort-order');
+            }
+
+            var gridEditTimer = function() {
+                var editable = grid.editable;
+                if (editable) {
+                    if (document.hasFocus() && $('input:focus,a:focus', row).length == 0 && editable.validatable.validate()) {
+                        var node = editable.element.find('.k-grid-Edit');
+                        setTimeout(function() { node.click(); }, 200);
+                    } else setTimeout(gridEditTimer, 100);
+                }
+            };
+
+            //setTimeout(gridEditTimer, 100);
+
+            setTimeout(function() { row.find('input[type=text]:visible').first().focus(); }, 100);
+
+            row.find('input:visible').each(function() {
+                if($(this).data('valNumber')) {
+                    var data = $(this).data();
+                    if (data.valRangeMax) data.valRangeMax = kendo.parseFloat(data.valRangeMax);
+                    if (data.valRangeMin) data.valRangeMin = kendo.parseFloat(data.valRangeMin);
+                }
+            });
+        }
+
+        function gridCmdInlineEdit(id, uid) {
+            var grid = $('#' + id).data('kendoGrid'), editable = grid.editable;
+            var row = $('tr[data-uid=' + uid + ']', grid.element);
+            if (editable) {
+                var node = editable.element.find('.k-grid-Edit');
+                if (node.hasClass('inline-save')) {
+                    editable.element.find('input[type=text]').each(function() {
+                        $(this).val($.trim($(this).val()));
+                        $(this).change();
+                    });
+                    gridSaveChanges(grid);
+                }
+            }
+            else { grid.select(row); grid.editRow(row);}
+        }
+
+        function gridSaveChanges(grid) {
+            if (!grid.clawReqStartTime || Date.now() - grid.clawReqStartTime > 15000) {
+                grid.saveRow();
+            } else setTimeout(function() {
+                console.log('save row delayed', Date.now(), grid.clawReqStartTime);
+                gridSaveChanges(grid);
+            }, 500);
+        }
+
+    </script>
+
+    <script src="@(Globals.ResolveClientUrl(LanguageMgr.KendoPath))/kendo.editable.js"></script>
+    <script src="@(Globals.ResolveClientUrl(LanguageMgr.KendoPath))/kendo.binder.js"></script>
+    <script src="@(Globals.ResolveClientUrl(LanguageMgr.KendoPath))/kendo.validator.js"></script>
+    <script src="@(Globals.ResolveClientUrl(LanguageMgr.KendoPath))/kendo.aspnetmvc.js"></script>
+    <script src="@(Globals.ResolveClientUrl(LanguageMgr.KendoPath))/cultures/kendo.culture.@(langObj.LanguageCode).js"></script>
+
+    <script type="text/javascript">
+        var currentCulture = kendo.cultures["@langObj.LanguageCode"], numberFormat = currentCulture.numberFormat;
+        numberFormat[','] = '@langObj.ThousandsSeperator';
+        numberFormat['.'] = '@langObj.DecimalSeperator';
+        numberFormat.percent[','] = numberFormat[','];
+        numberFormat.percent['.'] = numberFormat['.'];
+        numberFormat.currency[','] = numberFormat[','];
+        numberFormat.currency['.'] = numberFormat['.'];
+
+        kendo.culture('@langObj.LanguageCode');
+
+        function localizeParseFloat(value) {
+            return kendo.parseFloat(value, '@langObj.LanguageCode');
+        }
+
+        function localizeFloatToString(value, format) {
+            return kendo.toString(value, format || 'n2', kendo.cultures['@langObj.LanguageCode']);
+        }
+
+        function localizeMoneyToString(value, format) {
+            format = format || '@SettingsBiz.GetSettings().Display.Others.GetPriceFormat()';
+            return kendo.toString(value, format, kendo.cultures['@langObj.LanguageCode']);
+        }
+
+        function localizeDateToString(value, format) {
+            format = format || '@SettingsBiz.GetSettings().Display.Others.GetDateFormat()';
+            return kendo.toString(value, format, kendo.cultures['@langObj.LanguageCode']);
+        }
+
+        function formUpdateValidRules(node) {
+            $.validator.unobtrusive.parse(node);
+
+            var form = node.first().closest('form');
+            var unobtrusiveValidation = form.data('unobtrusiveValidation');
+            var validator = form.validate();
+
+            $.each(unobtrusiveValidation.options.rules, function (elname, elrules) {
+                if (!validator.settings.rules[elname]) {
+                    var args = $.extend({}, elrules);
+                    args.messages = unobtrusiveValidation.options.messages[elname];
+                    form.find("[name='" + elname + "']").rules("add", args);
+                }
+            });
+        }
+
+    </script>
+}
+
+@if (ViewBag.UseImgPreview != null && ViewBag.UseImgPreview)
+{
+    <style type="text/css">
+        #imgPreview {
+            max-width: 200px;
+            max-height: 200px;
+            width: 200px;
+        }
+
+            #imgPreview img {
+                max-width: 200px;
+                width: 200px;
+            }
+
+        .preview img {
+            max-height: 60px;
+            box-shadow: 2px 2px 3px #555562;
+        }
+    </style>
+
+    <script type="text/javascript">
+
+        function initImagePreviewRaw(fancybox, holder, autoPreview) {
+            var xOffset = -20, yOffset = 40, wSpace = 30, hSpace = 40;
+            var items = $("a.preview[href!=''][href!='@Claw.Modules.Eshop.Models.ImageModel.NoImg']", holder);
+
+            $("a.preview[href=''],a.preview[href='@Claw.Modules.Eshop.Models.ImageModel.NoImg']", holder).click(function () { return false; }).css({ 'cursor': 'default' });
+
+            if (autoPreview == null || autoPreview)
+                items.hover(function(e) {
+                    this.t = this.title;
+                    this.title = "";
+                    var c = (this.t != "") ? "<br/>" + this.t : "";
+                    $("body").append("<p id='imgPreview'><img src='" + this.href + "' alt='Image preview' />" + c + "</p>");
+                    var topP = e.pageY - xOffset, leftP = e.pageX + yOffset;
+
+                    var previewB = $("#imgPreview");
+                    var bottomP = topP + previewB.height() - $(window).scrollTop() + wSpace;
+                    if (window.innerHeight >= previewB.height() + wSpace) {
+                        var remainHeight = bottomP - window.innerHeight;
+                        if (remainHeight > 0) topP -= remainHeight;
+                    }
+
+                    var rightP = leftP + previewB.width() - $(window).scrollLeft() + hSpace;
+                    if (window.innerWidth >= previewB.width() + hSpace) {
+                        var remain = rightP - window.innerWidth;
+                        if (remain > 0) leftP = e.pageX - yOffset - previewB.width();
+                    }
+
+                    $("#imgPreview").css("top", topP + "px").css("left", leftP + "px").fadeIn("slow");
+                },
+                    //handlerOut (leave)
+                    function() {
+                        this.title = this.t;
+                        $("#imgPreview").remove();
+                    }
+                );
+
+            if (autoPreview == null || autoPreview)
+                items.mousemove(function(e) {
+                    var topP = e.pageY - xOffset, leftP = e.pageX + yOffset;
+                    var previewB = $("#imgPreview");
+                    var bottomP = topP + previewB.height() - $(window).scrollTop() + wSpace;
+                    if (window.innerHeight >= previewB.height() + wSpace) {
+                        var remainHeight = bottomP - window.innerHeight;
+                        if (remainHeight > 0) topP -= remainHeight;
+                    }
+
+                    var rightP = leftP + previewB.width() - $(window).scrollLeft() + hSpace;
+                    if (window.innerWidth >= previewB.width() + hSpace) {
+                        var remain = rightP - window.innerWidth;
+                        if (remain > 0) leftP = e.pageX - yOffset - previewB.width();
+                    }
+
+                    $("#imgPreview").css("top", topP + "px").css("left", leftP + "px");
+                });
+
+            if(fancybox == undefined || fancybox)
+                items.fancybox({ width: 800, height: 600, autoScale: false, fitToView: true });
+            else items.click(function () { return false; }).css({ 'cursor': 'default' });
+        };
+
+    </script>
+
+    @Html.CssBundle("~/content/plugin/fancybox/fancybox.css", "~/Content/plugin/fancybox/jquery.fancybox.css")
+    <script src="~/Content/plugin/fancybox/jquery.fancybox.pack.js"></script>
+}
+
+@if (!isFrontEnd)
+{
+    @Html.JsBundle("~/admin/eshop/common.js", ScriptAttribute.Defer, ModuleUrl.ContentUrl("Scripts/admin-eshop-common.js"))
+}
+
+@if (ViewBag.UseUploadFile != null && ViewBag.UseUploadFile)
+{
+    <script src="~/Scripts/claw/ajaxfileupload.js"></script>
+    <script type="text/javascript">
+
+        function doUploadFile(postUrl, uploadId, waitImgId, args, onResult) {
+
+            var waitImg = $('#' + waitImgId);
+            if (waitImg.is(':visible')) return;
+            else waitImg.show();
+
+            $.ajaxFileUpload({
+                url: urlInjectFocusLang(postUrl),
+                data: args,
+                dataType: "json",
+                contentType: "application/json; charset=utf-8",
+                fileElementId: uploadId,
+                success: function (result) {
+                    if (result.Status == 0) {
+                        if (onResult) onResult(result);
+                    } else if (result.Message != null) admincommon.showMessageDefault(result.Message, result.Status);
+                },
+                error: function(data, status, e) {
+                    admincommon.showMessageDefault('@(StringTable.AjaxCommandErrorMessage)', '@(ActionResultStatus.Fail)');
+                },
+                complete: function(data, status, e) {
+                    waitImg.hide();
+                }
+            });
+        };
+
+        function validFileExtension(node, attrRegex, errSelector, attrErrMsg) {
+            var errMsg = node.closest(errSelector).find('.file-ext-error');
+            var regex = new RegExp(node.attr(attrRegex), "ig");
+
+            if (!regex.test(node.val())) {
+                errMsg.html(node.attr(attrErrMsg) + ' (' + node.val() + ')');
+                errMsg.show(); return false;
+            }
+            else errMsg.hide();
+
+            return true;
+        }
+    </script>
+}
+
+@if (ViewBag.PermissionEdit != null && ViewBag.PermissionEdit == false)
+{
+    <style type="text/css">
+        .wr_submit_top .delete_big {
+            display: none !important;
+        }
+    </style>
+    <script type="text/javascript">
+        $(function() {
+            $('.js-add-new-selector', '.wr_submit_top').closest('li').hide();
+        });
+    </script>
+}

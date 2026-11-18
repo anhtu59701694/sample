@@ -1,0 +1,404 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model CategoryModel
+@{
+    var langCode = (string)ViewData["LangCode"];
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+<style type="text/css">
+    #gridprodcate thead.k-grid-header {
+        display: none;
+    }
+
+    #gridprodcate .k-pager-wrap.k-widget {
+        border-top: 1px solid #CCC !important;
+    }
+
+    #gridprodsel .k-pager-sizes.k-label {
+        white-space: nowrap;
+    }
+
+    #gridprodsel .price_2 {
+        font-size: small;
+        padding: 0px 1px;
+    }
+
+    #gridprodsel .k-detail-cell .price_2 {
+        margin-left: 5px;
+    }
+
+    #gridprodsel .line-through {
+        float: left;
+        width: 100%;
+    }
+</style>
+
+@{
+    var imgTemplate = "<a href='#:safePropImg(ProductImage,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(ProductImage,\"Thumb\")#'/></a>";
+    var imgTemplatePopup = "<a href='#:safePropImg(Image,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(Image,\"Thumb\")#'/></a>";
+
+    var salePricetmp = @"
+    <span class='line-through'>#:safeProp(PriceInc,'Text')#</span>
+    <span class='price_2'>#:safeProp(SalePriceInc,'Text')#</span>";
+
+    var priceTempl = @"<span>#:safeProp(PriceInc,'Text')#</span>";
+}
+
+<div class="wr_table_all" id="products">
+    @(Html.LocalizeGridFor<CategoryProductModel>("gridprodcate", "Product")
+          .DataSource(m => m.Id, Model.Products)
+          .Paging(4, new int[] { 10, 20, 30, 50, 100 }, StringTable.Products)
+          .Columns(grid => new[]
+          {
+              grid.Col(m => m.ProductImage, false, 120)
+                .SetTemplate(imgTemplate)
+                .SetCssClass("td-center image compact"),
+
+              grid.Col(m => m.ProductName, "Edit", m => m.ProductId)
+                .SetTemplate(StringTable.NewWinEditTempl(Html, "ProductName"))
+                .SetCssClass("name-pro2"),
+
+              //grid.Col(m => m.ProductSKU, false, 150),
+          })
+          .ColumnCheckBox(m => m.ProductId)
+          .Sortable(true)
+          .Config(grid => { grid.CustomScript = "gridProdCateCustom"; })
+          .ToMvcHtmlString())
+</div>
+<div id="prodsel-templ" style="display: none">
+    @(Html.LocalizeGridFor<ProductModel>("gridprodsel", "Product", null, null, null, null, null, null, grid =>
+    {
+        grid.ButtonDelBigClass += "_prosel";
+        grid.CheckBoxSelAllCss += "_prosel";
+        grid.CheckBoxRowCssClass += "_prosel";
+        grid.InputSearchId += "_prodsel";
+        grid.FormSearchId += "_prodsel";
+    })
+    .DataSource(m => m.Id, "List", null, null, "gridProdSelGetParams")
+    .Paging(4, new int[] { 10, 20, 30, 50, 100 }, StringTable.Products)
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[] {
+        grid.Col(m => m.Image, false, 100)
+            .SetTemplate(imgTemplatePopup)
+            .SetCssClass("td-center image compact noClick"),
+
+        //grid.Col(m => m.Name, "Edit", m => m.Id, true)
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetTemplate(StringTable.NewWinEditTempl(Html, "Name"))
+            .SetCssClass("name-pro2"),
+
+        grid.Col(m => m.PriceInc, true, 100)
+            .SetCssClass("td-right")
+            .SetTemplate("# if (SalePriceInc.Value > 0) { # "+salePricetmp+" # }  else{#" + priceTempl + "#} #"),
+
+        grid.Col(m => m.SKU, true, 150),
+    })
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridProdSelCustom"; })
+    .ToMvcHtmlString(false, false))
+</div>
+<script type="text/javascript">
+
+    var grid = $('#gridprodcate');
+
+    $(function () {
+
+        $('#gridprodsel').attr('id', 'gridprodsel-templ');
+
+        gridprodcateInit('#gridprodcate', true);
+
+        grid.data('kendoGrid').dataSource.bind('change', function (e) {
+            //console.log('change', e);
+            if (e.action == 'remove') {
+                e.items.forEach(function (item) { });
+            }
+            if (e.action == 'add') { }
+        });
+    });
+
+    function gridProdSelCustom(grid) {
+
+        initImagePreview(false, grid.element);
+
+        gridAdjustPopup(grid, '.wcontent', '.wr_clo1', null, null, null, 40);
+    }
+
+    function gridProdSelGetParams() {
+        var data = grid.data('kendoGrid').dataSource.data(), exceptids = [1];
+        data.forEach(function (row) { exceptids.push(row.ProductId); });
+        return { exceptids: exceptids.join(',')};
+    }
+
+    function gridProdCateSort(sorting) {
+        var arg = null;
+
+        switch (sorting) {
+            case '@SortingBiz.NameAsc.Val()':
+                arg = { field: 'ProductName', dir: 'asc' };
+                break;
+            case '@SortingBiz.NameDesc.Val()':
+                arg = { field: 'ProductName', dir: 'desc' };
+                break;
+            case '@SortingBiz.BestSelling.Val()':
+                arg = { field: 'ProductTotalSales', dir: 'desc' };
+                break;
+            case '@SortingBiz.PriceAsc.Val()':
+                arg = { field: 'ProductCombinedSalePriceInc.Value', dir: 'asc' };
+                break;
+            case '@SortingBiz.PriceDesc.Val()':
+                arg = { field: 'ProductCombinedSalePriceInc.Value', dir: 'desc' };
+                break;
+            case '@SortingBiz.DateAsc.Val()':
+                arg = { field: 'ProductCreatedDate.Value', dir: 'asc' };
+                break;
+            case '@SortingBiz.DateDesc.Val()':
+                arg = { field: 'ProductCreatedDate.Value', dir: 'desc' };
+                break;
+            case '@SortingBiz.DisplayOrderAsc.Val()':
+                arg = { field: 'DisplayOrder', dir: 'asc' };
+                break;
+            case '@SortingBiz.DisplayOrderDesc.Val()':
+                arg = { field: 'DisplayOrder', dir: 'desc' };
+                break;
+
+            case '@SortingBiz.PublishedDateAsc.Val()':
+                arg = { field: 'ProductPublishedDate.Value', dir: 'asc' };
+                break;
+            case '@SortingBiz.PublishedDateDesc.Val()':
+                arg = { field: 'ProductPublishedDate.Value', dir: 'desc' };
+                break;
+
+            case '@SortingBiz.ModifiedDateAsc.Val()':
+                arg = { field: 'ProductModifiedDate.Value', dir: 'asc' };
+                break;
+            case '@SortingBiz.ModifiedDateDesc.Val()':
+                arg = { field: 'ProductModifiedDate.Value', dir: 'desc' };
+                break;
+        }
+        //console.log(arg)
+        if (arg) grid.data('kendoGrid').dataSource.sort(arg);
+    }
+
+    function gridProdCateCustom(grid) {
+
+        //$('.preview[href=""]', grid.element).hide();
+
+        $('.delete_big').unbind('click').click(function () {
+            var arrRws = [], rows = grid.tbody.find('input:checked').closest('tr');
+            rows.each(function () { arrRws.push(grid.dataItem($(this))); });
+
+            arrRws.forEach(function (item) {
+                prodFormRemove(item);
+                grid.dataSource.data().remove(item);
+            });
+        });
+
+        $('#product-form-list > .product-form[data-valid=1]').each(function () {
+            var prodForm = $(this), key = $(this).attr('data-key');
+            var row = grid.dataSource.data().find(function (itm) { return itm.Key == key; });
+
+            if (row) {
+                $(this).attr('data-uid', row.uid);
+                row.ProductForm = prodForm;
+            } else console.log('row is empty', key);
+
+        });
+
+        initImagePreview(false, grid.element);
+        //remove border
+        if (grid.dataSource.total() == 0) grid.element.closest(".wr_table_all").hide();
+        else grid.element.closest(".wr_table_all").show();
+    }
+
+    function openAssignForm() {
+        var width = Math.max(200, Math.min(770, $(window).width() - 50));
+        var height = Math.max(200, Math.min(2048, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popTemplate = $("<div>").html($("#cateprod-popup-form-templ").html());
+        popTemplate.find('.htmlcontent .wr_table_all').html($('#gridprodsel-templ').clone().attr('id', 'gridprodsel').wrap('<p>').parent().html());
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@StringTable.AddProductToCategory', popTemplate.html(),
+            width, height, [], null,
+            function (modal) {
+
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+
+                $('#gridprodsel #SelectAll', modal).attr('id', 'SelectAll_prodsel').closest('div')
+                    .find('label').attr('for', 'SelectAll_prodsel');
+
+                gridprodselInit('#gridprodsel', true);
+
+                var gridProdSel = $('#gridprodsel').data('kendoGrid');
+
+                ////set height auto popup
+                //var objGrid = modal.find("#gridprodsel");
+                //PopUpSetHeight(objGrid, objGrid.height(), false);
+                ////end
+
+                modal.find(".btn_save").click(function () {
+
+                    var selCBox = $('.row-checkbox_prosel:checked', gridProdSel.element);
+                    var gridData = grid.data('kendoGrid');
+
+                    gridData.dataSource.transport.data = [];
+                    gridData.dataSource.data().forEach(function (itm) { gridData.dataSource.transport.data.push(itm); });
+
+                    selCBox.each(function () {
+                        var row = gridProdSel.dataItem($(this).closest('tr'));
+                        productAdd(row.Id, row.Name, row.Image, row.TotalSales,
+                            row.Price, row.PriceInc, row.SalePrice, row.SalePriceInc,
+                            row.CombinedSalePrice, row.CombinedSalePriceInc, row.CostPriceInc, row.Vat, row.CreatedDate, row.DisplayOrder, row.PublishedDate, row.ModifiedDate);
+                    });
+
+                    gridData.dataSource.read();
+
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close();
+                    $(window).scrollTop(scrollTop);
+                });
+                modal.find(".btn_cancel").click(function () {
+
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close();
+                    $(window).scrollTop(scrollTop);
+                });
+            });
+
+    }
+
+    function productAdd(id, name, image, totalSales, price, priceInc, salePrice, salePriceInc,
+        combinedSalePrice, combinedSalePriceInc, costPriceInc, vat, createdDate, displayOrder, publishedDate, modifiedDate) {
+        productAddRaw({
+            CategoryId: '@Model.Id', ProductId: id, ProductName: name, ProductImage: image, Key: id + '',
+            ProductTotalSales: totalSales, ProductPrice: price, ProductPriceInc: priceInc,
+            ProductSalePrice: salePrice, ProductSalePriceInc: salePriceInc, ProductCostPriceInc: costPriceInc,
+            ProductCombinedSalePrice: combinedSalePrice, ProductCombinedSalePriceInc: combinedSalePriceInc,
+            ProductVat: vat, ProductCreatedDate: createdDate, DisplayOrder: displayOrder, ProductPublishedDate: publishedDate, ProductModifiedDate: modifiedDate
+        });
+    }
+
+    function productAddRaw(fieldVals) {
+
+        var gridData = grid.data('kendoGrid');
+        var newRow = $.extend(true, {}, templProduct);
+
+        for (var prop in fieldVals) {
+            var pval = fieldVals[prop];
+            newRow[prop] = pval;
+        }
+
+        //console.log('productAdd', newRow);
+
+        prodFormAdd(fieldVals);
+        gridData.dataSource.transport.data.push(newRow);
+    }
+
+    function prodFormAdd(fieldVals) {
+
+        var lst = $('#product-form-list'), idx = parseInt(lst.attr('count'));
+
+        lst.attr('count', idx + 1);
+
+        var newForm = $('<div>').html($('#product-form-template').html()).find('.product-form');
+
+        newForm.find('input,textarea,select').each(function () {
+            $(this).attr('id', $(this).attr('id').replace('_0_', '_' + idx + '_'));
+            $(this).attr('name', $(this).attr('name').replace('[0]', '[' + idx + ']'));
+
+            if ($(this).attr('binding')) {
+                if ($(this).is('textarea')) $(this).html('');
+                else $(this).val('');
+            }
+        });
+
+        if (fieldVals)
+            for (var field in fieldVals) {
+                var fVal = fieldVals[field];
+
+                var node = newForm.find('.product-form-field[binding=' + field + ']');
+                if (node.is('textarea')) $(this).html(fVal);
+                else node.val(fVal);
+            }
+
+        newForm.attr({ 'data-id': 0, 'data-key': fieldVals['ProductId'], 'data-valid': 1 });
+
+        lst.append(newForm);
+
+        //console.log(newForm.html());
+
+        return newForm;
+    }
+
+    function prodFormRemove(row) {
+        console.log('prodFormRemove', row, row.ProductForm);
+        row.ProductForm.attr('data-valid', 0);
+        row.ProductForm.find('input,textarea,select').val('').attr('datavalid', 0);
+        $('#editform-change-state').val(1).change();
+    }
+
+    function bindInputField(prodForm, row, field, newVal) {
+        var inputField;
+
+        row[field] = newVal;
+        inputField = prodForm.find('.product-form-field[binding=' + field + ']');
+        inputField.val(newVal); console.log(inputField);
+    }
+
+    function safePropImg(obj, propName) {
+        return safeProp(obj, propName) || '@ImageModel.NoImg';
+    }
+
+</script>
+
+<div id="product-form-list" count="@Model.Products.Count" style="display: none">
+    @for (int i = 0; i < Model.Products.Count; i++)
+    {@RenderProductForm(i)}
+</div>
+<script id="product-form-template" type="text/product-form-template">
+    @{ Model.Products.Insert(0, (CategoryProductModel)ViewBag.TemplProduct); }
+    @RenderProductForm(0)
+</script>
+@Html.Raw("<script type='text/javascript'> var templProduct = " + Json.Encode(ViewBag.TemplProduct) + ";</script>")
+
+@helper RenderProductForm(int idx)
+{
+    <div class="product-form" data-id="@Model.Products[idx].Id" data-key="@Model.Products[idx].Key" data-valid="1">
+        @Html.SimpleHiddenFor(m => m.Products[idx].Id, new { @class = "product-form-field" })
+        @Html.SimpleHiddenFor(m => m.Products[idx].ProductId, new { @class = "product-form-field", @binding = "ProductId" })
+    </div>
+}
+
+<script type="text/x-kendo-template" id="cateprod-popup-form-templ">
+    <div class="popupBody">
+        <section id="err-message-holder" style="float: left; width: 100%;"></section>
+        <section class="row_content_box kpopup-content">
+            <section class="wr_clo1">
+                <div class="wcontent" style="margin:0 20px; color: #390F3D;line-height:2em">
+                    <div class="htmlcontent">
+                        <form id="formSearch_prodsel" style="margin-bottom:10px">
+                            <section class="wr-search-eshop" style="margin-left:0;">
+                                <input type="text" placeholder="@StringTable.SearchProducts" class="text-l" id="inputSearch_prodsel">
+                                <input type="submit" value="" class="button-l" name="button">
+                            </section>
+                        </form>
+                        <section class="clear"></section>
+                        <div class="wr_table_all" style="margin:0"></div>
+                    </div>
+                </div>
+            </section>
+            <section class="clear"></section>
+            <ul class="wr_submit_top form-action-menu" style="position:relative; padding:10px 0;">
+                <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+            </ul>
+        </section>
+    </div>
+</script>

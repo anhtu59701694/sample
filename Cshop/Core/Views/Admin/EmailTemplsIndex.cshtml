@@ -1,0 +1,115 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.Domain
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Core
+@model IEnumerable<EmailTemplModel>
+@{
+    Layout = "Layout/List.cshtml";
+    ViewBag.ControlSetting = true;
+
+    ViewBag.Title = StringTable.ManageNotifications;
+    ViewBag.AddAction = "Add";
+    ViewBag.UseInlineEdit = true;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/setting";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Settings;
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+
+<style type="text/css">
+
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageNotifications)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageNotifications)
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<EmailTemplModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", "Input", null, "(function(e){gridOnInlineEdit(e, '#Code', gridRefreshRow);})", @settings.Display.Product.PageSize)
+    .DataSource(m => m.Id, "List", null, null, "")
+    .Paging(10, new int[] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetInlineEdit(true)
+            .SetDefaultSort(true)
+            .SetCssClass("name-pro")
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+
+        grid.Col(m=>m.TypeTxt, false)
+            .SetCssClass("name-pro"),
+            
+        //grid.Col(m => m.Code),
+        //grid.Col(m => m.Active, "", m => m.Id, false, 80)
+        //    .SetTemplate("<div style='float: left; position: relative;'><div style='display:none;height: 13px; background: url(&quot;/areas/admin/styles/images/icon_btn.png&quot;) no-repeat scroll -5px -180px / 20px auto; position: absolute; width: 10px; left: 11px; top: -1px;'></div><a href='javascript:void(0);' /></div>")
+        //    .SetCssClass("k-grid-status"),
+    })
+    .ColumnCommand(grid => new[]
+    {
+
+        grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr"),
+        grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true),
+
+    }, 170)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid'); 
+    @*var statusActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "Enable"))';*@
+    var showDelNu = parseInt(@EmailTempl.EmailtemplIDEqual);
+    
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+    
+    function gridCustom(grid) {
+
+        //initGridStatusAction(grid, '.k-grid-status', statusActUrl,
+        //   function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+        //   function (row) { return { id: row.Id, active: row.Active }; });
+
+        //gridMarkLangDisabled(grid, '.k-grid-name', function (row) { return !row.LangVisible; });
+
+        //gridHideCell(grid, '.k-grid-Delete', function (row) { return (row.AnyChild); });
+
+        //gridDisableCheckBox(grid, function (row) { return (row.AnyChild); });
+
+        gridHideCell(grid, '.k-grid-Delete', function (row) { return (row.Id <= showDelNu); });
+
+        gridDisableCheckBox(grid, function (row) { return (row.Id <= showDelNu); });
+
+        $('tr', grid.element).each(function () {
+            $(this).dblclick(function (e) {
+                if (!grid.editable) grid.editRow($(this));
+            });
+        });
+    }
+
+    function gridRefreshRow(grid, rowEle) {
+
+        //initGridStatusAction(grid, rowEle.find('.k-grid-status'), statusActUrl,
+        //    function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+        //    function (row) { return { id: row.Id, active: row.Active }; });
+
+        //gridHideCell(grid, rowEle.find('.k-grid-Delete'), function (row) { return row.AnyChild; });
+
+        //gridDisableCheckBox(grid, function (row) { return row.AnyChild; }, rowEle.find('.row-checkbox'));
+
+        gridHideCell(grid, '.k-grid-Delete', function (row) { return (row.Id <= showDelNu); });
+        gridDisableCheckBox(grid, function (row) { return (row.Id <= showDelNu); });
+
+        rowEle.dblclick(function (e) {
+            if (!grid.editable) grid.editRow($(this));
+        });
+    }
+
+</script>

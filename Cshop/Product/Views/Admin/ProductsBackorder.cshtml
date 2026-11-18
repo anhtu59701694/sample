@@ -1,0 +1,103 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model IEnumerable<ProductModel>
+
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.Title = StringTable.ManageBackOrderProducts;
+    //ViewBag.AddAction = "Add";
+    ViewBag.UseImgPreview = true;
+    ViewBag.ShowSearchBox = true;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/product";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Products;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+
+<style type="text/css">
+    .controls .row_content_box .clo_left {padding-bottom: 15px;}
+    #grid .preview img {float: none;}
+    #grid .k-grid-header .k-header {white-space: normal !important;}
+    /*#grid .k-grid-header .k-header[data-field=Image] {white-space: nowrap !important;}*/
+    /*#grid .k-grid-header .k-header[data-field=Quantity] {min-width: 120px;}
+    #grid .k-grid-header .k-header[data-field=BackOrderQty] {min-width: 120px;}
+    #grid .k-grid-header .k-header[data-field=QtyInOrders] {min-width: 120px;}*/
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageBackOrderProducts)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageBackOrderProducts)
+}
+
+@{
+    //var imageTempl = @"<a class='grid-row-edit'><img src='#:(Image?Image.Thumb:'" + ImageModel.NoImg + "')#'/></a>";
+    var imgTempl = @"<a alt='#:Name#' href='#:safePropImg(Image,'FsUrl')#' class='preview'><img src='#:safePropImg(Image,'Thumb')#'/></a>";
+}
+@{ KendoGrid<ProductModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", null, null, null, settings.Display.Admin.ProductPageSize)
+    .DataSource(m => m.Id, "List", null, null, "gridGetParams")
+    .Paging(10, new[] { 10, 20, 30, 50, 100 })
+    //.ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Id, "Edit", m => m.Id, true),
+        grid.Col(m => m.Image)
+            .SetTemplate(imgTempl)
+            .SetCssClass("txt_align_c product-img"),
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetDefaultSort(true)
+            .SetCssClass("k-grid-name"),
+       grid.Col(m => m.SKU, true),
+       grid.Col(m => m.Quantity, true)
+            .SetCssClass("td-right"),
+       grid.Col(m => m.BackOrderQty, true)
+            .SetCssClass("td-right"),
+       grid.Col(m => m.QtyInOrders)
+            .SetCssClass("td-right"),
+       grid.Col(m => m.Orders,"ListBackOrder", m => m.Id)
+            .SetCssClass("td-right"),
+    })
+    .ColumnCommand(grid => new[]
+    {
+        grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr", false, StringTable.Update),
+        //grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true,StringTable.Delete),
+    }, 70)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid');
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function gridCustom(grid) {
+
+        initImagePreview(true, grid.element);
+
+        gridMarkLangDisabled(grid, '.k-grid-name', function (row) { return !row.LangVisible; });
+
+        //gridHideCell(grid, '.k-grid-Delete', function (row) { return row.AnyChild; });
+
+        //gridDisableCheckBox(grid, function (row) { return row.AnyChild; });
+    }
+
+    function gridGetParams(grid, e) {
+        return { backorder: true };
+    }
+
+    function safePropImg(obj, propName) {
+        if (obj == null) return '@ImageModel.NoImg';
+        return obj[propName] || '';
+    }
+
+</script>

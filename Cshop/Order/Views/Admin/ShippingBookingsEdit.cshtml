@@ -1,0 +1,594 @@
+﻿@using System.Linq
+@using System.Text.RegularExpressions
+@using System.Web.UI.WebControls
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@using Bring = Eshop.Shipping.BaseProvider;
+@model ShippingBookingModel
+
+@{
+    Layout = "Layout/Input.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.OrderEdit;
+    ViewBag.Title = StringTable.AddEditShippingBooking(Model.Id);
+    //ViewBag.ShowDeleteBtn = (Model != null && Model.Id > 0 && false);
+
+    //ViewBag.UseCKEditor = true;
+    //ViewBag.UseDatePicker = true;
+    //ViewBag.UseDropZone = true;
+
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/order";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Orders;
+
+    var customers = (Bring.Customer[])ViewBag.Customers;
+    var countries = (List<Claw.Modules.Eshop.Domain.Country>)ViewBag.Countries;
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var langOpt = LanguageMgr.ValidOptLang(Model.Id);
+    var langCode = langOpt.LanguageCode;
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageShippingBookings)
+}
+
+@section CurrentTitleSection {
+    <a href="/admin/modules/eshop/ShippingBooking/">@(StringTable.ManageShippingBookings)</a>
+}
+
+@section TabTitleSection {
+    @StringTable.AddEditShippingBooking(Model.Id)
+}
+<style type="text/css"> 
+    .controls.half-width {width: 45% !important;margin-left: 10px;}
+    .clo_right.col-right-eshop {width: 80% !important;}
+    .wr-line-eshop {margin-left: 3px;}
+    .service-box .booking-service { display: inline-block; margin-right:10px; }
+    a.form-link[href] input { cursor:pointer;}
+    a.form-link[href]:hover input{ text-decoration: underline; }
+</style>
+
+<div id="custsel-templ" style="display: none">
+    @(Html.LocalizeGridFor<CustomerModel>("gridcustsel", "Customer", null, null, null, null, null, null, grid =>
+    {
+        grid.ButtonDelBigClass += "_cussel";
+        grid.CheckBoxSelAllCss += "_cussel";
+        grid.CheckBoxRowCssClass += "_cussel";
+        grid.InputSearchId += "_custsel";
+        grid.FormSearchId += "_custsel";
+    })
+    .DataSource(m => m.Id, "List", null, null, "gridCustSelGetParams")
+    .Paging(4, new int[] { 10, 20, 30, 50, 100 }, StringTable.Products)
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[] {
+        grid.Col(m => m.DeliverName, "Edit", m => m.Id, true),
+        grid.Col(m => m.DeliverAddress)
+            .SetTemplate("#:DeliverAddress##=(DeliverAddress ? \",\" : \"\")# #:DeliverPostnr||\"\"# #:DeliverPosted||\"\"#" ),
+        grid.Col(m => m.DeliverMobile, true),
+        grid.Col(m => m.Email, true)
+            .SetTemplate("<a class='k-grid-link' href='mailto\\:#:Email#'>#:Email#</a>"),
+        grid.Col(m => m.CreatedDate.Text, m => m.CreatedDate, true, 130),
+    })
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustSelCustom"; })
+    .ToMvcHtmlString(false, false))
+</div>
+<script type="text/javascript">
+
+    $(function () {
+        $('#gridcustsel').attr('id', 'gridcustsel-templ');
+    });
+
+    function gridCustSelCustom(grid) {
+        
+        $('input.row-checkbox_prosel', grid.element).click(function () {
+            $('input.row-checkbox_prosel:checked', grid.element).prop('checked', false);
+            $(this).prop('checked', true);
+        })
+
+        gridAdjustPopup(grid, '.wcontent', '.wr_clo1', 400, null, null, 40);
+    }
+    
+    function gridCustSelGetParams() {
+        return {};
+    }
+
+    function openAssignCustForm() {
+        var width = Math.max(200, Math.min(1000, $(window).width() - 50));
+        var height = Math.max(200, Math.min(2048, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popTemplate = $("<div>").html($("#custsel-popup-form-templ").html());
+        popTemplate.find('.htmlcontent .wr_table_all').html($('#gridcustsel-templ').clone().attr('id', 'gridcustsel').wrap('<p>').parent().html());
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@StringTable.Customers', popTemplate.html(),
+            width, height, [], null,
+            function (modal) {
+
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+
+                $('#gridcustsel #SelectAll', modal).attr('id', 'SelectAll_custsel').closest('div')
+                    .find('label').attr('for', 'SelectAll_custsel');
+
+                admincommon.hideMessage();
+
+                gridcustselInit('#gridcustsel', true);
+
+                var gridCustSel = $('#gridcustsel').data('kendoGrid');
+
+                modal.find(".btn_save").click(function () {
+
+                    var selCBox = $('.row-checkbox_cussel:checked', gridCustSel.element);
+ 
+                    selCBox.each(function () {
+                        var row = gridCustSel.dataItem($(this).closest('tr'));
+                        
+                        $('input[databind]', '#editForm').each(function () {
+                            $(this).val(row[$(this).attr('databind')]);
+                        });
+
+                        $('#@Html.IdFor(m => m.CustomerId)').val(row.Id).change();
+                    });
+                   
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close();
+                    $(window).scrollTop(scrollTop);
+                });
+                modal.find(".btn_cancel").click(function () {
+
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close();
+                    $(window).scrollTop(scrollTop);
+                });
+            });
+    }
+
+</script>
+<script type="text/x-kendo-template" id="custsel-popup-form-templ">
+    <div class="popupBody">
+        <section id="err-message-holder" style="float: left; width: 100%;"></section>
+        <section class="row_content_box kpopup-content">
+            <section class="wr_clo1">
+                <div class="wcontent" style="margin:0 20px; color: #390F3D;line-height:2em">
+                    <div class="htmlcontent">
+                        <form id="formSearch_custsel" style="margin-bottom:10px">
+                            <section class="wr-search-eshop" style="margin-left:0;">
+                                <input type="text" placeholder="" class="text-l" id="inputSearch_custsel">
+                                <input type="submit" value="" class="button-l" name="button">
+                            </section>
+                        </form>
+                        <section class="clear"></section>
+                        <div class="wr_table_all" style="margin:0"></div>
+                    </div>
+                </div>
+            </section>
+            <section class="clear"></section>
+            <ul class="wr_submit_top form-action-menu" style="position:relative; padding:10px 0;">
+                <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+            </ul>
+        </section>
+    </div>
+</script>
+
+@using (@Html.BeginForm("Input", Html.GetController(), FormMethod.Post, new { @id = "editForm", enctype = "multipart/form-data" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(x => x.Id)
+    @Html.HiddenFor(x => x.Service)
+ 
+    <section class="row-content-lang-box">
+        <section class="row_content_box">
+            <section class="clo_right col-right-eshop">
+                <section class="clo_left txt_align_r" style="width: 100% !important; text-align: left !important;"></section>
+
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.ProductId)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeDropDownListKendoLangFor(m => m.ProductId, customers.SelectMany(x => x.Products.Select(z => new
+                            {
+                                Id = x.CustomerNumber + "___" + z, ProductId = z, CustomerNum = x.CustomerNumber,
+                                Name = Eshop.Shipping.Bring.BringStandardShippingProcessor.GetProductName(z) + " (" + x.CustomerNumber + ")",
+                                IsNoti = Eshop.Shipping.Bring.BringStandardShippingProcessor.IsRecvNotiProduct(z),
+                                IsCod = Eshop.Shipping.Bring.BringStandardShippingProcessor.IsCodProduct(z)
+                            })).OrderBy(x => x.Name).Select((x, idx) => new DDListItem()
+                            {
+                                Text = x.Name, Value = x.ProductId, Active = true, LangVisible = true, Model = x, id = idx + 1
+                            }), StringTable.SelectProduct, new { @style = "min-width:400px" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.ProductId)</section>
+                    </section>
+                </section>
+
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.CustomerNum)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.CustomerNum, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.CustomerNum)</section>
+                    </section>
+                </section>
+
+                <section class="item service-box controls half-width" style="display: none">
+                    <div class="left">@StringTable.BookingServices:</div>
+                    <div style="margin-top: 5px;float: left;width: 100%;">
+                        <ul style="float: left;margin-left: 10px;">
+                            <li class="booking-service">
+                                @Html.LocalizeCheckBoxFor(m => m.RecipientNoti, new { @class = "css-checkbox", @value = "true" })
+                                <label for="@Html.IdFor(m => m.RecipientNoti)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.RecipientNoti)</label>
+                                <input name="@Html.NameFor(m => m.RecipientNoti)" value="false" type="hidden" />
+                            </li>
+                            <li class="booking-service">
+                                @Html.LocalizeCheckBoxFor(m => m.ServiceCod, new { @class = "css-checkbox", @value = "true" })
+                                <label for="@Html.IdFor(m => m.ServiceCod)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.ServiceCod)</label>
+                                <input name="@Html.NameFor(m => m.ServiceCod)" value="false" type="hidden" />
+                            </li>
+                        </ul>
+                    </div>
+                </section>
+
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.CustomerId)</span>
+                    <section>
+                        <section>
+                            <a class="form-link" href="@(Model.CustomerId == null ? null : ModuleUrl.AdminUrl("Customer", "Edit", Model.CustomerId))">
+                                @Html.LocalizeTextBoxFor(m => m.CustomerId, new { @class = "", @style = "float:left;width:63%;" })
+                            </a>
+                            <input class="btn" value="@StringTable.Search" onclick="openAssignCustForm();" type="button" />
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.CustomerId)</section>
+                    </section>
+                </section>
+
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.RecipientCountryCode)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeDropDownListKendoFor(m => m.RecipientCountryCode, countries
+                                .Select(x => new { id = x.Code, x.Code, x.Name })
+                                .OrderBy(x => x.Code == "NO" ? "" : x.Name), m => m.id, m => m.Name,
+                                    new { id = "", Code = "", Name = StringTable.SelectCountry },
+                                    new { @onchange = "validPostalCodeRecipient()", @style = "float:left", @databind = "DeliverCountryCode" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.RecipientCountryCode)</section>
+                    </section>
+                </section>
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.RecipientName)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.RecipientName, new { @class = "", @style = "float:left", @databind = "DeliverName" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.RecipientName)</section>
+                    </section>
+                </section>
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.RecipientAddress)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.RecipientAddress, new { @class = "", @style = "float:left", @databind = "DeliverAddress" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.RecipientAddress)</section>
+                    </section>
+                </section>
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.RecipientPostalCode)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.RecipientPostalCode, new { @databind = "DeliverPostnr", @style = "float:left;width:100px;", @onchange = "validPostalCodeRecipient()" })
+                            @Html.LocalizeImageLoading(new { @id = "CheckingPostnr", @style = "margin-top:3px;" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.RecipientPostalCode)</section>
+                    </section>
+                </section>
+                
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.RecipientCity)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.RecipientCity, new { @databind = "DeliverPosted", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.RecipientCity)</section>
+                    </section>
+                </section>
+
+                <section class="controls half-width item">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.RecipientNotiMobile)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.RecipientNotiMobile, new { @databind = "DeliverMobile", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.RecipientNotiMobile)</section>
+                    </section>
+                </section>
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.RecipientNotiEmail)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.RecipientNotiEmail, new { @databind = "Email", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.RecipientNotiEmail)</section>
+                    </section>
+                </section>
+
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.WidthInCm)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.WidthInCm, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.WidthInCm)</section>
+                    </section>
+                </section>
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.HeightInCm)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.HeightInCm, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.HeightInCm)</section>
+                    </section>
+                </section>
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.LengthInCm)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.LengthInCm, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.LengthInCm)</section>
+                    </section>
+                </section>
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.WeightInKg)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.WeightInKg, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.WeightInKg)</section>
+                    </section>
+                </section>
+
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.OrderId)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.OrderId, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.OrderId)</section>
+                    </section>
+                </section>
+                <section class="controls half-width item">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Amount)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.Amount, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Amount)</section>
+                    </section>
+                </section>
+
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.NumberOfItems)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.NumberOfItems, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.NumberOfItems)</section>
+                    </section>
+                </section>
+                <section class="controls half-width item">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.CodAccountNumber)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.CodAccountNumber, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.CodAccountNumber)</section>
+                    </section>
+                </section>
+                
+
+                <section class="controls half-width">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.GoodsDescription)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.GoodsDescription, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.GoodsDescription)</section>
+                    </section>
+                </section>
+
+                
+                @if (!Model.BookingId.IsNullOrEmpty())
+                {
+                    <section class="wr-line-eshop" style="width: 90%;"></section>
+                    <section class="controls half-width">
+                        <span class="text-eshop">@Html.LocalizeNameFor(x => x.BookingId)</span>
+                        <section>
+                            <section>
+                                @Html.LocalizeTextBoxFor(m => m.BookingId, new {@class = "", @style = "float:left"})
+                            </section>
+                            <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.BookingId)</section>
+                        </section>
+                    </section>
+                    <section class="controls half-width">
+                        <span class="text-eshop">@Html.LocalizeNameFor(x => x.LabelUrl)</span>
+                        <section>
+                            <section>
+                                <a class="form-link" href="@Model.LabelUrl" target="_blank">
+                                    @Html.LocalizeTextBoxFor(m => m.LabelUrl, new { @class = "", @style = "float:left" })
+                                </a>
+                            </section>
+                            <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.LabelUrl)</section>
+                        </section>
+                    </section>
+                    <section class="controls half-width">
+                        <span class="text-eshop">@Html.LocalizeNameFor(x => x.TrackingUrl)</span>
+                        <section>
+                            <section>
+                                <a class="form-link" href="@Model.TrackingUrl" target="_blank">
+                                    @Html.LocalizeTextBoxFor(m => m.TrackingUrl, new { @class = "", @style = "float:left" })
+                                </a>
+                            </section>
+                            <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.TrackingUrl)</section>
+                        </section>
+                    </section>
+                    <section class="controls half-width">
+                        <span class="text-eshop">@Html.LocalizeNameFor(x => x.WaybillUrl)</span>
+                        <section>
+                            <section>
+                                <a class="form-link" href="@Model.WaybillUrl" target="_blank">
+                                    @Html.LocalizeTextBoxFor(m => m.WaybillUrl, new { @class = "", @style = "float:left" })
+                                </a>
+                            </section>
+                            <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.WaybillUrl)</section>
+                        </section>
+                    </section>
+                    <script type="text/javascript">
+                        $(function () {
+                            formEnable(false); $('.btn_save,.btn_reset').closest('li').hide();
+
+                            $('input.kendo-dropdownlist', '#editForm').each(function () { $(this).data('kendoDropDownList').enable(false); })
+
+                            $('input[disabled]:not([type=checkbox]):not([type=button]),textarea[disabled]', '#editForm').prop('disabled', false).prop('readonly', true);
+                        })
+                    </script>
+                }
+            </section>
+        </section>
+
+    </section>
+    <section class="wr-line-eshop"></section>
+}
+
+<script type="text/javascript">
+    var form = $('#editForm')[0];
+
+    form.customValidFields = function () {
+        return true;
+    };
+
+    form.CustomLangFormSwitch = function (langcode, node, senderuid) {
+        var ownerbox = node.closest('.row_content_box');
+    };
+
+    function dropdownGetData(node) {
+        return node.data("kendoDropDownList").dataSource.get(node.val());
+    }
+
+    var bookingholder = '#editForm';
+    var productId = $('#@Html.IdFor(m => m.ProductId)', bookingholder);
+    var recNotiBox = $('#@Html.IdFor(m => m.RecipientNoti)', bookingholder).closest('li');
+    var serCodBox = $('#@Html.IdFor(m => m.ServiceCod)', bookingholder).closest('li');
+    var amountBox = $('#@Html.IdFor(m => m.Amount)', bookingholder).closest('.item');
+    var codAccountBox = $('#@Html.IdFor(m => m.CodAccountNumber)', bookingholder).closest('.item');
+    var recMobileBox = $('#@Html.IdFor(m => m.RecipientNotiMobile)', bookingholder).closest('.item');
+
+    productId.change(function () {
+        var value = $(this).val(), kdNode = $(this).data("kendoDropDownList"), holder = '#editForm';
+
+        //console.log('productid', $(this).val(), kdNode);
+
+        kdNode.dataSource.data().forEach(function (itm) {
+            if (itm.Value == value) {
+
+                console.log('product', itm);
+
+                $('#@Html.IdFor(m => m.CustomerNum)', holder).val(itm.Model.CustomerNum);
+
+                $('.service-box', holder).show();
+                $('li.booking-service', holder).hide();
+                $('.booking-service input[type=checkbox]:checked', holder).prop('check', false);
+
+                if (itm.Model.IsNoti) recNotiBox.show().find('input[type=checkbox]').change();
+                else recNotiBox.hide().find('input[type=checkbox]').change();
+
+                if (itm.Model.IsCod) serCodBox.show().find('input[type=checkbox]').change();
+                else serCodBox.hide().find('input[type=checkbox]').change();
+
+                if ($('.booking-service:visible', holder).length == 0) $('.service-box', holder).hide();
+
+            }
+        });
+    });
+
+    recNotiBox.find('input[type=checkbox]').change(function () {
+        if ($(this).prop('checked') && recNotiBox.is(':visible')) recMobileBox.show();
+        else recMobileBox.hide();
+        formDisableValidation(recMobileBox.find('input'), !recMobileBox.is(':visible'));
+    });
+
+    serCodBox.find('input[type=checkbox]').change(function () {
+        if ($(this).prop('checked') && serCodBox.is(':visible')) { amountBox.show(); codAccountBox.show(); }
+        else { amountBox.hide(); codAccountBox.hide(); }
+
+        formDisableValidation(codAccountBox.find('input'), !codAccountBox.is(':visible'));
+        formDisableValidation(amountBox.find('input'), !amountBox.is(':visible'));
+    });
+
+    setTimeout(function () {
+        if (productId.val()) productId.change();
+    }, 500);
+
+    function validPostalCodeRecipient() {
+        return validPostalCode('@Html.IdFor(m => m.RecipientPostalCode)', '@Html.IdFor(m => m.RecipientCity)',
+            '@Html.IdFor(m => m.RecipientCountryCode)', 'CheckingPostnr');
+    }
+
+    function validPostalCode(postnrid, cityid, countryid, waitingId) {
+
+        var postalCode = $('#' + postnrid), postalVal = $.trim(postalCode.val());
+        var countryVal = safeProp(dropdownGetData($('#' + countryid)), 'Code');
+
+        if (countryVal == '' || postalVal == '') return true;
+        if (!postalCode[0].validPnr) postalCode[0].validPnr = {};
+
+        var key = countryVal + '&' + postalVal;
+
+        if (postalCode[0].validPnr.key == key && postalCode[0].validPnr.value) {
+            //console.log('cached:', key, postalCode[0].validPnr);
+            if (postalCodeOnResult(postnrid, cityid, postalCode[0].validPnr.value)) return true;
+            else {
+                postalCode.focus();
+                return false;
+            }
+        }
+
+        ajaxREST('/modules/eshop/BringShippingGuide/GetPostalCode', 'GET',
+            { country: countryVal, pnr: postalVal }, waitingId,
+            function (result) {
+                if (result) {
+                    if (!result.valid) result.result = '';
+                    result.pnr = postalVal;
+                    result.country = countryVal;
+                    postalCode[0].validPnr = { key: key, value: result };
+                    postalCodeOnResult(postnrid, cityid, result);
+                }
+            }, function (e) { console.log(e); });
+
+        return true;
+    }
+
+    function postalCodeOnResult(postnrid, cityid, result) {
+        var actCity = $('#' + cityid);
+        var curCity = $.trim(actCity.val());
+
+        if (curCity == '' || actCity.attr('bak-val') == curCity) {
+            actCity.val(result.result);
+            actCity.attr('bak-val', result.result);
+            actCity.change();
+        }
+
+        formShowErrorMsg(postnrid, result.valid ? null : '@StringTable.ErrMsgInvalidPostalCode');
+        return result.valid;
+    }
+
+</script>

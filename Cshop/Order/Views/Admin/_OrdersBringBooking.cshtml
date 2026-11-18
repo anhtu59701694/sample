@@ -1,0 +1,406 @@
+﻿@using System.Text.RegularExpressions
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@using Eshop.Shipping.Bring
+@using Newtonsoft.Json
+@using Bring = Eshop.Shipping.BaseProvider;
+@model BringBookingModel
+@{
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var errMsg = (string)ViewBag.ErrorMsg;
+    var customers = (Bring.Customer[])ViewBag.Customers;
+    var order = (OrderModel)ViewBag.Order;
+    var dom = order == null ? null : order.GetRaw();
+    var pickupPoints = new PickupPoint[0];
+
+    if (Model.PickupPointId.IsNullOrEmpty())
+    {
+        var fixShippingPickupPoint = dom == null
+            ? null
+            : dom.ShippingPickupPoint.FixShippingPickupPoint((ShippingServiceType?) dom.ShippingService);
+        var fixShippingPickupPointChanged = order != null && fixShippingPickupPoint != null && !fixShippingPickupPoint.EqualsIgCase(dom.ShippingPickupPoint);
+        var oldPickupPoint = fixShippingPickupPointChanged ? JsonConvert.DeserializeObject<Eshop.Shipping.Logistra.ServicePartner>(dom.ShippingPickupPoint) : null;
+        pickupPoints = oldPickupPoint != null && !oldPickupPoint.Number.IsNullOrEmpty()
+            ? BringShippingMgr.GetPickupPoints(oldPickupPoint.Country, oldPickupPoint.Postcode)
+            : (order == null ? null : BringShippingMgr.GetPickupPoints(order.DeliverCountryCode, order.DeliverPostnr));
+
+        var newPickupPoint = fixShippingPickupPointChanged ? fixShippingPickupPoint.JsonDeserializeSafe<PickupPoint>() : null;
+        Model.PickupPointId = newPickupPoint == null ? null : newPickupPoint.Id;
+    }
+    else
+    {
+        var pickupPoint = dom == null || dom.ShippingPickupPoint == null ? null : dom.ShippingPickupPoint.JsonDeserializeSafe<PickupPoint>();
+        pickupPoints = BringShippingMgr.GetPickupPoints(order.DeliverCountryCode, pickupPoint == null ? order.DeliverPostnr : pickupPoint.PostalCode);
+    }
+
+    var bundleNotAnyDone = Model.Items.SafeCount() != 0 && Model.Items.Any(m => m.ConsignmentNumber.IsNullOrEmpty() && m.ErrMsg.IsNullOrEmpty());
+    var priorityProds = new[]
+    {
+        "Klimanøytral Servicepakke", "Pakke til hentested", "Mailbox Parcel", "På Døren", "Pakke levert hjem", 
+        "Retur pakke i postkassen", "Servicepakke returservice", "Retur fra hentested", "Bedriftspakke", "Pakke til bedrift", "Ekspress neste dag", "Returekspress",
+        "Bedriftspakke returservice", "Retur pakke fra bedrift", "Stykkgods", "Stykkgods til bedrift", "Stykk-og partigods", "Retur stykkgods fra bedrift", "Stykkgods til bedrift Partigods tilbedrift"
+    };
+}
+
+<style type="text/css">
+    .booking-service{ display: inline-block; margin-right: 15px; min-width: 170px}
+    #bring-booking-form .right { margin-top: 3px; margin-left: 2%; width: 72%; }
+    #bring-booking-form .right.link { margin-top: 7px;height: 2em;overflow: hidden;border: 1px solid #ccc;padding-left: 5px; }
+    #bring-booking-form .left { width: 22%; text-align: right; }
+    #bring-booking-form .item { margin: 0;  }
+    #bring-booking-form .item.disabled { display: none !important;  }
+    table.order-item-list .order-item a{color:#390f3d;}
+    table.order-item-list .order-item .nSuccess {background-color:transparent;border:none;}
+    table.order-item-list tr{border-bottom:1px solid rgb(197, 197, 197);}
+    table.order-item-list tr:last-child{border-bottom:none;}
+    table.order-item-list tr.header td{font-weight:bold;color:rebeccapurple;}
+    ul.wr-pickuppointtype li { display:inline-block; min-width: 10px; }
+    ul.wr-pickuppointtype li input { width: auto !important;margin-top: -3px; }
+</style>
+
+<div id="bring-booking-form" style="float: left; margin-bottom: 20px;width:100%;">
+    @Html.SimpleHiddenFor(m => m.OrderId, new { })
+    @Html.SimpleHiddenFor(m => m.Currency, new { })
+    @Html.SimpleHiddenFor(m => m.CustomerId, new { })
+    @Html.SimpleHiddenFor(m => m.NumberOfItems, new { })
+    @Html.SimpleHiddenFor(m => m.GoodsDescription, new {  })
+    @Html.SimpleHiddenFor(m => m.RecipientNotiEmail, new { })
+    
+    @if ((Model.ConsignmentNumber.IsNullOrEmpty() && Model.Items.SafeCount() == 0) || bundleNotAnyDone)
+    {
+        <div class="request-form">
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.ProductId): </div>
+                <div class="right">
+                    @Html.LocalizeDropDownListKendoLangFor(m => m.ProductId, customers.SelectMany(x => x.Products.Select(z => new
+                    {
+                        Id = x.CustomerNumber + "___" + z, ProductId = z, CustomerId = x.CustomerNumber,
+                        Name = BringStandardShippingProcessor.GetProductName(z) + " (" + x.CustomerNumber + ")",
+                        IsNoti = BringStandardShippingProcessor.IsRecvNotiProduct(z),
+                        IsCod = Model.Items.SafeCount() == 0 && BringStandardShippingProcessor.IsCodProduct(z),
+                        Service1081 = BringStandardShippingProcessor.HasService(z, "1081"),
+                        Service9650 = BringStandardShippingProcessor.HasService(z, "9650"),
+                        Service9650A1073 = BringStandardShippingProcessor.HasService(z, "9650A1073"),
+                        IsPickupPoint = Model.Items.SafeCount() == 0 && BringStandardShippingProcessor.IsPickupPoint(z),
+                    }))
+                        .OrderBy(x => priorityProds.Any(z => x.Name.IndexOf(z, StringComparison.InvariantCultureIgnoreCase) != -1) ? 0 : 1).ThenBy(x => x.Name)
+                        .Select((x, idx) => new DDListItem()
+                        {
+                            Text = x.Name, Value = x.ProductId, Active = true, LangVisible = true, Model = x, id = idx + 1
+                        }), StringTable.SelectProduct, new { @style = "min-width:400px" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.ProductId)</div>
+                </div>
+            </div>       
+            <div class="item" id="pickup-point-box" style="display: none; margin-bottom: 3px">
+                <div class="left">@Html.LocalizeNameFor(m => m.PickupPointId): </div>
+                <div class="right">
+                    <div class="pickuppoint-search" style="margin-bottom:5px;">
+                        <input name="CountryCode" value="@(order.SafeProp(m => m.DeliverCountryCode))" type="hidden" />
+                        <input name="PostalCode" value="@(order.SafeProp(m => m.DeliverPostnr))" type="hidden" />
+                        <input name="Count" value="20" type="hidden" />
+                        <input id="SearchForText" name="SearchForText" style="width: 220px !important; min-width: 0;" placeholder="@("bring_pickuppoint_search_kw".ModLocalize("name, address, city or location"))" type="text" />
+                        <ul class="wr-pickuppointtype" style="display: inline-block; vertical-align: middle;">
+                            <li>
+                                <input id="pickupPointType_Manned" name="pickupPointType" style="width: auto !important;" value="manned" type="radio" />
+                                <label for="pickupPointType_Manned">@("pickupPointType_Manned".ModLocalize("Manned"))</label>
+                            </li>
+                            <li>
+                                <input id="pickupPointType_Locker" name="pickupPointType" style="width: auto !important;" value="locker" type="radio" />
+                                <label for="pickupPointType_Locker">@("pickupPointType_Locker".ModLocalize("Locker"))</label>
+                            </li>
+                            <li>
+                                <input id="pickupPointType_None" name="pickupPointType" style="width: auto !important;" checked=checked type="radio" />
+                                <label for="pickupPointType_None">@("pickupPointType_None".ModLocalize("None"))</label>
+                            </li>
+                        </ul>
+                    </div>
+                    @(Html.LocalizeDropDownListKendoLangFor(m => m.PickupPointId, "ListPickupPointD2", Html.GetController(), null, 
+                        StringTable.SelectPickupPoint, new { @style = "min-width:450px" }).DataSource(m => m.Read(w => w.Data("function(){ return urlToJSON('?' + $('.pickuppoint-search input').serialize());}"))))
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.PickupPointId)</div>
+                </div>
+                <script>
+                    $(function () {
+                        $('#SearchForText,.wr-pickuppointtype input').change(function () { $('#PickupPointId').data('kendoDropDownList').dataSource.read();  });
+                    })
+                </script>
+            </div>            
+            <div class="item" style="@(Model.Items.SafeCount() != 0 ? "display:none;" : "")">
+                <div class="left">@Html.LocalizeNameFor(m => m.WeightInKg):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.WeightInKg, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.WeightInKg)</div>
+                </div>
+            </div> 
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.WidthInCm):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.WidthInCm, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.WidthInCm)</div>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.HeightInCm):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.HeightInCm, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.HeightInCm)</div>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.LengthInCm):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.LengthInCm, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.LengthInCm)</div>
+                </div>
+            </div>
+            <div class="item service-box" style="display: none">
+                <div class="left">@StringTable.BookingServices:</div>
+                <div class="right" style="margin-top: 5px">
+                    <ul>
+                        <li class="booking-service">
+                            @Html.LocalizeCheckBoxFor(m => m.RecipientNoti, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.RecipientNoti)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.RecipientNoti)</label>
+                            <input name="@Html.NameFor(m => m.RecipientNoti)" value="false" type="hidden" />
+                        </li>
+                        <li class="booking-service">
+                            @Html.LocalizeCheckBoxFor(m => m.ServiceCod, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.ServiceCod)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.ServiceCod)</label>
+                            <input name="@Html.NameFor(m => m.ServiceCod)" value="false" type="hidden" />
+                        </li>
+                        <li class="booking-service">
+                            @Html.LocalizeCheckBoxFor(m => m.Service1081, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.Service1081)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.Service1081)</label>
+                            <input name="@Html.NameFor(m => m.Service1081)" value="false" type="hidden" />
+                        </li>
+                        <li class="booking-service">
+                            @Html.LocalizeCheckBoxFor(m => m.Service9650, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.Service9650)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.Service9650)</label>
+                            <input name="@Html.NameFor(m => m.Service9650)" value="false" type="hidden" />
+                        </li>
+                        <li class="booking-service">
+                            @Html.LocalizeCheckBoxFor(m => m.Service9650A1073, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.Service9650A1073)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.Service9650A1073)</label>
+                            <input name="@Html.NameFor(m => m.Service9650A1073)" value="false" type="hidden" />
+                        </li>
+                    </ul>
+                </div>
+            </div>
+            <div class="item" style="display: none">
+                <div class="left">@Html.LocalizeNameFor(m => m.CodAccountNumber):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.CodAccountNumber, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.CodAccountNumber)</div>
+                </div>
+            </div>
+            <div class="item" style="display: none">
+                <div class="left">@Html.LocalizeNameFor(m => m.Amount):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.Amount, new { @style = "width: 150px !important;min-width: 0;" })
+                    @Html.LocalizeTextBoxFor(m => m.Currency, new { @style = "width: 40px !important;min-width: 0;", @disabled = "disabled" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Amount)</div>
+                </div>
+            </div>
+            <div class="item @(Model.Items.SafeCount() != 0 ? "disabled" : "")" style="display: none">
+                <div class="left">@Html.LocalizeNameFor(m => m.RecipientNotiMobile):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.RecipientNotiMobile, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.RecipientNotiMobile)</div>
+                </div>
+            </div>
+            @if (Model.Items != null)
+            {
+                <div class="order-item-list" style="display:none;">
+                    @for (var i = 0; i < Model.Items.Count; i++)
+                    {
+                        var idx = i;
+                        <div class="order-item">
+                            @Html.SimpleHiddenFor(m => m.Items[idx].Amount, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].Currency, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].GoodsDescription, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].NumberOfItems, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].OrderId, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].PickupPointId, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].RecipientNotiEmail, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].RecipientNotiMobile, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].ServiceCod, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].WeightInKg, new { })
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        <script type="text/javascript">
+            var bookingholder = '#bring-booking-form';
+            var productId = $('#@Html.IdFor(m => m.ProductId)', bookingholder);
+            var recNotiBox = $('#@Html.IdFor(m => m.RecipientNoti)', bookingholder).closest('li');
+            var serCodBox = $('#@Html.IdFor(m => m.ServiceCod)', bookingholder).closest('li');
+            var ser1081Box = $('#@Html.IdFor(m => m.Service1081)', bookingholder).closest('li');
+            var ser9650Box = $('#@Html.IdFor(m => m.Service9650)', bookingholder).closest('li');
+            var ser9650A1073Box = $('#@Html.IdFor(m => m.Service9650A1073)', bookingholder).closest('li');
+            var amountBox = $('#@Html.IdFor(m => m.Amount)', bookingholder).closest('.item');
+            var codAccountBox = $('#@Html.IdFor(m => m.CodAccountNumber)', bookingholder).closest('.item');
+            var recMobileBox = $('#@Html.IdFor(m => m.RecipientNotiMobile)', bookingholder).closest('.item');
+
+            formUpdateValidRules($('#bring-booking-form'));
+
+            productId.change(function () {
+                var value = $(this).val(), kdNode = $(this).data("kendoDropDownList"), holder = '#bring-booking-form';
+                var pickupPoint = $('#@Html.IdFor(m => m.PickupPointId)', holder).data("kendoDropDownList");
+
+                //console.log('productid', $(this).val(), kdNode);
+
+                kdNode.dataSource.data().forEach(function (itm) {
+                    if (itm.Value == value) {
+
+                        console.log('product', itm);
+
+                        $('#@Html.IdFor(m => m.CustomerId)', holder).val(itm.Model.CustomerId);
+
+                        $('.service-box', holder).show();
+                        $('li.booking-service', holder).hide();
+                        $('.booking-service input[type=checkbox]:checked', holder).prop('check', false);
+
+                        if (itm.Model.IsNoti) recNotiBox.show().find('input[type=checkbox]').change();
+                        else recNotiBox.hide().find('input[type=checkbox]').change();
+
+                        if (itm.Model.IsCod) serCodBox.show().find('input[type=checkbox]').change();
+                        else serCodBox.hide().find('input[type=checkbox]').change();
+                        
+                        if (itm.Model.Service1081) ser1081Box.show();
+                        else ser1081Box.hide();
+
+                        if (itm.Model.Service9650) ser9650Box.show().find('input[type=checkbox]').change();
+                        else ser9650Box.hide();
+
+                        if (itm.Model.IsPickupPoint) {
+                            $('#pickup-point-box', holder).show(); pickupPoint.enable(true);
+                        } else {
+                            $('#pickup-point-box', holder).hide(); pickupPoint.enable(false);
+                        }
+
+                        if ($('.booking-service:visible', holder).length == 0) $('.service-box', holder).hide();
+
+                    }
+                });
+            });
+            
+            ser9650Box.find('input[type=checkbox]').change(function () {
+                if ($(this).prop('checked')) ser9650A1073Box.show();
+                else ser9650A1073Box.hide();
+            });
+
+            recNotiBox.find('input[type=checkbox]').change(function () {
+                if ($(this).prop('checked') && recNotiBox.is(':visible')) recMobileBox.show();
+                else recMobileBox.hide();
+                formDisableValidation(recMobileBox.find('input'), !recMobileBox.is(':visible'));
+            });
+
+            serCodBox.find('input[type=checkbox]').change(function () {
+                if ($(this).prop('checked') && serCodBox.is(':visible')) { amountBox.show(); codAccountBox.show(); }
+                else { amountBox.hide(); codAccountBox.hide(); }
+
+                formDisableValidation(codAccountBox.find('input'), !codAccountBox.is(':visible'));
+                formDisableValidation(amountBox.find('input'), !amountBox.is(':visible'));
+            });
+
+            setTimeout(function () {
+                if (productId.val()) productId.change();
+            }, 500);
+
+        </script>
+    }
+    else
+    {
+        <div class="result-form">
+            @if (Model.Items == null)
+            {
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.ConsignmentNumber):</div>
+                    <div class="right">@Html.LocalizeTextBoxFor(m => m.ConsignmentNumber, new { @readonly = "readonly", @style = "width: 150px !important;min-width: 0;" })</div>
+                </div>
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.PackageNumber):</div>
+                    <div class="right">@Html.LocalizeTextBoxFor(m => m.PackageNumber, new { @readonly = "readonly", @style = "width: 150px !important;min-width: 0;" })</div>
+                </div>
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.EarliestPickup):</div>
+                    <div class="right">@Html.LocalizeTextBoxFor(m => m.EarliestPickup.TextF, new { @readonly = "readonly", @style = "width: 150px !important;min-width: 0;" })</div>
+                </div>
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.ExpectedDelivery):</div>
+                    <div class="right">@Html.LocalizeTextBoxFor(m => m.ExpectedDelivery.TextF, new { @readonly = "readonly", @style = "width: 150px !important;min-width: 0;" })</div>
+                </div>
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.LabelUrl):</div>
+                    <div class="right link">
+                        <a href="@Model.LabelUrl" target="_blank">@Model.LabelUrl</a>
+                    </div>
+                </div>
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.TrackingUrl):</div>
+                    <div class="right link">
+                        <a href="@Model.TrackingUrl" target="_blank">@Model.TrackingUrl</a>
+                    </div>
+                </div>
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.WaybillUrl):</div>
+                    <div class="right link">
+                        <a href="@Model.WaybillUrl" target="_blank">@Model.WaybillUrl</a>
+                    </div>
+                </div>
+            }
+            else
+            {
+                <table class="order-item-list" style="width: 90%;margin-left: 5%;">
+                    <tr class="header">
+                        <td style="width:100px;">@Html.LocalizeNameFor(m => m.OrderId)</td>
+                        <td style="width:200px;">@Html.LocalizeNameFor(m => m.ConsignmentNumber)</td>
+                        <td>@Html.LocalizeName(new BringBookingItemModel(), m => m.ErrMsg) / @Html.LocalizeNameFor(m => m.LabelUrl)</td>
+                    </tr>
+                    @for (var i = 0; i < Model.Items.Count; i++)
+                    {
+                        <tr class="order-item">
+                            <td>
+                                <input class="order-item-orderid" value="@Model.Items[i].OrderId" data-consignment="@(Model.Items[i].ConsignmentNumber.IsNullOrEmpty() ? 0 : 1)" type="hidden" />
+                                <a class="link" href="@ModuleUrl.AdminUrl("Order", "Input", Model.Items[i].OrderId)">@Model.Items[i].OrderId</a>
+                            </td>
+                            <td>@Model.Items[i].ConsignmentNumber</td>
+                            <td style="line-height:1.4em;">
+                                @if (Model.Items[i].ConsignmentNumber.IsNullOrEmpty())
+                                {
+                                    <span class="error">@Model.Items[i].ErrMsg</span>
+                                }
+                                else
+                                {
+                                    <a href="@Model.Items[i].LabelUrl" target="_blank">@Model.Items[i].LabelUrl</a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                </table>
+                <script type="text/javascript">
+                    window.refreshGrid = function () {
+                        if (grid && grid.attr('bactionurl') == '/admin/modules/eshop/order') {
+                            var gridKd = grid.data('kendoGrid');
+                            if (gridKd) gridKd.dataSource.page(gridKd.dataSource.page())
+                        }
+                    };
+
+                </script>
+            }
+
+        </div>
+    }
+</div>
+
+<script type="text/javascript">
+    var errMsg = '@Regex.Replace(errMsg ?? "","\\s"," ")';
+
+    setTimeout(function () {
+        if (errMsg) admincommon.showMessage(errMsg.replace(/&lt;br\/&gt;/g, '<br/>'), 'Error');
+    }, 500);
+
+</script>

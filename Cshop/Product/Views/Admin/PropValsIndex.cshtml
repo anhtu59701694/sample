@@ -1,0 +1,163 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model IEnumerable<PropValModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+    ViewBag.Title = StringTable.ManagePropVals;
+    ViewBag.AddAction = "Add";
+    ViewBag.UseInlineEdit = true;
+    ViewBag.ShowFilterBox = true;
+    ViewBag.UseImgPreview = true;
+    
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/product";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Product;
+    
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var properties = (List<PropertyModel>)ViewBag.Properties;
+    var qargs = new QParam();
+}
+
+<style type="text/css">
+    .preview img.empty {width: @(Html.CalcAutoWidth())px;}
+</style>
+
+@if (!ViewBag.PermissionEdit)
+{
+    <style type="text/css">
+        .k-grid-status a.enable, .k-grid-status a.disable {cursor: default;}
+    </style>
+}
+
+@section MainTitleSection {
+    @(StringTable.ManagePropVals)
+}
+
+@section CurrentTitleSection {
+    <a href="/admin/modules/eshop/property/">
+        @(StringTable.ManageProperties)
+    </a>
+    <i class="dot_bre"></i>
+    <a id="aroles" class="current">
+        @(StringTable.ManagePropVals)
+    </a>
+}
+@section FilterMenuSection
+{
+    <ul class="filter-box">
+        <li>
+            <span class="filter-title">
+                @Html.LocalizeNameFor(m => m.PropertyId):
+            </span>
+            @Html.LocalizeDropDownListKendoLang("propertyid", qargs.PropertyId, properties.Select(x => new DDListItem()
+        {
+            Value = x.Id.ToString(),
+            Text = x.Name,
+            Active = x.Active ?? false,
+            LangVisible = x.LangVisible
+        }), StringTable.SelectProperty,
+        new { @class = "filter-dropdown", @onchange = "onFilterChange()" })
+        </li>
+    </ul>
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<PropValModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", "Input", null, "(function(e){gridOnInlineEdit(e, '#DisplayOrder', gridRefreshRow);})", @settings.Display.Product.PageSize)
+    .DataSource(m => m.Id, "List", null, null, "gridGetParams")
+    .Paging(10, new int[] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.ImageThumb)
+            .SetTemplate(StringTable.SimpImgTempl())
+            .SetCssClass("txt_align_c image"),
+
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetInlineEdit(true)
+            .SetDefaultSort(true)
+            .SetCssClass("name-pro")
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+
+       grid.Col(m => m.DisplayOrder, true, 120)
+            .SetInlineEdit(true)
+            .SetCssClass("td-center")
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+
+        //grid.Col(m => m.PropertyName, "EditProp", m => m.PropertyId),
+
+        grid.Col(m => m.Active, "", m => m.Id, false, 80)
+            .SetTemplate("<div style='float: left; position: relative;'><div style='display:none;height: 13px; background: url(&quot;/areas/admin/styles/images/icon_btn.png&quot;) no-repeat scroll -5px -180px / 20px auto; position: absolute; width: 10px; left: 11px; top: -1px;'></div><a href='javascript:void(0);' /></div>")
+            .SetCssClass("k-grid-status"),
+    })
+    .ColumnCommand(grid => new[]
+    {
+        grid.Cmd(m => m.Id, "Edit", "Edit", "edit_fr"),
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Delete", "Delete", "delete_fr", true) : null
+    }.Where(x => x != null).ToArray(), 120)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid'), permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+    var statusActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "Enable"))';
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function gridCustom(grid) {
+
+        initGridStatusAction(grid, '.k-grid-status', permEdit ? statusActUrl : '',
+           function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+           function (row) { return { id: row.Id, active: row.Active }; });
+
+        //gridMarkLangDisabled(grid, '.k-grid-name', function (row) { return !row.LangVisible; });
+
+        //gridHideCell(grid, '.k-grid-Delete', function (row) { return (row.AnyChild); });
+
+        //gridDisableCheckBox(grid, function (row) { return (row.AnyChild); });
+
+        initImagePreview(false, grid.element, false);
+
+        if (permEdit)
+            $('tr', grid.element).each(function() {
+                $(this).dblclick(function(e) {
+                    if (!grid.editable) grid.editRow($(this));
+                });
+            });
+    }
+
+    function gridRefreshRow(grid, rowEle) {
+
+        initGridStatusAction(grid, rowEle.find('.k-grid-status'), permEdit ? statusActUrl : '',
+            function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+            function (row) { return { id: row.Id, active: row.Active }; });
+
+        //gridHideCell(grid, rowEle.find('.k-grid-Delete'), function (row) { return row.AnyChild; });
+
+        //gridDisableCheckBox(grid, function (row) { return row.AnyChild; }, rowEle.find('.row-checkbox'));
+
+        initImagePreview(false, rowEle, false);
+
+        if (permEdit)
+            rowEle.dblclick(function(e) {
+                if (!grid.editable) grid.editRow($(this));
+            });
+    }
+
+    function gridGetParams(grid, e) {
+        return { propertyid: $('#propertyid').val() };
+    }
+
+    function onFilterChange() {
+        grid.data('kendoGrid').dataSource.page(1);
+    }
+
+</script>

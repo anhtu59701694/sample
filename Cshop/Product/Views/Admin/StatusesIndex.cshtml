@@ -1,0 +1,153 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Product
+@model IEnumerable<StatusModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+    ViewBag.Title = StringTable.ManageStatus;
+    ViewBag.AddAction = "Add";
+    ViewBag.UseInlineEdit = true;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/product";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Product;
+    ViewBag.UseImgPreview = true;
+    
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+
+<style type="text/css">
+    .grid-info-stat .num {color: #636262;}
+    .w10Per {width: 10%;}
+    .w15Per {width: 15%;}
+    .w10Per a, .w15Per a {display: inline-block;float: none;}
+    .preview img.empty {width: @(Html.CalcAutoWidth())px;}
+</style>
+
+@if (!ViewBag.PermissionEdit)
+{
+    <style type="text/css">
+        .k-grid-enablebuy a.enable, .k-grid-enablebuy a.disable {cursor: default;}
+    </style>
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageStatus)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageStatus)
+}
+
+@Html.AntiForgeryToken()
+
+@{ KendoGrid<StatusModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", "Input", null, @"(function(e){gridOnInlineEdit(e,'#DisplayOrder',gridRefreshRow);})", @settings.Display.Product.PageSize)
+    .DataSource(m => m.Id, "List", null, null, "")//gridGetParams
+    .Paging(10, new int[] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.ImageThumb)
+            .SetTemplate(StringTable.SimpImgTempl())
+            .SetCssClass("txt_align_c image"),
+
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetInlineEdit(true)
+            .SetDefaultSort(true)
+            .SetCssClass("name-pro")
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+
+        grid.Col(m => m.EnableBuy)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-enablebuy img-center w10Per"),
+            
+        grid.Col(m => m.ShowPrice)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-showprice img-center w10Per"),
+            
+        grid.Col(m => m.ShowFrontEnd)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-frontend img-center w10Per"),
+    })
+    .ColumnCommand(grid => new[]
+    {
+        grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr"),
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true) : null
+    }.Where(x => x != null).ToArray(), 120)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid'), permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+    var showDelNu = parseInt(@Claw.Modules.Eshop.Domain.Status.StatusIDEqual);
+    var statusEnableBuyActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "StatusEnableBuy"))';
+    var statusShowPriceActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "StatusShowPrice"))';
+    var statusShowFrontEndActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "StatusShowFrontEnd"))';
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function gridRefreshRow(grid, rowEle) {
+
+        initGridStatusAction(grid, '.k-grid-enablebuy', permEdit ? statusEnableBuyActUrl : '',
+           function (row) { return row.EnableBuy; }, function (row, value) { row.EnableBuy = value; },
+           function (row) { return { id: row.Id, value: row.EnableBuy }; });
+
+        initGridStatusAction(grid, '.k-grid-showprice', permEdit ? statusShowPriceActUrl : '',
+           function (row) { return row.ShowPrice; }, function (row, value) { row.ShowPrice = value; },
+           function (row) { return { id: row.Id, value: row.ShowPrice }; });
+        
+        initGridStatusAction(grid, '.k-grid-frontend', permEdit ? statusShowFrontEndActUrl : '',
+           function (row) { return row.ShowFrontEnd; }, function (row, value) { row.ShowFrontEnd = value; },
+           function (row) { return { id: row.Id, value: row.ShowFrontEnd }; });
+
+        gridHideCell(grid, '.k-grid-Delete', function (row) { return (row.Id <= showDelNu); });
+        gridDisableCheckBox(grid, function (row) { return (row.Id <= showDelNu); });
+
+        if (permEdit)
+            rowEle.dblclick(function(e) {
+                if (!grid.editable) grid.editRow($(this));
+            });
+
+        initImagePreview(false, rowEle, false);
+    }
+
+    function gridCustom(grid) {
+
+        initGridStatusAction(grid, '.k-grid-enablebuy', permEdit ? statusEnableBuyActUrl : '',
+           function (row) { return row.EnableBuy; }, function (row, value) { row.EnableBuy = value; },
+           function (row) { return { id: row.Id, value: row.EnableBuy }; });
+
+        initGridStatusAction(grid, '.k-grid-showprice', permEdit ? statusShowPriceActUrl : '',
+           function (row) { return row.ShowPrice; }, function (row, value) { row.ShowPrice = value; },
+           function (row) { return { id: row.Id, value: row.ShowPrice }; });
+        
+        initGridStatusAction(grid, '.k-grid-frontend', permEdit ? statusShowFrontEndActUrl : '',
+           function (row) { return row.ShowFrontEnd; }, function (row, value) { row.ShowFrontEnd = value; },
+           function (row) { return { id: row.Id, value: row.ShowFrontEnd }; });
+
+        gridHideCell(grid, '.k-grid-Delete', function (row) { return (row.Id <= showDelNu); });
+        gridDisableCheckBox(grid, function (row) { return (row.Id <= showDelNu); });
+
+        if (permEdit)
+            $('tr', grid.element).each(function() {
+                $(this).dblclick(function(e) {
+                    if (!grid.editable) grid.editRow($(this));
+                });
+            });
+
+        initImagePreview(false, grid.element, false);
+    }
+
+    function ifnull(obj, def) {
+        if (obj == null) return def || '';
+        return obj;
+    }
+
+</script>

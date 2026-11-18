@@ -1,0 +1,2913 @@
+﻿@using System.Text
+@using System.Web.Mvc
+@using System.Web.Mvc.Html
+@using Claw.Core
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.Core
+@using Claw.Core.Enumerations
+
+@{
+    Layout = QParam.IsFontEnd ? "~/Areas/Admin/Layout/admin.front.cshtml" : "~/Areas/Admin/Layout/admin.default.cshtml";
+    ViewBag.Controller = Html.GetController();
+
+    var isFrontEnd = QParam.IsFontEnd;
+    var controller = ViewBag.Controller as string;
+    var extraButtons = RenderSection("ExtraButtonSection", false);
+    var extraButtonsHtml = (extraButtons == null ? "" : extraButtons.ToHtmlString());
+}
+
+@section Styles {
+
+    <style type="text/css">
+        .wr_name_es { margin: 16px 0 5px !important; }
+        .wr_usertop_colLeft { height: 60px !important; }
+        /*.wr-menu-top-eshop {width: 100% !important;padding: 15px 0px !important;margin-bottom: 14px !important;}*/
+        .wr-img-sub {background-color: transparent !important;text-align: right !important;float:right;min-height:inherit!important;}
+
+        .set-relative { position: relative !important; clear:both; }
+
+        input[type="text"].js-required, textarea.js-required, input.reduced-size, .k-numerictextbox.kendo-numeric.reduced-size {width: 63% !important;}
+        input[type="number"] { width: 30% !important; margin-right: 5px; }
+        .input-col-1 input[type="number"],.input-col-2 input[type="number"]{width: 98% !important;-webkit-box-sizing:border-box;}
+        input.input-gam {width:80px !important; margin-right:0px !important}
+        input.w30pr, input.browseText.sub-text-input {margin-bottom: 5px !important;}
+        input.datetimepicker.k-input{height: 24px !important;text-indent: 0 !important;}
+
+        .k-datetimepicker .k-picker-wrap {height: 25px;}
+
+        .field-valid-msg { line-height: 1em;clear: both; }
+
+        .browseButton.sub-brow-btn{ padding: 5px 8px !important }
+        .wr_submit_top.btn-inline{ position: relative; }
+
+        .col-right-eshop .btn { background: initial; } 
+        .col-right-eshop .wr_table_all { overflow: auto; position: relative; }
+        .col-right-eshop {margin-right: 3% !important;margin-left: initial !important;}
+        .col-right-eshop .controls { margin-bottom: 7px; }
+        .clo_left .text-eshop { line-height: 30px; }
+        .col-right-eshop span.text-eshop.ck-editor { float: initial; }
+        .col-right-eshop span.text-eshop.no100 { width: auto; }
+        .row_content_box .clo_left label.text-hint { white-space: normal !important; }
+
+        .tab-big-2 input, .tab-big-2 label, .tab-big-2 img { float: left; }
+        .tab-big-2 .active-lang label { color: #333; cursor: initial !important; }
+        .tab-big-2 .langItem { height: 18px !important; }
+        .tab-big-2 .langItem label { width: 100px; }
+        .tab-big-2 .es-show-tranglate {float: left !important;margin-right: 7px;margin-left: 7px;line-height: 1.4em;}
+        .tab-big-2 .inline-flag { margin: -2px 0px 0px; padding: 0px; border: 0px none; }
+
+        body.dropzone, body.dropzone.dz-drag-hover {min-height: initial;border: 0px;background-color: transparent;padding: 0px;margin: 0px;}
+        .dropzone, .dropzone * { box-sizing: initial  !important; }
+        .dropzone.single, .dropzone.single * { box-sizing: border-box; }
+        .dz-preview.dz-file-preview { width:inherit; }
+  
+        body > .dz-default.dz-message{display: none !important;}
+    
+    </style>   
+    <style type="text/css">
+
+        input.btn.btn-icon {
+            background-image: url("@ModuleUrl.ContentUrl("Images/admin/icon_btn.png", true)"), url("@ModuleUrl.ContentUrl("Images/admin/bg_button.png", true)");
+            background-position: 0px -28px, left top;
+            background-repeat: no-repeat, repeat;
+            background-color: #F2F1F1;
+            padding-left: 30px;
+        }
+
+        .dropzone.single {
+            width: @((ViewBag.DZItemWidth ?? 200) + 20)px;
+        }
+ 
+        .mask-dropzone, .dropzone .dz-image-preview {
+            width: @((ViewBag.DZItemWidth ?? 200) + 20)px !important;
+        }
+       
+    </style>
+    <style type="text/css">
+
+        .dropzone.single.dz-drag-hover { border: none; }
+        .dropzone.single.dz-drag-hover .mask-dropzone { border: yellowgreen 1px dashed; }
+
+        .mask-dropzone {border: royalblue 1px dashed;background-color: rgba(200, 200, 200, .8);display: none;z-index: 9999;vertical-align: middle;text-align: center;position: absolute;}
+        .mask-dropzone span {text-align: center !important;vertical-align: middle !important;float: left;width: 100%;height: 100%;}
+
+        .dropzone .dz-preview, .dropzone .dz-preview img { max-width:100%; }
+        .dropzone .dz-preview img { border-radius: 3px;vertical-align: middle; }
+        .wr_center li { height: auto !important; }
+        .dropzone .dz-image-preview { margin: 0px; padding: 0px; }
+        .dropzone .img-check.selected{box-shadow: 0px 0px 6px red;}
+        .dropzone .dz-preview { position: relative; min-height:inherit!important; }
+        .dropzone .dz-preview .dz-details { overflow: hidden !important; padding: 20px 2px !important; }
+
+        .dz-preview .dz-preview-menu {position: absolute;visibility: hidden;width:100%;height:2em;z-index: 9999;text-align: center;background-color: rgba(100, 100, 100, 0.5);}
+        .dropzone.single .dz-preview-menu .center{width: 105px;}
+        .dz-preview .dz-preview-menu a.view_fr {height: 20px !important; background-position: 0 -397px !important;}       
+        .dz-preview:hover .dz-preview-menu { visibility: visible; }
+
+        .hint_box { max-width: 63%; padding-left: 5px; background-color: #D3D3D3; }
+        .hintFieldInput { color: graytext; }
+
+        div.k-treeview {max-width: 62.7%;background-color: transparent;border-width: 1px;}
+        .k-treeview { background-color: transparent; padding: 2px 2px; }
+        .k-treeview .k-in.k-state-selected, .k-calendar .k-state-selected {background-color: #60ADFF;}
+        .k-treeview .k-in.k-state-selected.k-state-focused, .k-calendar .k-state-selected.k-state-focused {box-shadow: 0px 0px 3px 4px #60ADFF inset;}
+
+        .k-calendar .k-state-selected .k-link { color: #390F3D; }
+        div.listview-pager { max-width: 62.3%; margin-bottom: 2px; }
+
+        .item-lang-disabled { font-style: italic; color: gray; }
+
+        .k-widget.k-datepicker .k-picker-wrap {height: 26px;}
+        .k-widget .k-input.datepicker { padding: 0px !important; }
+        .k-widget.k-datepicker .k-picker-wrap .k-input {height: 25px;}
+        .k-widget.k-dropdown .k-dropdown-wrap {height: 26px;}
+        .k-widget.kendo-numeric .k-numeric-wrap {float: left;}
+
+        .assign-item { color: #390F3D; cursor: pointer; }
+
+        .form-link { color: #390F3D; cursor: pointer; }
+        .form-link:hover { text-decoration: underline; }
+
+        .url-handle{cursor: text;}
+
+        .kendo-numeric.k-input {width: 100% !important;text-align: left;box-shadow: none;margin-bottom: 0px !important;height: 26px !important;}
+
+        .k-grid td .preview img{vertical-align: bottom; padding: 0;float: none !important;}
+        .k-grid .error {position: absolute;margin-top: -3px;line-height: 1.1em;background-color: rgb(224, 224, 224);padding: 1px 7px;border: 0px solid white;z-index: 9999;}
+        .k-grid .input-validation-error{border: none !important;}       
+        .k-grid .field-validation-error{ display: block !important;}
+        .k-grid .error:empty { display: none !important; }
+
+        input.js-required.kendo-numeric {width: 100% !important; }
+        input.ckeditor_standard,textarea.ckeditor_standard{ min-height:272px; }
+        input.ckeditor_simple,textarea.ckeditor_simple{ min-height:192px; }
+
+        .k-grid ul.k-pager-numbers{width: auto !important;min-height: 0px !important;background: none !important;height: 2em;}
+        .k-grid ul.k-pager-numbers li { height: auto !important; background: none !important; }
+        .k-grid ul.k-pager-numbers .k-link { padding: 0px; height: 2em; width: 2em; }
+
+        a.delete_fr.inline-cancel { background-position: 0px -89px !important; }
+        a.edit_fr.inline-save { background-position: 0px -31px !important; }
+
+        td.td-right {text-align: right !important;}
+        td.td-center.image.compact a.preview img {float: none;padding: 0;margin:2px;vertical-align: bottom;}             
+        .k-grid td .preview img[src='']{display: none}
+        .name-pro2 .grid-row-edit {padding:0;color:#390F3D;}
+
+        .k-list-container.k-popup .k-item div.item {margin-left: 10px;}
+        .k-list-container.k-popup .k-item div.group {font-weight: bold;}
+
+        .show_massage .nNote { width: 90% !important; float: left; }
+        .show_massage .close {position: relative;float: right;font-size: 14px !important;padding-right: 10px;margin: 0;color: #333;line-height: 2.1em !important;}
+        .show_massage .close:hover {color: red;}
+
+        .wr_submit_top.link-button li { margin: 1px;height: 24px;}
+        .wr_submit_top.link-button li a { padding: 0 10px;line-height: 24px;}
+
+        .field-row .text-translator {display:none;}
+        .cke_contents textarea.cke_source{height: 98% !important;}
+
+    </style>
+
+    @Html.CssBundle("~/style/leftmenu.css", MediaDeviceType.Screen, "~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Css/eshop-style.css", "~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Css/eshop-style-custom.css")
+}
+
+@{ var optLang = LanguageMgr.OptLang(Model.Id);}
+
+<script src="@(Globals.ResolveClientUrl(LanguageMgr.KendoPath))/cultures/kendo.culture.@(optLang.LanguageCode).js"></script>
+
+<script type="text/javascript">
+    var debugMode = false, enableRemoteValidate = true, firstErrorInputElement = null;
+    var activeLang = '@(optLang.LanguageCode)';
+
+    if (!location.origin) location.origin = location.protocol + '//' + location.host;
+
+    function getFocusLang() {
+        return activeLang;
+    }
+
+    function clawSetTimeout(cond, code, timeout, maxSteps) {
+        if (cond()) code();
+        else {
+            if (!maxSteps) maxSteps = 100;
+            if (--maxSteps > 0) {
+                setTimeout(function () { clawSetTimeout(cond, code, timeout, maxSteps); }, timeout);
+            }
+            else console.log('clawSetTimeout -> skipped');
+        }
+    }
+
+    function dropDownListSetStyleLangVisible(id) {
+        $('#' + id + ' option').each(function () {
+            if ($(this).attr('disabled') == 'disabled') {
+                $(this).addClass('item-lang-disabled');
+                $(this).attr('title', '@StringTable.ItemLanguageDisabled');
+            }
+        });
+    }
+
+    function translateAlias(srcNode, dstId, override) {
+        var dstNode = $('#' + dstId);
+        var dstOVal = getInputVal(dstNode);
+        var dstBKVal = dstNode.attr('bak-value');
+        var srcVal = getInputVal($(srcNode));
+
+        if (!override || !dstBKVal || dstBKVal == dstOVal || dstOVal == '') {
+            AutoGenerateAlias($(srcNode).val(), dstId, override);
+
+            if (dstOVal == dstNode.val()) return;
+
+            dstNode.attr('bak-value', dstNode.val());
+
+            function timerValid() {
+                var validate = $(dstNode[0].form).validate();
+                var aliasLoad = $('.alias-hint-loading', $(srcNode).closest('.lang_form'));
+                var newDstVal = getInputVal(dstNode);
+
+                if (!newDstVal && srcVal && dstOVal) {
+                    setInputVal(dstNode, dstOVal);
+                    return;
+                }
+
+                if (validate.pendingRequest > 0) setTimeout(timerValid, 100);
+                else {
+                    if (!dstNode.valid())
+                        ajaxREST('@Html.ActionUrl("GetUniqueFieldHint", null, new { @id = Model.Id })',
+                            'POST', { name: 'Alias', value: dstNode.val() },
+                            aliasLoad.length != 0 ? aliasLoad.attr('id') : 'alias-hint-loading',
+                            function (result) {
+                                if (result.Value) {
+                                    dstNode.val(result.Value).attr('bak-value', result.Value);
+                                    dstNode.change(); dstNode.valid();
+                                }
+                            }, function (e) { console.log('error', e); });
+                }
+            };
+
+            dstNode.change(); dstNode.valid();
+
+            setTimeout(timerValid, 100);
+        }
+    }
+
+    function ckeGenerateAlias(srcId, dstId, maxLen) {
+        var node = $(srcId), alias = $(dstId), override = ('@Model.Id' == '0');
+        clawSetTimeout(function () { return isNodeCKEditor(node); },
+            function () {
+                alias.change(function () {
+                    var val = $.trim($(this).val());
+                    if (val == '') translateAlias(node, alias.attr('id'), override);
+                    else if (val.length > maxLen)
+                        $(this).val(val.substring(0, maxLen) + '-' + Math.floor(new Date().getTime() / 60000));
+                });
+                CKEDITOR.instances[node.attr('id')].on('blur', function (e) {
+                    translateAlias(node, alias.attr('id'), override);
+                });
+            }, 500, 20);
+    }
+
+    function formEnable(enable) {
+        $('#editForm').find('input,textarea,select').prop('disabled', !enable);
+
+        $('#editForm').find('.wr_submit_top li input[type=button]').css(enable
+            ? { 'cursor': 'pointer', 'background-color': null }
+            : { 'cursor': 'default', 'background-color': '#CCC' });
+
+        $('li input[type=button]', '.wr_submit_top.form-action-menu ').css(enable
+            ? { 'cursor': 'pointer', 'background-color': null }
+            : { 'cursor': 'default', 'background-color': '#CCC' }).prop('disabled', !enable);
+    }
+
+    function formShowErrorMsg(fieldName, errMessage, form) {
+        var validObj = $(form || '#editForm').validate();
+
+        if (!validObj.settings.rules[fieldName]) {
+            console.log(fieldName + ' not found!'); return;
+        }
+        else {
+            var errors = {}; errors[fieldName] = errMessage;
+            validObj.showErrors(errors);
+        }
+    }
+
+    function formSetRuleMsg(fieldName, method, msg, form) {
+        var validObj = $(form || '#editForm').validate();
+
+        if (validObj.settings.messages[fieldName]) {
+            validObj.settings.messages[fieldName][method] = msg;
+        }
+    }
+
+    function inputNoEmpty(node) {
+        if ($.trim($(node).val()) == '') $(node).val($(node).attr('value'));
+    }
+
+    $.validator.methods.remoteClaw = $.validator.methods.remote;
+    $.validator.methods.remote = function (value, element, param) {
+        if (!this.clawRemoteValidate) this.clawRemoteValidate = $.validator.methods.remoteClaw;
+        if (debugMode) console.log('RemoteValidate:', '[', enableRemoteValidate, this, ']', value, element, param);
+        if (this.optional(element) || !enableRemoteValidate) {
+            return "dependency-mismatch";
+        }
+        else return this.clawRemoteValidate(value, element, $.fn.getRemoteValidArgs ? $(element).getRemoteValidArgs(param) : param);
+    };
+
+    function formValidateClearOldValue(rawElement, form) {
+        $(form || $(rawElement).closest('form')).validate().previousValue(rawElement).old = '';
+    }
+
+    function formUpdateValidRules(node) {
+        $.validator.unobtrusive.parse(node);
+
+        var form = node.first().closest('form');
+        var unobtrusiveValidation = form.data('unobtrusiveValidation');
+        var validator = form.validate();
+
+        $.each(unobtrusiveValidation.options.rules, function (elname, elrules) {
+            if (!validator.settings.rules[elname]) {
+                var args = $.extend({}, elrules);
+                args.messages = unobtrusiveValidation.options.messages[elname];
+                form.find("[name='" + elname + "']").rules("add", args);
+            }
+        });
+    }
+
+    function localizeParseFloat(value) {
+        return kendo.parseFloat(value, '@optLang.LanguageCode');
+    }
+
+    function localizeFloatToString(value, format) {
+        return kendo.toString(value, format || 'n2', kendo.cultures['@optLang.LanguageCode']);
+    }
+
+    function localizeMoneyToString(value, format) {
+        format = format || '@SettingsBiz.GetSettings().Display.Others.GetPriceFormat()';
+        return kendo.toString(value, format, kendo.cultures['@optLang.LanguageCode']);
+    }
+
+    function localizeDateToString(value, format) {
+        format = format || '@SettingsBiz.GetSettings().Display.Others.GetDateFormat()';
+        return kendo.toString(value, format, kendo.cultures['@optLang.LanguageCode']);
+    }
+
+    function localizeCurrencyToString(value, code) {
+        if (value == null || value === '') value = 0;
+        if (!code) code = '@CurrencyMgr.Default.Code';
+        var formatInfo = kendo.currencies[code.toLowerCase()] || {};
+        var txtVal = kendo.toString(value, 'n', formatInfo);
+        return formatInfo.location ? ((formatInfo.token || '') + ' ' + txtVal) : (txtVal + ' ' + (formatInfo.token || ''));
+    }
+
+    function initCurrencies(currencies) {
+
+        kendo.currencies = kendo.currencies || {};
+
+        currencies.forEach(function (itm) {
+            var formatInfo = $.extend(true, {}, kendo.cultures.current);
+
+            formatInfo.name = itm.Code;
+            formatInfo.location = itm.Location;
+            formatInfo.token = itm.Token;
+            formatInfo.numberFormat[','] = itm.ThousandSep;
+            formatInfo.numberFormat['.'] = itm.DecimalSep;
+            formatInfo.numberFormat.decimals = itm.DecimalPlaces;
+
+            kendo.currencies[itm.Code.toLowerCase()] = formatInfo;
+        });
+
+    }
+
+    $.fn.clawGetFloat = function (defVal, format) {
+        var value = $.trim($(this).val());
+        return value == '' ? defVal : localizeParseFloat(value, format);
+    };
+
+    $.fn.clawSetFloat = function (value, format) {
+        $(this).val(localizeFloatToString(value, format));
+        return $(this);
+    };
+
+    $.fn.clawGetInt = function (defVal) {
+        var value = $.trim($(this).val());
+        return value == '' ? defVal : parseInt(value);
+    };
+
+    $.fn.clawChangeInt = function (delta) {
+        $(this).val($(this).clawGetInt() + delta);
+        return $(this);
+    };
+
+    $.fn.isEmptyVal = function () {
+        var value = $.trim($(this).val());
+        return value == '';
+    };
+
+    $.fn.getBoolVal = function () {
+        var value = $.trim($(this).val()).toLowerCase();
+        return value == 'true';
+    };
+
+    $.fn.scrollHeight = function () {
+        if (this.length > 0) return this[0].scrollHeight;
+        else return undefined;
+    };
+
+    $.fn.scrollWidth = function () {
+        if (this.length > 0) return this[0].scrollWidth;
+        else return undefined;
+    };
+
+    $.validator.methods.number = function (value, element) {
+        if (!value || $.trim(value) == '') return this.optional(element);
+        var regex = new RegExp('@(LanguageMgr.GetNumberRegex(optLang).Replace("\\", "\\\\"))');
+        return regex.test(value);
+    };
+
+    $.validator.methods.range = (function (value, element, param) {
+        param[0] = localizeParseFloat($(element).attr('data-val-range-min'));
+        param[1] = localizeParseFloat($(element).attr('data-val-range-max'));
+        var newval = localizeParseFloat(value);
+        //console.log('range', value, element, param, newval, value);
+        return this.optional(element) || (newval >= param[0] && newval <= param[1]);
+    });
+
+    $.fn.getFormFields = function (selector) {
+        if ($(this).is('form')) {
+            if (selector) return $(this).find(selector);
+            var fields = [], form = $(this)[0];
+            for (var i = 0; i < form.length; i++) {
+                fields.push(form[i]);
+            }
+            return $(fields);
+        }
+        else return $(this).find('input,select,textarea');
+    };
+
+    var currentCulture = kendo.cultures["@optLang.LanguageCode"], numberFormat = currentCulture.numberFormat;
+    numberFormat[','] = '@optLang.ThousandsSeperator';
+    numberFormat['.'] = '@optLang.DecimalSeperator';
+    numberFormat.percent[','] = numberFormat[','];
+    numberFormat.percent['.'] = numberFormat['.'];
+    numberFormat.currency[','] = numberFormat[','];
+    numberFormat.currency['.'] = numberFormat['.'];
+
+    kendo.culture('@optLang.LanguageCode');
+    //console.log(kendo.cultures["@optLang.LanguageCode"].numberFormat);
+
+    function formDisableValidation(inputs, isDisabled) {
+        inputs.each(function () {
+            var dataKey = 'backupValidRule';
+            var dataVal = $(this).data(dataKey);
+            if (isDisabled) {
+                formShowErrorMsg($(this).attr('name'), null);
+                //$(this).closest('section').find('.error').hide();
+                var rule = $(this).rules('remove');
+                if (Object.keys(rule).length != 0 || !dataVal) $(this).data(dataKey, rule);
+            } else if (dataVal && Object.keys(dataVal).length != 0) $(this).rules('add', dataVal);
+        });
+    }
+
+    function urlToJSON(url, skipEmpty) {
+        if (!url || url.indexOf('?') == -1) return {};
+
+        var result = {}, pairs = url.slice(url.indexOf('?') + 1).split('&');
+
+        pairs.forEach(function (item) {
+            var pair = item.split('=');
+            if (pair.length > 0 && (pair[1] || !skipEmpty))
+                result[pair[0].toLowerCase()] = decodeURIComponent(pair[1] || '');
+        });
+
+        return result;
+    }
+
+    function urlMergeParams(url, params) {
+        if (!url || !params) return url;
+
+        if (typeof (params) == 'string') params = urlToJSON('?' + params, false);
+
+        var idx = url.indexOf('?');
+
+        if (idx == -1) url += '?';
+        else {
+            params = $.extend(urlToJSON(url, true), params);
+            url = url.substr(0, idx + 1);
+        }
+
+        for (var key in Object.keys(params)) {
+            if (!params[key]) delete params[key];
+        }
+
+        return url + $.param(params);
+    }
+
+    function urlInjectFocusLang(url) {
+        if (!url || /^http(s?):\/\//i.test(url) || /[?&]lang=/i.test(url)) return url;
+        return urlMergeParams(url, { lang: getFocusLang() });
+    }
+
+    function aviaryInit(node, updateSelector, eventHandler) {
+        var aviaryHolder = $('#aviary-holder');
+        if (aviaryHolder.length == 0) {
+            aviaryHolder = $('<div id="aviary-holder" style="display:none"><img/></div>');
+            $('body').append(aviaryHolder);
+        }
+
+        var url = node.is('input') ? node.val() : node.attr('src'), imgId = 'aviary-img-' + node.attr('id');
+
+        if (url && url.indexOf('http://') != 0 && url.indexOf('https://') != 0) url = location.origin + url;
+
+        aviaryHolder.find('img').attr({ id: imgId, src: url });
+
+        var aviary = new AviaryPlugin(imgId, url);
+        aviary.launch(function (targetId, newUrl) {
+            if (node.is('input')) node.val(newUrl);
+            else node.attr('src', newUrl);
+
+            if (updateSelector)
+                $(updateSelector).each(function () {
+                    if ($(this).is('input')) $(this).val(newUrl);
+                    else $(this).attr('src', newUrl);
+                });
+
+            aviary.hideMask(); aviary.close();
+
+            if (eventHandler) eventHandler(imgId, newUrl);
+        });
+    }
+
+    //set height auto popup
+    function PopUpSetHeight(objGrid, fGridH, treeView) {
+
+        var fullH = $(window).outerHeight();
+        var objWin = $('.k-widget.k-window');
+        //var objGrid = $(".wr_table_all #gridprodsel");
+
+        var temp = objWin.outerHeight();
+        var myVar = setInterval(function () {
+            //set height
+            if (treeView) {
+                objGrid.removeAttr('style');
+                objWin.css({ 'height': 'auto', "min-height": "auto" });
+            }
+
+            if (fullH > objWin.outerHeight()) {
+                objGrid.height() > fGridH ? objGrid.css("max-height", objGrid.height()) : "";
+                objWin.css({ "height": (objGrid.height() > fGridH ? objWin.height() : 'auto'), "top": ((fullH - objWin.outerHeight()) / 2) });
+            } else {
+                objWin.css({ "height": (fullH - 30), "top": 0 });
+                objGrid.height() > fGridH ? objGrid.css("max-height", fullH - (treeView ? 80 : 170)) : "";
+            }
+            //clear Interval
+            if (temp < objWin.outerHeight() || treeView) {
+                clearInterval(myVar);
+            }
+        }, 100);
+    }
+
+    function gridAdjustPopup(grid, holder, scrollBox, minHeight, maxHeight, cmdBoxHeight, adjustY) {
+
+        cmdBoxHeight = cmdBoxHeight || 60; adjustY = adjustY || 10;
+        minHeight = minHeight || 200; maxHeight = maxHeight || 2048;
+
+        var holderNode = grid.element.closest(holder), scrollNode = holderNode.closest(scrollBox);
+        var recHeight = Math.max(minHeight, Math.min(maxHeight, $(window).height() - 50));
+        var height = Math.min(recHeight, Math.max(minHeight, holderNode.height() + cmdBoxHeight + 30 + adjustY));
+
+        scrollNode.closest('.k-widget.k-window').css({
+            'height': height + 'px',
+            'top': ($(window).height() - height - 30) / 2 + 'px',
+        });
+        scrollNode.css({ 'max-height': (height - cmdBoxHeight - 30) + 'px', 'overflow': 'auto' });
+    }
+
+    function treeAdjustPopup(tree, holder, scrollBox, minHeight, maxHeight, cmdBoxHeight, adjustY) {
+        if (tree.adjustPopupTimer) clearTimeout(tree.adjustPopupTimer);
+        tree.adjustPopupTimer = setTimeout(function () {
+            tree.adjustPopupTimer = null;
+            gridAdjustPopup(tree, holder, scrollBox, minHeight, maxHeight, cmdBoxHeight, adjustY);
+        }, 500);
+    }
+
+    function ifnull(obj, def) {
+        if (obj == null) return def || '';
+        return obj;
+    }
+
+    function safeProp(obj, propName) {
+        if (obj == null) return '';
+        if (typeof (obj) != 'object') return obj;
+        return obj[propName] || '';
+    }
+
+    function getObjectProperty(obj, propPath) {
+        if (!obj || !propPath) return null;
+
+        var retVal = null, arrProp = propPath.split('.');
+
+        for (var i = 0; i < arrProp.length; i++) {
+            var pVal = (retVal || obj)[arrProp[i]];
+            if (pVal != null) retVal = pVal;
+            else return null;
+        }
+
+        return retVal;
+    }
+
+    function kendoHtmlDecode(value) {
+        if (!value) return value;
+        return value.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'");
+    }
+
+    admincommon.showMessageDefault = function (message, status, scrollTo) {
+        //clearTimeout(timer);
+        var msg = $("#massage");
+        if (msg.is(":visible")) msg.hide();
+        this.resetMessageClass(msg);
+        this.addMessageClass(msg, status);
+        $("span#show_error", msg).html(message);
+        msg.slideDown("slow", function () {
+            if (scrollTo != null && $.scrollTo) {
+                var scrollToOffset = $(scrollTo).offset();
+                $.scrollTo(scrollToOffset.left, scrollToOffset.top, { duration: 1000 });
+            }
+        }); //timer = setTimeout(this.slideUpMessage, 10000);
+
+        msg.unbind('click').click(function () {
+            if (timer) clearTimeout(timer);
+            $("span#show_error", msg).html('');
+            $(this).slideUp(700);
+        });
+    };
+
+    admincommon.showMessage = function (message, status, timeout) {
+        this.showMessageDefault(message, status);
+        if (timeout) timer = setTimeout(function () { admincommon.slideUpMessage(); }, timeout);
+    };
+
+    function msTranslatorGetText(text, targetLang, conType, resultHandler, errorHandler, loadingImage) {
+        if (window.msTranslatorToken) {
+            ajaxREST((location.protocol||'https:') + '//api.microsofttranslator.com/V2/Ajax.svc/Translate', 'GET', {
+                appId: 'Bearer ' + window.msTranslatorToken, from: getFocusLang(), to: targetLang, text: text, contentType: conType, oncomplete: '?'
+            }, loadingImage, resultHandler, errorHandler);
+        } else
+            setTimeout(function () {
+                msTranslatorGetText(text, targetLang, conType, resultHandler, errorHandler, loadingImage);
+            }, 200);
+    }
+
+    function initMsTranslator(loadingImage) {
+        window.clawInitMsTranslator = function () { if (!window.msTranslatorToken) initMsTranslatorRaw(loadingImage); };
+    }
+
+    function initMsTranslatorRaw(loadingImage) {
+        console.log('initMsTranslator', Date.now());
+
+        loadingImage = loadingImage || 'no-loading-image';
+
+        ajaxREST('@ModuleUrl.AdminUrl(Html.GetController(), "MsTranslatorToken")', 'POST', {}, loadingImage,
+            function () {
+                setTimeout(function () { initMsTranslator(loadingImage); }, 1000 * ((window.msTranslatorExpiry || 600) - 120));
+            }, function (e) { console.log('initMsTranslator failed'); }, null, 'script');
+    }
+
+    function initLangFormTranslator(langForm) {
+        $('.field-row .text-translator', langForm).unbind('click').click(function () {
+            var inputNode = $(this).closest('.field-row').find('.right-sec .lang_form_field');
+            var lang = langForm.attr('data-lang'), conType = isNodeCKEditor(inputNode) ? 'text/html' : 'text/plain';
+            msTranslatorGetText(getInputVal(inputNode), lang, conType,
+                function (result) {
+                    setInputVal(inputNode, result);
+                    var translateEvent = inputNode.attr('ontranslate');
+                    if (translateEvent) eval(translateEvent.replace('$(this)', 'inputNode'));
+                },
+                function (e) { formShowErrorMsg(inputNode.attr('name'), '@StringTable.AjaxCommandErrorMessage'); },
+                inputNode.attr('loadingimg'));
+        });
+    }
+
+    function langFormSetOtherActive() {
+        $('.tab-big-2 .inputLang .langItem').each(function () {
+            if (!$(this).hasClass('active-lang')) {
+                var node = $(this).find('input');
+                node.prop({ disabled: true, checked: true });
+                node.change();
+            }
+        });
+    }
+
+</script>
+
+<script type="text/javascript">
+
+    function gridStringifyAttributes(attributes) {
+        var attr, result = " ";
+
+        if (attributes) {
+            if (typeof attributes === 'string') {
+                return attributes;
+            }
+
+            for (attr in attributes) {
+                result += attr + '="' + attributes[attr] + '"';
+            }
+        }
+        return result;
+    }
+
+    function gridGetRowTemplate(grid, alt, map) {
+        var that = grid,
+            columns = that.columns,
+            settings = $.extend({}, kendo.Template, that.options.templateSettings),
+            idx,
+            length = columns.length,
+            template,
+            state = { storage: {}, count: 0 },
+            column,
+            type,
+            hasDetails = that._hasDetails(),
+            className = [],
+            groups = that._groups(),
+            skipGroupCells;
+
+        var rowTemplate = "<tr";
+
+        if (alt) className.push("k-alt");
+
+        if (hasDetails) className.push("k-master-row");
+
+        if (className.length) rowTemplate += ' class="' + className.join(" ") + '"';
+
+        if (length) rowTemplate += ' ' + kendo.attr("uid") + '="#=' + kendo.expr("uid", settings.paramName) + '#"';
+
+        rowTemplate += " role='row'>";
+
+        if (groups > 0 && !skipGroupCells) rowTemplate += groupCells(groups);
+
+        var colTempls = [];
+
+        if (hasDetails) colTempls.push('<td class="k-hierarchy-cell"><a class="k-icon k-plus" href="\\#" tabindex="-1"></a></td>');
+
+        for (idx = 0; idx < length; idx++) {
+            column = columns[idx];
+
+            var colTempl = "<td" + gridStringifyAttributes(column.attributes) + " role='gridcell'>";
+            colTempl += that._cellTmpl(column, state);
+            colTempl += "</td>";
+            colTempls.push(colTempl);
+        }
+
+        for (var i = 0; i < colTempls.length; i++) {
+            if (map && map[i] != null) {
+                rowTemplate += colTempls[map[i]];
+            } else rowTemplate += colTempls[i];
+        }
+
+        rowTemplate += "</tr>";
+
+        return kendo.template(rowTemplate, settings);
+    }
+
+    function gridSwapElements(holder, selector, map, transformHandler, moveLast2First) {
+        var nodes = holder.find(selector), lst = [], lst0 = [];
+
+        for (var k = 0; k < nodes.length; k++) {
+            lst0.push(nodes[k]);
+        }
+
+        if (moveLast2First) lst0.unshift(lst0.pop());
+
+        for (var i = 0; i < lst0.length; i++) {
+            if (map[i] != null) {
+                var node = lst0[map[i]];
+                if (transformHandler) transformHandler(i, node);
+                lst.push({ node: node, html: $(node).html() });
+            } else lst.push({ node: lst0[i], html: $(lst0[i]).html() });
+        }
+
+        holder.html('');
+        lst.forEach(function (itm) { holder.append($(itm.node).html(itm.html)); });
+    }
+
+    function gridChangeColumnTitle(id, index, title) {
+        var grid = $('#' + id).data('kendoGrid');
+        if (grid.columns.length > index) {
+            var col = grid.columns[index];
+            col.title = grid.options.columns[index].title = title;
+            $('th.k-header[data-field=' + col.field + ']', grid.thead)
+                .attr('data-title', title)
+                .find('.k-link').html(title);
+        }
+    }
+
+    function gridInitErrMsgEvent(grid) {
+        $('.error[data-valmsg-for]', grid.element).unbind('click').click(function () {
+            $(this).html('');
+        });
+    }
+
+    function kendoGetResultError(result) {
+
+        if (result && result.Status != 0 && !result.Errors) return result.Message;
+        if (!result || !result.Errors) return null;
+
+        var keys = Object.keys(result.Errors);
+
+        if (keys.length == 0 || result.Errors[keys[0]].errors.length == 0) return null;
+
+        return result.Errors[keys[0]].errors[0];
+    }
+
+    function gridShowMessage(grid, selector, message, status) {
+        var msg = $(selector);
+        var showMsg = function() {
+            admincommon.addMessageClass(msg, status);
+            msg.slideDown(700).find('.nNote').html(message);
+            //grid.showMessageTimerId = setTimeout(function() {
+            //    msg.slideUp(700).find('.nNote');
+            //    grid.showMessageTimerId = null;
+            //}, 7000);
+        };
+        msg.unbind('click').click(function () {
+            $('.nNote', msg).html("");
+            msg.slideUp(700);
+        });
+        if (grid.showMessageTimerId) clearTimeout(grid.showMessageTimerId);
+        if (msg.is(':visible')) msg.slideUp(700, showMsg);
+        else showMsg();
+    }
+
+</script>
+
+@helper RenderCmdButtons(string extraButtonsHtml)
+{
+    <ul class="wr_submit_top form-action-menu">
+        @Html.Raw(extraButtonsHtml)
+        @if (ViewBag.ShowEditBtn == null || ViewBag.ShowEditBtn)
+        {
+            <li><input type="button" id="btn_save" value="@Html.Raw(StringTable.Save)" class="btn_save" /></li>
+            if (ViewBag.ShowDeleteBtn != null && ViewBag.ShowDeleteBtn)
+            {
+                <li><input type="button" id="btn_delete" value="@Html.Raw(StringTable.Delete)" class="btn_delete" /></li>
+            }
+            <li><input type="button" id="btn_reset" value="@Html.Raw(StringTable.Reset)" class="btn_reset" /></li>
+        }
+        <li><input type="reset" class="btn_cancel" value="@Html.Raw(StringTable.Cancel)" /></li>
+    </ul>
+}
+
+<section class="out_main @(!isFrontEnd ? "bg_col_left_eshop" : "")" style="@(isFrontEnd ? "min-width:776px;" : "")">
+    <section class="wr_top_action">
+        <section class="top_breadcrumb">
+            @if (isFrontEnd)
+            {
+                var reController = QParam.GetReController() ?? controller;
+                var selItem = BaseController.Names.FirstOrDefault(x => x.Controller.EqualsIgCase(reController));
+                if (selItem != null)
+                {
+                    <script type="text/javascript">$('#admin-home-title').html('@("Manage".ModLocalize() + " " + selItem.Name.ModLocalize().ToLower())');</script>
+                }
+            }
+        </section>
+        @if (!isFrontEnd)
+        {
+            <div class="exshrink click_full full" data-expand-title="@("Expand".Localize("Expand"))" data-shrink-title="@("Shrink".Localize("Shrink"))" title="@("Expand".Localize("Expand"))">&nbsp;</div>
+        }
+    </section>
+    <!--end wr_top_action-->
+    <section class="wr_content_all">
+        <section class="wr_left eshop_Left" style="float: left;@(isFrontEnd ? "display:none" : "")">
+            @{ Html.RenderPartial("~/Claw/Sites/Default/Modules/" + ModuleMgr.Name + "/Admin/Layout/_MenuLeftControl.cshtml", StringTable.MenuLeftKey); }
+        </section>
+        <section class="wr_right eshop_Right" style="@(isFrontEnd ? "margin-left:0px !important" : "")">
+            @if (ViewBag.OrderDetail == null || ViewBag.OrderDetail == false)
+            {
+                <section style="min-width: 600px; float: left; height: 45px;">
+                    <h2 class="title_top" style="float: left; margin-top: 5px;@(isFrontEnd ? "display:none" : "")">
+                        @RenderSection("MainTitleSection", false)
+                    </h2>
+                    @RenderCmdButtons(extraButtonsHtml)
+                </section>
+
+                <section class="wr_breadcrumb" style="@(isFrontEnd ? "display:none" : "")">
+                    <a href="/" class="home"></a><i class="dot_bre"></i>
+                    <a href="@(ViewBag.ParentBreadcrumbLink ?? Html.Claw().SiteUrls().DefaultAdminUrl())">
+                        @(ViewBag.ParentBreadcrumbTitle ?? StringTable.Admin)
+                    </a>
+                    <i class="dot_bre"></i>
+                    @*<a id="aroles" class="current" href="/eshop/category">
+                        @RenderSection("CurrentTitleSection", false)
+                        </a>*@
+                    @*<a href="/admin/modules/eshop/category/"></a>*@
+                    @RenderSection("CurrentTitleSection", false)
+                    <i class="dot_bre"></i>
+                    <a id="aroles" class="current">
+                        @RenderSection("TabTitleSection", false)
+                    </a>
+                </section>
+            }
+            else
+            {
+                @RenderSection("TabOrderDetail", false)
+            }
+            <section class="row_content">
+                <section class="wr_clo1">
+                    <section class="row_content">
+                        @*<section class="wr_box_all">
+                                <h3 style="margin-bottom:3px">
+                                    @RenderSection("TabTitleSection", false)
+                                </h3>
+                        </section>
+                        <section style="float: left; width: 100%; height: 21px; margin-left: 3px;">
+                                <section id="input-err-msg-box" style="position: absolute; height: 0px; min-width: 472px">
+                                    <section id="massage" class="show_massage" style="display:none;" data-status="@TempData["ActionStatus"]">
+                                        <span id="show_error" class="nNote">@ViewBag.Message</span>
+                                    </section>
+                                </section>
+                         </section>*@
+                        <section id="input-err-msg-box">
+                            <section id="massage" class="show_massage" style="display:none;" data-status="">
+                                <span id="show_error" class="nNote"></span><a title="@StringTable.Close" class="close" href="javascript:void(0)">X</a>
+                            </section>
+                        </section>
+                        <input id="editform-change-state" type="text" style="display: none;" value="0" />
+                        @RenderBody()
+                        <script type="text/javascript">
+                            (function() {//resolve F5 button
+                                if (document.getElementById('editform-change-state').value != '0')
+                                    $(function() { location.href = location.href; });
+                                else {
+                                    var form = document.getElementById('editForm');
+                                    if (form && form.reset) form.reset();
+                                }
+                            })()
+                        </script>
+                    </section>
+                </section>
+            </section>
+            @if (ViewBag.OrderDetail == null || ViewBag.OrderDetail == false)
+            {
+                <section class="wr-top-eshop" style="height: 50px;">
+                    @RenderCmdButtons(extraButtonsHtml)
+                </section>
+            }
+            <section class="clear_fix"></section>
+        </section>
+        <section class="clear_fix"></section>
+    </section>
+    <!--end wr_content-->
+    <section class="clear_fix"></section>
+</section>
+
+@if (ViewBag.ParentBreadcrumbLink != null)
+{
+    <script type="text/javascript">
+        $(function () {
+            //if ($('li a.active', '.eshop_Left ul.eshop_menu').length == 0)
+            $('li a[href="@ViewBag.ParentBreadcrumbLink"]', '.eshop_Left ul.eshop_menu').addClass('active');
+        });
+
+    </script>
+}
+
+@if (!PermissionMgr.CurrentUser.IsAdmin())
+{
+    var perm = PermissionMgr.CurrentPerm;
+    <script type="text/javascript">
+        var catalogView = @(perm.CatalogView ? 1 : 0), promotionView = @(perm.PromotionView ? 1 : 0), orderView = @(perm.OrderView ? 1 : 0);
+        $('li a.set,li a.act-log', '.eshop_menu').closest('li').hide();
+        if (!catalogView)$('li a.pro,li a.emarket', '.eshop_menu').closest('li').hide();
+        if (!promotionView)$('li a.dis', '.eshop_menu').closest('li').hide();
+        if (!orderView)$('li a.oder,li a.cus', '.eshop_menu').closest('li').hide();
+        
+        $('li a[href="/admin"]', '#adTopMenu').closest('li').hide();
+    </script>
+
+    if (!PermissionMgr.CurrentUser.HasUserPermission())
+    {
+        <script type="text/javascript">
+            $('a[href="/admin/users/updateprofile"],a[href="/admin/users/changepw"]', '.top-nav .sub.sub_user').closest('li').hide();
+        </script>
+    }
+}
+
+<script type="text/javascript">
+
+    var prevActionStatus = '@TempData["ActionStatus"]';
+    var prevActionMsg = '@Html.Raw((ViewBag.Message ?? (TempData["ActionMessage"] ?? "")).ToString().Replace("'", @"\'"))';
+
+    if (prevActionStatus && prevActionMsg) setTimeout(function () { admincommon.showMessage(prevActionMsg, prevActionStatus); }, 2000);
+
+    function kendoDropDownHideItems(node, hiddens, valueSelector) {
+        var nodeKd = node.data('kendoDropDownList'), itemDic = {};
+
+        if (hiddens != null)
+            hiddens.forEach(function (itm) { itemDic[itm] = true; });
+
+        $('li.k-item', nodeKd.ul).each(function () {
+            var valTxt = (valueSelector ? $(this).find(valueSelector) : $(this)).html();
+            if (itemDic[valTxt]) $(this).hide();
+            else $(this).show();
+        });
+    }
+
+</script>
+
+<script type="text/x-kendo-template" id="change-content-confirmation">
+    <div id="modal">
+        <p class="prompt-mess">@StringTable.ConfirmSave</p>
+        <div class="wr_bottom_popup_s">
+            <section class="wr_btn_pp">
+                <button class="btnYes btn_yes" type="button">@StringTable.Yes</button>
+            </section>
+            <section class="wr_btn_pp">
+                <button class="btnNo btn_no" type="button">@StringTable.No</button>
+            </section>
+        </div>
+    </div>
+</script>
+
+<script type="text/x-kendo-template" id="delete-confirmation">
+    <div id="modal">
+        <p class="prompt-mess">@Html.Raw(StringTable.ConfirmDelete)</p>
+        <div class="wr_bottom_popup_s">
+            <section class="wr_btn_pp">
+                <button class="delete-confirm btn_delete" type="button">@(StringTable.Delete)</button>
+            </section>
+            <section class="wr_btn_pp">
+                <button class="delete-cancel btn_cancel" type="button">@(StringTable.Cancel)</button>
+            </section>
+        </div>
+    </div>
+</script>
+
+@if (ViewBag.UseUploadFile != null && ViewBag.UseUploadFile)
+{
+    <script src="~/Scripts/claw/ajaxfileupload.js"></script>
+    <script type="text/javascript">
+
+        function doUploadFile(postUrl, uploadId, waitImgId, args, onResult) {
+
+            var waitImg = $('#' + waitImgId);
+            if (waitImg.is(':visible')) return;
+            else waitImg.show();
+
+            $.ajaxFileUpload({
+                url: urlInjectFocusLang(postUrl),
+                data: args,
+                dataType: "json",
+                contentType: "application/json; charset=utf-8",
+                fileElementId: uploadId,
+                success: function (result) {
+                    if (result.Status == 0) {
+                        if (onResult) onResult(result);
+                    } else if (result.Message != null) admincommon.showMessageDefault(result.Message, result.Status);
+                },
+                error: function (data, status, e) {
+                    admincommon.showMessageDefault('@(StringTable.AjaxCommandErrorMessage)', '@(ActionResultStatus.Fail)');
+                },
+                complete: function (data, status, e) {
+                    waitImg.hide();
+                }
+            });
+        };
+
+        function validFileExtension(node, attrRegex, errSelector, attrErrMsg) {
+            var errMsg = node.closest(errSelector).find('.file-ext-error');
+            var regex = new RegExp(node.attr(attrRegex), "ig");
+
+            if (!regex.test(node.val())) {
+                errMsg.html(node.attr(attrErrMsg) + ' (' + node.val() + ')');
+                errMsg.show(); return false;
+            }
+            else errMsg.hide();
+
+            return true;
+        }
+    </script>
+}
+
+@if (ViewBag.UseListView != null && ViewBag.UseListView)
+{
+    <style type="text/css">
+        .listview-item {
+            float: left;
+            margin: 2px 4px 5px 0px;
+        }
+
+        .listview-item .title {
+            overflow: hidden;
+            width: @(ViewBag.ListViewItemWidth ?? 100)px;
+            height: 1.3em;
+            margin-top: 2px;
+        }
+
+        .listview-item .frame {
+            display: table-cell;
+            vertical-align: middle;
+            text-align: center;
+            background-color: rgba(100, 100, 100, 0.20);
+            border: 1px solid rgba(50, 50, 50, 0.20);
+            width: @(ViewBag.ListViewItemWidth ?? 100)px;
+            height: @(ViewBag.ListViewItemHeight ?? 100)px;
+        }
+
+        .listview-item:hover .frame {
+            background-color: rgba(0, 0, 100, 0.50);
+        }
+
+        .listview-item .item.selected {
+            border: 1px solid #F35800;
+        }
+
+        .listview-item img {
+            border-width: 0px;
+            display: block;
+            margin: 0 auto;
+            max-width: @(ViewBag.ListViewItemWidth ?? 100)px;
+            max-height: @(ViewBag.ListViewItemHeight ?? 100)px;
+        }
+
+        .listview-item .del-box {
+            float: right;
+            background-color: gray;
+            cursor: pointer;
+        }
+
+        .listview-item a:link {
+            color: white;
+            text-decoration: none;
+        }
+
+        .listview-item a:hover {
+            color: red;
+            text-decoration: none;
+        }
+
+        .listview-item .mask {
+            visibility: hidden;
+            position: absolute;
+            border: 1px solid transparent;
+            background-color: rgba(0, 0, 100, 0.50);
+            width: @(ViewBag.ListViewItemWidth ?? 100)px;
+            height: @(ViewBag.ListViewItemHeight ?? 100)px;
+        }
+
+        .listview-item:hover .mask {
+            visibility: visible;
+        }
+
+    </style>
+    <script type="text/x-kendo-template" id="img-template">
+        <li class="listview-item" title="#:Title#" data-key="#:Key#">
+            <div class="mask">
+                <div class="del-box">
+                    <a href="javascript:;" title="@StringTable.Delete">&nbsp;X&nbsp;</a>
+                </div>
+            </div>
+            <div class="frame item">
+                <img src="#:Url#" alt="#:Title#" />
+            </div>
+            <div class="title">#:Title#&nbsp;</div>
+        </li>
+    </script>
+    <style type="text/css">
+        .listview-item td .del-box {
+            visibility: hidden;
+            height: 0px;
+            font-size: 0px;
+            position: absolute;
+        }
+
+        .listview-item:hover td .del-box {
+            visibility: visible;
+            height: inherit;
+            font-size: inherit;
+        }
+
+        .listview-item td div.item {
+            border: 1px solid transparent;
+            height: 1.7em;
+            max-width: 150px;
+            overflow: hidden;
+            background-color: grey;
+            padding: 2px 4px 0px 4px;
+            cursor: default;
+        }
+
+        .listview-item:hover div.item {
+            background-color: rgba(0, 0, 100, 0.50);
+        }
+    </style>
+    <script type="text/x-kendo-template" id="file-template">
+        <li class="listview-item" title="#:Title#" data-key="#:Key#">
+            <table>
+                <tr>
+                    <td>
+                        <div class="item" title="#:FileName#" data-url="#:Url#">#:FileName#</div>
+                        <div class="title">#:Title#&nbsp;</div>
+                    </td>
+                    <td style="vertical-align:top;">
+                        <div style="width:1em;margin-right:2px;">
+                            <div class="del-box">
+                                <a href="javascript:;" title="@StringTable.Delete">&nbsp;X&nbsp;</a>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            </table>
+        </li>
+    </script>
+    <script type="text/javascript">
+
+        function listViewFormFieldChange(node, type, listViewId, formDataKeyAttr) {
+            var keyVal = $(node).closest('.multi-lang-item-form').attr(formDataKeyAttr);
+            var data = kendoListViewGetItem(listViewId, 'data-key', keyVal);
+
+            if (data && type == 'Title') {
+                data.Model.Title = $.trim($(node).val());
+                data.Element.find('.title').html(data.Model.Title + '&nbsp;');
+                data.Element.find('img').attr('alt', data.Model.Title);
+                data.Element.attr('title', data.Model.Title);
+            }
+        }
+
+        function kendoListViewOnOffPager(id) {
+            var listView = $('#' + id).data('kendoListView');
+
+            if (listView.dataSource.total() <= listView.dataSource.options.pageSize) {
+                listView.pager.element.hide();
+            } else listView.pager.element.show();
+
+            listView.pager.element.addClass('listview-pager');
+
+            setTimeout(function () {
+                $('#' + id + ' .listview-item table .item').each(function () {
+                    var par = $(this).parent();
+                    if (par.length > 0 && par[0].offsetWidth) {
+                        $(par[0]).find('.title').css('width', par[0].offsetWidth);
+                    }
+                });
+            }, 100);
+        }
+
+        function kendoListViewRefreshPager(id) {
+            var listView = $('#' + id).data('kendoListView');
+            if (listView.pager.page() > listView.pager.totalPages()) {
+                listView.pager.page(listView.pager.totalPages());
+            }
+        }
+
+        function kendoListViewAddItem(id, item, argTag, cmdUrl, cmdArgs, formListSelector, itemSelector, itemAttr) {
+
+            ajaxCmd(cmdUrl, cmdArgs,
+                function (result, customTag) {
+                    if (result && result.length > 0) {
+                        var data = $('#' + id).data('kendoListView').dataSource.data();
+                        var formLst = $(formListSelector);
+                        data.unshift(customTag.item);
+                        formLst.append(result);
+                        formUpdateValidRules(formLst.find('.multi-lang-item-form').last());
+                        $('#' + id + ' li').each(function () {
+                            if ($(this).find(itemSelector).attr(itemAttr) == customTag.tag) {
+                                $(this).click();
+                            }
+                        });
+                    }
+                    else {
+                        admincommon.showMessageDefault('@(StringTable.ErrLimitCountMessage)', '@(ActionResultStatus.Fail)');
+                    }
+                }, { tag: argTag, item: item });
+        }
+
+        function kendoListViewBindDelBtn(id, btnTag, formSelector, formKeyAttr, langTabSelector, getKeyHandler) {
+            $('#' + id + ' li').each(function () {
+                $(this).find(btnTag).unbind('click').click(function () {
+                    var listView = $('#' + id).data('kendoListView');
+                    var data = listView.dataSource.data();
+                    var item = $(this).closest('li');
+                    var row = listView.dataSource.getByUid(item.attr('data-uid'));
+                    $(formSelector).each(function () {
+                        if ($(this).attr('data-id') == row.Id && $(this).attr(formKeyAttr) == getKeyHandler(row)) {
+                            data.remove(row);
+                            kendoListViewRefreshPager(id);
+                            var input = $(this).find('input,textarea');
+                            input.val(''); input.attr('datavalid', 0);
+                            if ($(this).is(':visible')) {
+                                $(langTabSelector).hide();
+                            }
+                            $(this).hide();
+                        }
+                    });
+                });
+            });
+        }
+
+        function kendoListViewBindItemClick(id, itemSelector, formSelector, formKeyAttr, langTabSelector, getKeyHandler) {
+            $('#' + id + ' li').unbind('click').click(function () {
+                var selUId = $(this).attr('data-uid');
+                $('#' + id + ' li').each(function () {
+                    var itm = $(this).find(itemSelector);
+                    if (selUId == $(this).attr('data-uid')) itm.addClass('selected');
+                    else itm.removeClass('selected');
+                });
+
+                var listView = $('#' + id).data('kendoListView');
+                var row = listView.dataSource.getByUid(selUId);
+                $(formSelector).each(function () {
+                    if ($(this).attr('data-id') == row.Id && $(this).attr(formKeyAttr) == getKeyHandler(row)) {
+                        //$(this).show(); $(langTabSelector).show();
+                        var langCode = activeLang;//$(langTabSelector).find('.langItem.selected').attr('data-lang');
+                        multilangformSetActive($(this), langCode, formSelector, '.lang_form', langTabSelector);
+                    }
+                    else $(this).hide();
+                });
+            });
+        }
+
+        function multilangformSetActive(itemFormNode, langcode, formListSelector, langFormSelector, langTabSelector) {
+            //console.log(itemFormNode);
+            if (itemFormNode.length == 0) return;
+
+            $(formListSelector).each(function () { $(this).hide(); });
+            var langTabItems = $(langTabSelector).find('.langItem');
+            //console.log(itemFormNode.find(langFormSelector));
+            itemFormNode.find(langFormSelector).each(function () {
+                if ($(this).attr('data-lang') == langcode) {
+                    $(this).show();
+                    itemFormNode.show();
+                    $(langTabSelector).show();
+                }
+                else {
+                    $(this).hide();
+                    multilangformMarkDataStatusEx($(this), langTabItems);
+                }
+            });
+        }
+
+        function multilangformMarkDataStatusEx(langForm, langItems) {
+
+            var langCode = langForm.attr('data-lang');
+
+            langItems.each(function () {
+                if ($(this).attr('data-lang') == langCode) {
+                    if (langFormIsEmpty(langForm)) {
+                        $(this).find('i').removeClass('dot_flag');
+                    }
+                    else $(this).find('i').addClass('dot_flag');
+                }
+            });
+        }
+
+        function kendoListViewGetItem(id, keyAttr, keyValue) {
+
+            var listView = $('#' + id).data('kendoListView'), fItem = null;
+
+            $('#' + id + ' li').each(function () {
+                var uId = $(this).attr('data-uid');
+                if ($(this).attr(keyAttr) == keyValue) {
+                    fItem = { Element: $(this), Model: listView.dataSource.getByUid(uId) };
+                }
+            });
+
+            return fItem;
+        }
+
+    </script>
+}
+
+<script type="text/javascript">
+
+    function mapAction(action, autoController) {
+        @{ var mapQArgs = new QParam(); }
+
+        if (autoController) {
+            @{ mapQArgs.Id = mapQArgs.ReId; mapQArgs.ReId = null;}
+            return '@ModuleUrl.AdminUrl(QParam.GetReController() ?? controller, "")/' + action + '@Html.Raw(mapQArgs.ToString(false, true))';;
+        }
+        else {
+            @{ mapQArgs.Id = null;}
+            return '@ModuleUrl.AdminUrl(controller, "")/' + action + '@Html.Raw(mapQArgs.ToString(false, true))';
+        }
+    }
+
+    $().ready(function () {
+        initValidateInput();
+
+        $('#editForm').attr('action', $('#editForm').attr('action') + '@Html.Raw(QParam.Args(false, false))');
+
+        $('.btn_save').click(function () {
+            focusInputs();
+
+            var retCode = validateSubmit(null, null, function (emptyLForms) {
+                var dialog = new ClawDialog('modal-mask');
+                var title = '@StringTable.Confirmation';
+                var content = $('#popupAutoFillLangForm').html();
+                var kendoWindow = dialog.showDialog(title, content, 350, 150);
+                var promptMsg = kendoWindow.find('.prompt-mess');
+
+                var langNames = '';
+                emptyLForms.each(function () {
+                    langNames += (langNames.length == 0 ? '' : ', ') + $(this).attr('data-lang-name');
+                });
+
+                promptMsg.html(promptMsg.html().replace('{0}', langNames));
+
+                kendoWindow.find('.btn_yes').click(function () {
+                    var activeLForm = $('#lang-form-list .lang_form[active-lang=1]');
+                    emptyLForms.each(function () { langFormCopy(activeLForm, $(this)); });
+                    dialog.close();
+
+                    if (validateSubmit()) { admincommon.showMask(); $('#editForm')[0].submit(); }
+                    else $(this).focus();
+                });
+                kendoWindow.find('.btn_no').click(function () { dialog.close(); });
+            });
+
+            if (retCode == 1) {
+                admincommon.showMask(); $('#editForm')[0].submit();
+            } else $(this).focus();
+        });
+
+        $('.form-action-menu .btn_delete').click(function () {
+            var dialog = new ClawDialog("modal-mask");
+            var kendoWindow = dialog.showDialog("@(StringTable.Confirmation)", $("#delete-confirmation").html(), 350, 150);
+
+            kendoWindow.find(".delete-cancel").click(function () { dialog.close(); });
+            kendoWindow.find(".delete-confirm").click(function () {
+                $.ajax({
+                    url: mapAction('delete', false),
+                    type: "POST",
+                    contentType: "application/json; charset=utf-8",
+                    data: JSON.stringify([{ id: $('#Id', '#editForm').val(), grid: '' }]),
+                    beforeSend: function () { dialog.close(); admincommon.hideMessage(); admincommon.showMask(); },
+                    success: function (result) {
+                        if (result.Status == 0) $(location).attr('href', mapAction('index', true));
+                        else if (result.Message) admincommon.showMessageDefault(result.Message, result.Status);
+                    },
+                    error: function (errorResult) { admincommon.showMessageDefault('@(StringTable.AjaxDeleteErrorMessage)', '@(ActionResultStatus.Fail)'); },
+                    complete: function () { admincommon.hideMask(); }
+                });
+            });
+        });
+
+        $('.form-action-menu .btn_reset').click(function () {
+            var form = $('#editForm')[0], validator = $(form).validate(); form.reset(); focusInputs();
+
+            $(form).getFormFields('textarea').each(function (i, e) {
+                var val = $(e).val(); var editor = CKEDITOR.instances[e.id];
+                if (editor != null) editor.setData(val);
+            });
+
+            var fields = $(form).getFormFields(), arrInputs = [];
+            for (var i = 0; i < fields.length; i++) {
+                var element = $(fields[i]);
+                if (element.is('input:text,input:radio,input:checkbox,textarea,select')) {
+                    if (element.attr('id')) arrInputs.push(element.attr('id'));
+                }
+            }
+
+            setTimeout(function () {
+                arrInputs.forEach(function (itm) { $('#' + itm).change(); });
+            }, 500);
+
+            $('.field-validation-error:parent').html('');
+            focusInputs();
+
+            $(this).focus();
+
+            admincommon.hideMessage();
+
+            if (!$(form).valid()) validator.hideThese(validator.toShow);
+
+            setTimeout(function () {
+                for (var i = 0; i < form.length; i++) {
+                    var element = $(form[i]);
+                    if (element.is('input[type!=hidden],textarea,select')) {
+                        showRequireAsterisk(element, false);
+                        if (!element.valid()) validator.hideThese(validator.toShow);
+                    }
+                }
+            }, 1000);
+        });
+       
+        
+        $('.form-action-menu .btn_cancel').click(function () {
+            if ('@(isFrontEnd)' === 'True') {
+                if (parent != null && parent.jQuery.fancybox != null) {
+                    parent.jQuery.fancybox.close();
+                }
+            }else $(location).attr('href', mapAction('index', true));
+        });
+
+        initFieldLeftCharCountStat();
+        initUrlHandle();
+    });
+
+    function initUrlHandle(holder) {
+        $('input.url-handle', holder).change(function () {
+            var urlLangs = JSON.parse(@Html.Raw(Json.Encode(ModuleUrl.GetFrontEndViewUrls(controller, "", Model))));
+            var url = location.origin + urlLangs[$(this).attr('lang')];
+            url = url.substring(0, url.length - 1) + $.trim($(this).val());
+            $('.url-handle', $(this).closest('.lang_form')).each(function() {
+                if (!$(this).is('input')) $(this).attr('href', url).text(url);
+            });
+        }).change();
+    }
+
+    function initFieldLeftCharCountStat(owner) {
+        $('.text-eshop-ita-2.char-count-stat', owner).each(function () {
+            var label = $(this);
+            var node = $(this).closest('.controls').find('input[type=text]');
+
+            var updateText = function () {
+                var maxlen = node.attr('data-val-length-max'), val = node.val();
+                var text = '@StringTable.CharLeftHint';
+                label.text(text.replace('{0}', val.length).replace('{1}', maxlen));
+            };
+
+            node.keyup(function () { updateText(); });
+            updateText();
+        });
+    }
+
+    function initValidateInput(formNode) {
+        var arr = (formNode ? formNode.find('.js-required') : $('.js-required'));
+        arr.change(function (event) {
+            var ele = $(event.target);
+            if (ele.length > 0) {
+                var rule = $.validator.staticRules(ele[0]);
+                if (rule && rule.required) {
+                    var errNode = ele.closest('section').find('.error');
+                    if (getInputVal(ele).length == 0) errNode.show();
+                    else errNode.hide();
+                }
+            }
+        });
+    }
+
+    function validateSubmit(formNode, remoteValid, emptyLangFormHandler) {
+
+        $('.field-validation-error:parent', formNode || $('#editForm')).html('');
+
+        enableRemoteValidate = (remoteValid == null ? true : remoteValid);
+        firstErrorInputElement = null;
+
+        var editForm = $('#editForm');
+        var arrInputs = (formNode ? formNode.find('input:text,textarea') : editForm.getFormFields('input:text,textarea'));
+
+        arrInputs.each(function () {
+            trimInputVal($(this));
+            inputCopyValid($(this), true);
+        });
+
+        var langFormValid = null, activeForm = null, dataForm = null, emptyLangForms = [];
+        var arrForms = (formNode ? formNode : $('#lang-form-list .lang_form'));
+        arrForms.each(function () {
+            var zeroId = $(this).find('.lang_form_id').val() == '0'; var count = 0;
+            var isActiveForm = ($(this).attr('active-lang') == '1');
+
+            $(this).find('.lang_form_field[type!=hidden]').each(function () {
+                var value = getInputVal($(this));
+
+                if (($(this).hasClass('bool-def-false') && value == 'false')
+                    || ($(this).hasClass('bool-def-true') && value == 'true')) value = '';
+
+                if (!$(this).hasClass('no-empty-check') && value.length != 0) count++;
+            });
+
+            $(this).find('.js-required').each(function () {
+                $(this).attr('datavalid', count == 0 && !isActiveForm && !formNode ? 0 : (zeroId ? 2 : 1));
+            });
+
+            if ($(this).is(':visible')) activeForm = $(this);
+
+            if (count != 0) {
+                if (zeroId) dataForm = $(this);
+                else langFormValid = $(this);
+            } else {
+                $(this).find('.field-validation-error:parent').html('');
+                if (!formNode) emptyLangForms.push(this);
+            }
+        });
+
+        if (!langFormValid && (dataForm || activeForm)) {
+            (dataForm ? dataForm : activeForm).find('.js-required').each(function () {
+                $(this).attr('datavalid', 2);
+            });
+        }
+
+        var valid = true; var form = editForm[0]; var lastErrInput = null, lastErrRequiredField = false, firstErrInput = null;
+        var arrRequire = (formNode ? formNode.find('.js-required') : editForm.getFormFields('.js-required'));
+        arrRequire.each(function () {
+            var datavalid = $(this).attr('datavalid');
+            if (getInputVal($(this)).length == 0 && (!datavalid || datavalid != '0')) {
+                showRequireAsterisk($(this), true, false);
+                lastErrRequiredField = true; valid = false;
+                if (!lastErrInput || $(this).closest('.lang_form').css('display') != 'none') {
+                    lastErrInput = $(this); if (!firstErrInput) firstErrInput = $(this);
+                }
+            } else showRequireAsterisk($(this), false);
+        });
+
+        if (!formNode && form.customValidFields) valid = form.customValidFields() && valid;
+
+        var chkForm = (formNode ? formNode : $(form));
+        var arrFValidPar = (formNode ? formNode.find('.field-validation-error:parent') : $('.field-validation-error:parent'));
+
+        if (chkForm.length != 0) {
+            var fields = chkForm.getFormFields();
+            for (var i = 0; i < fields.length; i++) {
+                var element = $(fields[i]), datavalid = element.attr('datavalid');
+                var optField = !element.hasClass('js-required') && element.is('input:text,textarea,input[type=number]');
+                var optFHasVal = optField && element.val().length > 0;
+                if (!element.is('form') && (!datavalid || datavalid != '0' || optFHasVal) && !element.valid()) {
+                    valid = false; showRequireAsterisk(element, true, false);
+                    if (!lastErrInput || element.closest('.lang_form').css('display') != 'none') {
+                        lastErrInput = element; if (!firstErrInput) firstErrInput = element;
+                    }
+                }
+            }
+        }
+
+        arrInputs.each(function () { inputCopyValid($(this), false); });
+
+        enableRemoteValidate = true;
+
+        if (valid && arrFValidPar.find('span').length == 0) {
+            var lfVisibles = $(emptyLangForms).find('.lang_form_visible[value=True]');
+            if (lfVisibles.length > 0) {
+                if (emptyLangFormHandler) emptyLangFormHandler(lfVisibles.closest('.lang_form'));
+                return 2;
+            }
+            return 1; //true
+        }
+        else {
+            showFailedValidMsg(lastErrRequiredField);
+            if (!lastErrInput && arrFValidPar.length > 0) {
+                lastErrInput = inputFromErrSpan($(arrFValidPar[0]));
+            }
+            console.log('valid-failed', lastErrRequiredField, lastErrInput);
+            var errLangForm = (lastErrInput ? lastErrInput.closest('.lang_form') : null);
+            if (errLangForm && errLangForm.length != 0) langFormFocus(errLangForm);
+
+            firstErrorInputElement = lastErrInput = firstErrInput || lastErrInput;
+
+            if (lastErrInput) setTimeout(function () { focusInput(lastErrInput); }, 2000);
+
+            return 0;//false;
+        }
+    }
+
+    function focusInputs() {
+        //$('#editForm').getFormFields('input:text').each(function () { $(this).focus(); });
+    }
+
+    function focusInput(node) {
+        if (node.is(':visible')) node.focus();
+        else {
+            if (node.hasClass('kendo-dropdownlist')) node.closest('.k-dropdown').focus();
+            else if (node.hasClass('kendo-numeric'))
+                node.closest('.k-numerictextbox').find('input').focus();
+            else console.log('focusInput skip hidden input');
+        }
+    }
+
+    function trimInputVal(node) {
+
+        if (node.is('input:text,textarea')) {
+            node.val($.trim(node.val()));
+        }
+    }
+
+    function inputCopyValid(node, isCopy) {
+        if (node.is('textarea') && isNodeCKEditor(node)) {
+            if (isCopy) {
+                node.attr('valid-origin-val', node.val());
+                node.val(getInputVal(node));
+            } else node.val(node.attr('valid-origin-val'));
+        }
+    }
+
+    function getInputVal(node) {
+        if (isNodeCKEditor(node)) {
+            var ckNode = CKEDITOR.instances[node.attr('id')];
+            if (ckNode) {
+                return $.trim(ckNode.getData());
+            }
+        }
+
+        if (node.attr('type') == 'radio') {
+            var radio = $("input:radio[name='" + node.attr('name') + "']:checked");
+            //console.log('get:' + node.attr('id') + ':' + node.attr('name') + ':' + radio.val());
+            return $.trim(radio.val());
+        }
+
+        return $.trim(node.val());
+    }
+
+    function setInputVal(node, value) {
+        if (isNodeCKEditor(node)) {
+            var ckNode = CKEDITOR.instances[node.attr('id')];
+            if (ckNode) { ckNode.setData(value); return; }
+        }
+
+        if (node.attr('type') == 'radio') {
+            var radio = $("input:radio[name='" + node.attr('name') + "'][value=" + value + "]");
+            //console.log('set:'+node.attr('id') +':'+node.attr('name') + ':' + value);
+            radio.prop("checked", true);
+            return;
+        }
+
+        node.val(value);
+    }
+
+    function isNodeCKEditor(node) {
+        return window.CKEDITOR && CKEDITOR.instances &&
+        (
+            node.hasClass('ckeditor_standard') || node.hasClass('sub_ckeditor_standard') ||
+                node.hasClass('ckeditor_simple') || node.hasClass('sub_ckeditor_simple')
+        );
+    }
+
+    function showRequireAsterisk(inputNode, show, focus) {
+        var errSpan = inputNode.closest('section').find(".error:contains('*')");
+        if (show) {
+            errSpan.css('font-weight', 'bold');
+            errSpan.show();
+            if (focus == null || focus) inputNode.focus();
+            console.log('required', inputNode);
+        } else errSpan.hide();
+    }
+
+    function showFailedValidMsg(requiredField) {
+        admincommon.showMessageDefault(requiredField ? '@(StringTable.ErrValidateRequireFieldMsg)' : '@StringTable.ErrValidateFailedMessage', '@(ActionResultStatus.Fail)');
+    }
+
+    function showFailedValidMsgText(requiredField, mgs) {
+        admincommon.showMessageDefault(requiredField ? '@(StringTable.ErrValidateRequireFieldMsg)' : mgs, '@(ActionResultStatus.Fail)');
+    }
+
+    function inputFromErrSpan(node) {
+        return $('#' + node.attr('data-valmsg-id'));
+    }
+
+    function initKendoNumeric(selector, options) {
+
+        var nodes = $(selector);
+
+        nodes.each(function () {
+            
+            $(this).kendoNumericTextBox($.extend({
+                culture: getFocusLang(),
+            }, options || {}));
+
+            var nodeKd = $(this).data('kendoNumericTextBox');
+
+            if (nodeKd) nodeKd.options.originValue = nodeKd.value();
+
+            if ($(this).hasClass('js-required'))
+                $(this).closest('.k-numerictextbox')
+                    .removeClass('js-required')
+                    .find('.js-required:visible').removeClass('js-required');
+        });
+    }
+
+</script>
+
+<script type="text/javascript">
+    var form = $('#editForm')[0];
+
+    form.langFormSwitch = langFormSwitch;
+
+    var uidIseq = 1;
+    $('.row_content_box').each(function () {
+        $(this).attr('data-uid', uidIseq++);
+    });
+
+    $('#lang-form-list').find('.lang_form:visible').each(function () {
+        $(this).attr('active-lang', 1); activeLang = $(this).attr('data-lang');
+    });
+
+    $(".inputLang .langItem .inline-flag").each(function () {
+        var langItem = $(this).closest('.langItem'), contentBox = $(this).closest('.row-content-lang-box');
+        var chkBox = langItem.find('input[type=checkbox]'), cmdBox = langItem.find('.lang-cmd-box');
+
+        chkBox.change(function () {
+            var checked = $(this).prop('checked'), langCode = langItem.attr('data-lang');
+            contentBox.find('.lang_form_visible[lang=' + langCode + ']').val(checked ? 'True' : 'False');
+            if (checked && !langItem.is('.active-lang')) cmdBox.show(); else cmdBox.hide();
+        });
+
+        if (!langItem.is('.active-lang'))
+            $(this).unbind("click").click(function () {
+                if ($(this).closest('ul').hasClass("tab-big-2")) {
+                    langFormTranslate(langItem.attr('data-lang'), langItem);
+                } else langFormTranslate(langItem.attr('data-lang'), langItem);
+            });
+    });
+
+    var anyErrOwnerVisible = false, lastErrHiddenLangForm = null, lastErrInput = null;
+
+    $('.field-validation-error:parent').each(function () {
+        var errLangForms = $(this).closest('.lang_form,.multi-lang-item-form');
+        lastErrInput = inputFromErrSpan($(this));
+        if (errLangForms.length > 0 && form.langFormSwitch) {
+            //$(this).attr('show-err', '1');
+            lastErrHiddenLangForm = $(errLangForms[0]);
+            //form.langFormSwitch($(errLangForms[0]).attr('data-lang'), $(errLangForms[0]));
+        }
+        if (errLangForms.length == 0 || errLangForms.is(':visible')) anyErrOwnerVisible = true;
+    });
+
+    if (!anyErrOwnerVisible && lastErrHiddenLangForm && lastErrInput) {
+        if (lastErrHiddenLangForm.is('.multi-lang-item-form')) lastErrHiddenLangForm.show();
+        else langFormFocus(lastErrHiddenLangForm);
+        setTimeout(function () {
+            lastErrHiddenLangForm.find('input,textarea,select').focus();
+            focusInput(lastErrInput);
+        }, 3000);
+    }
+    else if (lastErrInput) setTimeout(function () { focusInput(lastErrInput); }, 3000);
+
+    function langFormFocus(langform) {
+        //console.log($('.field-validation-error:parent'));
+        var holder = langform.closest('.multi-lang-item-form, #lang-form-list');
+        var langTabs = null;
+        //console.log(holder, langform.is(':visible'), langform.attr('data-lang'));
+        if (holder.length == 0) return;
+
+        if (holder.is('.multi-lang-item-form')) {
+            holder.parent().find('.multi-lang-item-form').each(function () { $(this).hide(); });
+
+            holder.show();
+            langTabs = holder.closest('.row_content_box').find('.lang-tabs');
+            langTabs.show();
+        } else langTabs = $('.tab-big-2');
+
+        if (!langform.is(':visible')) {
+            var langCode = langform.attr('data-lang');
+            var langItem = langTabs.find(".inputLang .langItem[data-lang='" + langCode + "']");
+            setTimeout(function () { langItem.click(); }, 2000);
+        }
+    }
+
+    function langFormMarkDataStatus() {
+        $('#lang-form-list').closest('.row-content-lang-box').find('.tab-big-2 .langItem').each(function () {
+            var langForm = $('#lang-form-list').find('.lang_form[data-lang=' + $(this).attr('data-lang') + ']');
+            var chkBox = $(this).find('input[type=checkbox]'), langVisible = langForm.find('.lang_form_visible');
+            var chkChecked, dataValid = langForm.attr('data-valid');
+            if (dataValid == '1' || !langFormIsEmpty(langForm)) {
+                $(this).find('i').addClass('dot_flag');
+            } else $(this).find('i').removeClass('dot_flag');
+            //console.log('uuu', langVisible.val(), langVisible, langVisible.val() == 'True');
+            chkChecked = (dataValid != '0' || chkBox.prop('disabled') || $(this).is('.active-lang')) && (langVisible.length == 0 || langVisible.val() == 'True');
+            //console.log('uuu2', chkChecked, dataValid, $(this).is('.active-lang'), $(this));
+            //chkBox.prop('checked', chkChecked); 
+            chkBox.change();
+        });
+    }
+
+    $(function () { langFormMarkDataStatus(); });
+
+    function langFormTranslate(langcode, node) {
+        var translateMaxWidth = parseInt('@(ViewBag.TranslateMaxWidth ?? 800)');
+        var translateMaxHeight = parseInt('@(ViewBag.TranslateMaxHeight ?? 520)');
+        var width = (window.innerWidth - 40 <= translateMaxWidth ? window.innerWidth - 40 : translateMaxWidth);
+        var height = (window.innerHeight - 40 <= translateMaxHeight ? window.innerHeight - 40 : translateMaxHeight);
+
+        var ownerbox = node.closest('.row-content-lang-box');
+        var formList = null, activeForm = null, langForm = null, initHandler = null, saveHandler = null;
+
+        if (ownerbox.find('#lang-form-list').length != 0) {
+            formList = $('#lang-form-list');
+            activeForm = formList.find('.lang_form:visible');
+            langForm = formList.find('.lang_form[data-lang=' + langcode + ']');
+            initHandler = function (modal) { };
+            saveHandler = function (modal, formNode) {
+                setTimeout(function () { langFormMarkDataStatus(); }, 500);
+            };
+        }
+        else {
+            var itembox = ownerbox.find('.multi-lang-item-form:visible');
+            activeForm = itembox.find('.lang_form:visible');
+            langForm = itembox.find('.lang_form[data-lang=' + langcode + ']');
+
+            width = 500; height = 240; formList = itembox;
+            initHandler = function (modal) {
+                modal.find(".htmlcontent").css('display', 'inline-block');
+                modal.find(".wcontent").css('text-align', 'center');
+                modal.find(".lang_form_td_full").css('width', 'inherit');
+            };
+
+            closeHandler = function (modal) {
+                modal.find(".lang_form_td_full").css('width', '100%');
+            };
+            saveHandler = function (modal, formNode) {
+                multilangformMarkDataStatusEx(formNode, ownerbox.find('.inputLang .langItem'));
+            };
+        }
+        //console.log(activeForm); console.log(langForm);
+        if (activeForm.length > 0 && langForm.length > 0) {
+            langFormTranslateRaw(formList, activeForm, langForm, width, height, initHandler, saveHandler);
+        }
+    }
+
+    function langFormTranslateRaw(formList, activeForm, langForm, width, height, initHandler, saveHandler) {
+
+        if (!validateSubmit(activeForm, false)) return;
+
+        if (window.clawInitMsTranslator) window.clawInitMsTranslator();
+
+        langForm.find('.lang_form_field').each(function () {
+            $(this).attr('data-init', getInputVal($(this)));
+        });
+
+        var popContent = $("<p>").append(langForm);
+        var popTemplate = $("<div>").html($("#popupFormTemplate").html());
+        popTemplate.find(".htmlcontent").html(popContent.html());
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", langForm.attr('data-lang-name'), popTemplate.html(),
+            width, height, [], null,
+            function (modal) {
+
+                if (initHandler) initHandler(modal);
+
+                var scrollTop = $(window).scrollTop();
+                var reForm = modal.find(".lang_form");
+                var chkForm = reForm.closest('form');
+                var ckArr = modal.find(".sub_ckeditor_standard,.sub_ckeditor_simple");
+                var msgBox = modal.find('#massage.show_massage');
+
+                var initScript = reForm.find("script[type='text/custom-initializer']").html();
+
+                $(window).scrollTop(10000);
+
+                if (initScript && initScript != '') {
+                    try { eval(initScript); }
+                    catch (e) { console.log(e); }
+                }
+
+                initEditor(ckArr); $.validator.unobtrusive.parse("#popupForm");
+
+                langFormRestore(reForm);
+
+                if (langFormIsEmpty(reForm)) langFormCopy(activeForm, reForm);
+
+                var completeScript = reForm.find("script[type='text/custom-complete']").html();
+
+                if (completeScript && completeScript != '') {
+                    try { eval(completeScript); }
+                    catch (e) { console.log(e); }
+                }
+
+                msgBox.hide();
+                //reForm.find("span.error").each(function () {
+                //if ($(this).attr('show-err') == '1') $(this).show(); else $(this).hide();
+                //});
+
+                initValidateInput(reForm);
+                reForm.show(); chkForm.valid();
+                setTimeout(function () { validateSubmit(chkForm); }, 2000);
+
+                $('textarea', reForm).each(function () {
+                    if (!$(this).attr('adjust-width') && !$(this).hasClass('sub_ckeditor_standard') && !$(this).hasClass('sub_ckeditor_simple')) {
+                        var cssWidth = parseInt($(this).css('width'));
+                        if (cssWidth) {
+                            $(this).css({ 'width': (cssWidth - 12) + 'px', 'min-width': '40%' });
+                            $(this).attr('adjust-width', 'true');
+                        }
+                    }
+                });
+
+                modal.find(".btn_save").click(function () {
+                    if (!validateSubmit(chkForm)) return;
+                    termEditor(ckArr);
+
+                    reForm.hide(); msgBox.hide();
+                    reForm.attr('data-valid', langFormIsEmpty(reForm) ? 0 : 1);
+                    if (saveHandler) saveHandler(modal, reForm);
+                    formList.append(reForm);
+                    $('#input-err-msg-box').append(msgBox);
+
+                    //reForm.find("span.error[show-err=1]").attr('show-err', '0');
+
+                    popup.close(); $(window).scrollTop(scrollTop);
+                });
+
+                modal.find(".btn_cancel").click(function () {
+                    termEditor(ckArr);
+                    langFormRestore(reForm);
+                    validateSubmit(chkForm, false);
+                    reForm.hide(); msgBox.hide();
+                    formList.append(reForm);
+                    $('#input-err-msg-box').append(msgBox);
+                    popup.close(); $(window).scrollTop(scrollTop);
+                });
+            });
+    }
+
+    function langFormSwitch(langcode, node) {
+        var ownerbox = node.closest('.row_content_box');
+
+        if (ownerbox.find('#lang-form-list').length != 0) return;
+
+        var senderuid = ownerbox.attr('data-uid');
+        ownerbox.find(".inputLang .langItem").each(function () {
+            if (senderuid == $(this).closest('.row_content_box').attr('data-uid')) {
+                if ($(this).attr('data-lang') == langcode) {
+                    $(this).addClass('selected');
+                    $(this).unbind("click");
+
+                    ownerbox.find('#active-lang-img').attr('src', $(this).find('img').attr('src'));
+                    ownerbox.find('#active-lang-img').attr('alt', $(this).attr('title'));
+                    ownerbox.find('#active-lang-name').html($(this).attr('title'));
+                } else {
+                    $(this).removeClass('selected');
+                    $(this).unbind("click").click(function () {
+                        if ($(this).closest('ul').hasClass("tab-big-2")) {
+                            langFormTranslate($(this).attr('data-lang'), $(this));
+                        }
+                        else langFormSwitch($(this).attr('data-lang'), $(this));
+                    });
+                }
+            }
+        });
+
+        if (senderuid == $('#lang-form-list').closest('.row_content_box').attr('data-uid')) {
+            $('#lang-form-list').find('.lang_form').each(function () {
+                if ($(this).attr('data-lang') == langcode) $(this).show();
+                else $(this).hide();
+            });
+        }
+
+        if (form.CustomLangFormSwitch) form.CustomLangFormSwitch(langcode, node, senderuid);
+    }
+
+    function langFormIsEmpty(node) {
+        var count = 0;
+        node.find('.lang_form_field[type!=hidden]').each(function () {
+            var value = getInputVal($(this));
+
+            if (($(this).hasClass('bool-def-false') && value == 'false')
+                || ($(this).hasClass('bool-def-true') && value == 'true')) value = '';
+
+            if (!$(this).hasClass('no-empty-check') && value.length != 0) count++;
+            //console.log($(this));
+        });
+        //console.log(count == 0);
+        return count == 0;
+    }
+
+    function langFormRestore(node) {
+        node.find('.lang_form_field[type!=hidden]').each(function () {
+            setInputVal($(this), $(this).attr('data-init'));
+        });
+    }
+
+    function langFormCopy(src, dst) {
+        var iseq = 0;
+        src.find('.lang_form_field').each(function () { $(this).attr('data-iseq', iseq++); });
+
+        iseq = 0;
+        dst.find('.lang_form_field').each(function () {
+            if ($(this).attr('type') != 'hidden') {
+                var value = getInputVal(src.find('.lang_form_field[data-iseq=' + iseq + ']'));
+                setInputVal($(this), value);
+            }
+            iseq++;
+        });
+    }
+
+    function langFormValidDependants(node, copySelector, dependantSelector) {
+
+        if (copySelector)
+            $(copySelector).val($(node).val());
+
+        //if (navigator.msPointerEnabled == undefined) {
+        //var scrollPos = $(window).scrollTop();
+        $(dependantSelector).each(function () {
+            var dependNode = this;//oVal = $(this).val(), 
+            //$(this).val(oVal + ' ');
+            //$(this).valid();
+            //$(dependNode).val(oVal);
+            //$(this).focus();
+            formValidateClearOldValue(this);
+            setTimeout(function () { $(dependNode).valid(); }, 100);
+        });
+
+        //if ($(node).hasClass('kendo-dropdownlist')) $(node).data('kendoDropDownList').focus();
+        //else $(node).focus();
+
+        //$(window).scrollTop(scrollPos);
+        //}
+    }
+
+</script>
+
+<script type="text/x-kendo-template" id="popupAutoFillLangForm">
+    <div id="modal">
+        <p class='prompt-mess' style="margin-top:20px">@StringTable.ConfirmAutoFillLangForm</p>
+        <div class='wr_bottom_popup_s'>
+            <section class='wr_btn_pp'>
+                <button class='btn_yes' type='button'>@StringTable.OK</button>
+            </section>
+            <section class='wr_btn_pp'>
+                <button class='btn_no' type='button'>@StringTable.Cancel</button>
+            </section>
+        </div>
+    </div>
+</script>
+
+<script type="text/x-kendo-template" id="popupFormTemplate">
+    <style type="text/css">
+        #popupForm .lang_form { float: left; padding: 0 2%; width:96%; }
+        #popupForm .controls {padding: 0px;margin: 0px;}
+        #popupForm .lang_form .hidden-sec { display:none; }
+        #popupForm .lang_form .left-sec { width:28%; float:left; text-align:right; }
+        #popupForm .lang_form .right-sec { width: 70%;float:right; }
+        #popupForm .lang_form .char-count-stat {display: none;}
+        #popupForm .lang_form .field-row {margin:2px 0;min-height:50px;}
+        #popupForm .lang_form .text-translator {display:block;color:#333;line-height:1.3em;cursor:pointer;}
+        #popupForm .lang_form .text-translator:hover {text-decoration:underline;}
+    </style>
+    <div class="popupBody">
+        <section id="err-message-holder" style="float: left; width: 100%; height: 18px;"></section>
+        <section class="row_content_box kpopup-content">
+            <section class="wr_clo1">
+                <div class="wcontent" style="margin-top: 20px; color: #390F3D;line-height:2em">
+                    <form id="popupForm">
+                        <div class="htmlcontent"></div>
+                    </form>
+                </div>
+            </section>
+            <section class="clear"></section>
+        </section>
+        <section class="row_content_box">
+            <section class="txt_align_c">
+                <section class="wr_btn_pp">
+                    <input type="button" value="@StringTable.Done" class="btn_save" />
+                </section>
+                <section class="wr_btn_pp">
+                    <input type="button" value="@StringTable.Cancel" class="btn_cancel" />
+                </section>
+            </section>
+        </section>
+    </div>
+</script>
+
+<style type="text/css">
+    .ext-icon-img {
+        max-height: 32px;
+        margin: 0px;
+        padding: 0px;
+        border-width: 0px;
+        vertical-align: middle;
+        margin-right: 2px;
+    }
+
+    .ext-icon-img-val {
+        height: 20px;
+        width: inherit;
+        margin: 0px;
+        padding: 0px;
+        border-width: 0px;
+        vertical-align: middle;
+        margin-left: 2px;
+        margin-right: 2px;
+    }
+</style>
+
+<script type="text/javascript">
+
+    function ajaxREST(actionUrl, type, params, imgLoading, resultHandler, errorHandler, tag, dataType, contentType) {
+        $.ajax({
+            url: urlInjectFocusLang(actionUrl),
+            type: type,
+            data: params,
+            dataType: dataType || 'json',
+            contentType: contentType || 'application/x-www-form-urlencoded; charset=UTF-8',
+            beforeSend: function () {
+                if (imgLoading) $('#' + imgLoading).show();
+                else { admincommon.hideMessage(); admincommon.showMask(); }
+            },
+            success: function (result) {
+                resultHandler(result, tag);
+            },
+            error: function (e) {
+                if (errorHandler) errorHandler(e);
+                else admincommon.showMessageDefault('@(StringTable.AjaxCommandErrorMessage)', '@(ActionResultStatus.Fail)');
+            },
+            complete: function () { if (imgLoading) $('#' + imgLoading).hide(); else admincommon.hideMask(); }
+        });
+    }
+
+    function ajaxCmd(actionUrl, params, resultHandler, tag, method) {
+        $.ajax({
+            url: (params && params['lang'] ? actionUrl : urlInjectFocusLang(actionUrl)),
+            type: method || 'POST',
+            data: params,
+            beforeSend: function () { admincommon.hideMessage(); admincommon.showMask(); },
+            success: function (result) {
+                resultHandler(result, tag);
+            },
+            error: function (e) { admincommon.showMessageDefault('@(StringTable.AjaxCommandErrorMessage)', '@(ActionResultStatus.Fail)'); },
+            complete: function () { admincommon.hideMask(); }
+        });
+    }
+
+    function ajaxCmdStatus(actionUrl, params, resultHandler) {
+        ajaxCmd(actionUrl, params, function (result) {
+            if (result.Status == 0) {
+                if (resultHandler) resultHandler(result);
+            }
+            if (result.Message != null) admincommon.showMessageDefault(result.Message, result.Status);
+        });
+    }
+
+    function ajaxCmdHtml(actionUrl, params, resultHandler, tag, method) {
+        ajaxCmd(actionUrl, params, resultHandler, tag, method);
+    }
+
+    function iconDropDownInit(id, value, items) {
+        var templNam = '<table class="ext-icon-img" ><tr><td><img class="ext-icon-img" src="@(ModuleUrl.ExtIconPath.TrimStart('~').TrimEnd('/'))/#:Value#" /></td><td>#:Name#</td></tr></table>';
+        var templVal = '<img class="selected-value ext-icon-img-val " src="@(ModuleUrl.ExtIconPath.TrimStart('~').TrimEnd('/'))/#:Value#" /><span>#:Name#</span>';
+
+        $("#" + id).kendoDropDownList({
+            dataTextField: "Name",
+            dataValueField: "Value",
+            headerTemplate: "",
+            template: function (item) {
+                if (item.Value == '') return item.Name;
+                else return templNam.replace("#:Value#", item.Value).replace("#:Name#", item.Name);
+            },
+            valueTemplate: function (item) {
+                if (item.Value == '') return item.Name;
+                else return templVal.replace("#:Value#", item.Value).replace("#:Name#", item.Name);
+            },
+            dataSource: items,
+            animation: false,
+            index: 0,
+            value: value,
+            optionLabel: { Name: '@StringTable.SelectIcon', Value: '' },
+            change: function (e) { },
+            dataBound: function (e) { this.clawDataBound = true; }
+        });
+    }
+
+    function iconDropDownSelect(id, prefixValues) {
+        var dropdown = $("#" + id);
+
+        for (var i = 0; i < prefixValues.length; i++) {
+            var item = dropdown.find("option[value^='" + prefixValues[i] + "']");
+            if (item.length > 0) {
+                dropdown.data('kendoDropDownList').value(item.attr('value'));
+                //console.log(id + ':' + dropdown.data('kendoDropDownList').value());
+                break;
+            }
+        }
+    }
+
+    function gridMarkLangDisabled(grid, selector, cond) {
+        $(selector, grid.element).each(function () {
+            var row = grid.dataItem($(this).closest("tr"));
+            if (cond(row)) {
+                $(this).addClass('item-lang-disabled');
+                var title = $(this).attr('title');
+                $(this).attr('title', (title ? title + ', ' : '') + '@(StringTable.ItemLanguageDisabled)');
+            }
+        });
+    }
+
+    function gridDisableCheckBox(grid, cond, checkboxSelector) {
+        $(checkboxSelector || '.row-checkbox', grid.element).each(function () {
+            if (cond(grid.dataItem($(this).closest("tr")))) {
+                $(this).removeClass("row-checkbox");
+                $(this).closest("div").find('input[type=checkbox]').prop('disabled', true);
+            }
+
+            $(this).closest("td").css({ 'padding': '0px', 'min-width': '35px' });
+        });
+    }
+
+    function gridHideCell(grid, selector, cond) {
+        $(selector, grid.element).each(function () {
+            var rw = grid.dataItem($(this).closest("tr"));
+            if (cond(rw)) $(this).hide();
+        });
+    }
+
+    function initGridStatusAction(grid, selector, actionUrl, getterStatus, setterStatus, getterCmdParams) {
+
+        var titleEnable = '@(StringTable.ItemEnableTitle)';
+        var titleDisable = '@(StringTable.ItemDisableTitle)';
+
+        $(selector, grid.element).each(function () {
+
+            var rdata = grid.dataItem($(this).closest("tr"));
+            var ritmA = $(this).find('a');
+            var status = getterStatus(rdata);
+
+            ritmA.addClass(status ? 'enable' : 'disable');
+            ritmA.attr('title', status ? titleDisable : titleEnable);
+
+            $(this).unbind('click').click(function (e) {
+                var row = grid.dataItem($(this).closest("tr"));
+                var itm = $(this).find('a');
+
+                setterStatus(row, !getterStatus(row));
+
+                if (typeof (actionUrl) == 'string') ajaxCmd(actionUrl, getterCmdParams(row));
+                else actionUrl($(this), row);
+
+                if (getterStatus(row)) {
+                    itm.removeClass("disable");
+                    itm.addClass("enable");
+                    itm.attr('title', titleDisable);
+                } else {
+                    itm.removeClass("enable");
+                    itm.addClass("disable");
+                    itm.attr('title', titleEnable);
+                }
+            });
+        });
+    }
+
+</script>
+
+@if (ViewBag.UseCKEditor != null && ViewBag.UseCKEditor)
+{
+    @Html.JsBundle("~/js/editor", true, 100)
+
+    <script type="text/javascript">
+
+        function initEditor(inputNode) {
+            if (!$.fn.clawEditor) setTimeout(initEditor, 100);
+            else {
+                var arr = (inputNode ? inputNode : $('.ckeditor_standard,.ckeditor_simple'));
+                arr.each(function () {
+                    var ckHeight = $(this).attr('ck_height'), item = $(this);
+                    if (!item.hasClass('ckeditor-inst')) {
+                        if (item.hasClass('ckeditor_simple') || item.hasClass('sub_ckeditor_simple')) {
+                            item.clawEditor('simple', { height: ckHeight ? ckHeight : '120px' });
+                        }
+                        else item.clawEditor('basic', { height: ckHeight ? ckHeight : '200px' });
+                        item.addClass('ckeditor-inst');
+
+                        CKEDITOR.instances[item.attr('id')].on('blur', function (e) {
+                            item.val($.trim(e.sender.getData())); item.valid();
+                        });
+                    }
+                });
+            }
+        }
+
+        function termEditor(inputNodes) {
+            if (CKEDITOR && CKEDITOR.instances) {
+                inputNodes.each(function () {
+                    try {
+                        $(this).removeClass('ckeditor-inst');
+                        CKEDITOR.instances[$(this).attr("id")].destroy();
+                    }
+                    catch (e) {
+                        console.log(e);
+                    }
+                });
+            }
+        }
+
+        $(function () { initEditor(); });
+
+    </script>
+}
+
+@if (ViewBag.UseDatePicker != null && ViewBag.UseDatePicker)
+{
+    <script type="text/javascript">
+
+        function initDatePicker(node) {
+            (node ? node : $("input.datepicker")).each(function () {
+
+                if (!$(this).hasClass('setKendoDatepicker')) {
+                    $(this).kendoDatePicker({
+                        culture: '@(optLang.LanguageCode)',
+                        format: '@(SettingsBiz.GetSettings().Display.Others.GetDateFormat())',
+                        animation: {
+                            close: { effects: "fadeOut zoom:out", duration: 300 },
+                            open: { effects: "fadeIn zoom:in", duration: 300 }
+                        }
+                    });
+
+                    $(this).addClass('setKendoDatepicker');
+                }
+            });
+        }
+
+        $(function () { initDatePicker(); });
+
+    </script>
+}
+
+@if (ViewBag.UseDateTimePicker != null && ViewBag.UseDateTimePicker)
+{
+    <script type="text/javascript">
+
+        function initDateTimePicker(node, format) {
+            (node ? node : $("input.datetimepicker")).each(function () {
+
+                if (!$(this).hasClass('setKendoDateTimePicker')) {
+                    $(this).kendoDateTimePicker({
+                        culture: '@(optLang.LanguageCode)',
+                        format: format || '@(SettingsBiz.GetSettings().Display.Others.GetDateTimeFormat(true))',
+                        animation: {
+                            close: { effects: "fadeOut zoom:out", duration: 300 },
+                            open: { effects: "fadeIn zoom:in", duration: 300 }
+                        }
+                    });
+
+                    $(this).addClass('setKendoDateTimePicker');
+                }
+            });
+        }
+
+        $(function () { initDateTimePicker(); });
+
+    </script>
+}
+
+@if (ViewBag.UseImgPreview != null && ViewBag.UseImgPreview)
+{
+    <script type="text/javascript">
+
+        function initEditImagePreview() {
+            $("a.preview").fancybox({ width: 800, height: 600, autoScale: false, fitToView: true });
+        }
+
+        function initImagePreview(fancybox, holder) {
+            var xOffset = -20, yOffset = 40, wSpace = 30, hSpace = 40;
+            var items = $("a.preview[href!=''][href!='@Claw.Modules.Eshop.Models.ImageModel.NoImg']", holder);
+
+            $("a.preview[href=''],a.preview[href='@Claw.Modules.Eshop.Models.ImageModel.NoImg']", holder).click(function () { return false; }).css({ 'cursor': 'default' });
+
+            items.hover(function (e) {
+                    this.t = this.title;
+                    this.title = "";
+                    var c = (this.t != "") ? "<br/>" + this.t : "";
+                    $("body").append("<p id='imgPreview'><img src='" + this.href + "' alt='Image preview' />" + c + "</p>");
+                    var topP = e.pageY - xOffset, leftP = e.pageX + yOffset;
+
+                    var previewB = $("#imgPreview");
+                    var bottomP = topP + previewB.height() - $(window).scrollTop() + wSpace;
+                    if (window.innerHeight >= previewB.height() + wSpace) {
+                        var remainHeight = bottomP - window.innerHeight;
+                        if (remainHeight > 0) topP -= remainHeight;
+                    }
+
+                    var rightP = leftP + previewB.width() - $(window).scrollLeft() + hSpace;
+                    if (window.innerWidth >= previewB.width() + hSpace) {
+                        var remain = rightP - window.innerWidth;
+                        if (remain > 0) leftP = e.pageX - yOffset - previewB.width();
+                    }
+
+                    $("#imgPreview").css("top", topP + "px").css("left", leftP + "px").fadeIn("slow");
+                },
+                //handlerOut (leave)
+                function () {
+                    this.title = this.t;
+                    $("#imgPreview").remove();
+                }
+            );
+
+            items.mousemove(function (e) {
+                var topP = e.pageY - xOffset, leftP = e.pageX + yOffset;
+                var previewB = $("#imgPreview");
+                var bottomP = topP + previewB.height() - $(window).scrollTop() + wSpace;
+                if (window.innerHeight >= previewB.height() + wSpace) {
+                    var remainHeight = bottomP - window.innerHeight;
+                    if (remainHeight > 0) topP -= remainHeight;
+                }
+
+                var rightP = leftP + previewB.width() - $(window).scrollLeft() + hSpace;
+                if (window.innerWidth >= previewB.width() + hSpace) {
+                    var remain = rightP - window.innerWidth;
+                    if (remain > 0) leftP = e.pageX - yOffset - previewB.width();
+                }
+
+                $("#imgPreview").css("top", topP + "px").css("left", leftP + "px");
+            });
+
+            if (fancybox == undefined || fancybox) {
+                items.fancybox({ width: 800, height: 600, autoScale: false, fitToView: true });
+            } else items.click(function () { return false; }).css({ 'cursor': 'default' });
+        };
+
+    </script>
+
+    @Html.CssBundle("~/content/plugin/fancybox/fancybox.css", "~/Content/plugin/fancybox/jquery.fancybox.css")
+    <script src="~/Content/plugin/fancybox/jquery.fancybox.pack.js"></script>
+}
+
+@if (ViewBag.UseVideoImport != null && ViewBag.UseVideoImport)
+{
+    <script type="text/javascript">
+
+        function getVideoInfo(url, apiKey, thumbWidth, thumbHeight, loadingImage, dataHandler, errorHandler) {
+            if (/[\.\/]youtube\.com[\/\?]/i.test(url)) {
+                getYouTubeVideo(url, apiKey, thumbWidth, thumbHeight, loadingImage, dataHandler, errorHandler);
+            }
+            else getVimeoVideo(url, thumbWidth, thumbHeight, loadingImage, dataHandler, errorHandler);
+        }
+
+        function getVimeoVideo(url, thumbWidth, thumbHeight, loadingImage, dataHandler, errorHandler) {
+
+            ajaxREST('http://vimeo.com/api/oembed.json', 'GET', { url: url, width: thumbWidth, height: thumbHeight }, loadingImage,
+                function (result, tag) {
+                    //console.log(result);
+                    if (result) {
+                        var embedUrl = getVideoEmbedSrc(result.html), embeddable = true;
+                        dataHandler(result.video_id, url, embedUrl, result.thumbnail_url, result.title, tranformVideoText(result.description), embeddable);
+                    }
+                },
+                errorHandler);
+        }
+
+        function getYouTubeVideo(url, apiKey, thumbWidth, thumbHeight, loadingImage, dataHandler, errorHandler) {
+            var apiUrl = 'https://www.googleapis.com/youtube/v3/videos';
+
+            ajaxREST(apiUrl, 'GET', { id: getVideoId(url), key: apiKey, part: 'snippet,player,status' }, loadingImage,
+                function (result) {
+                    //console.log(result);
+                    if (result && result.items && result.items.length > 0) {
+                        var item = result.items[0], image = null, embedUrl = null, embeddable = true;
+                        var snippet = item.snippet;
+
+                        if (snippet && snippet.thumbnails) {
+                            image = getVideoImgUrl(snippet.thumbnails.maxres, null, thumbWidth, thumbHeight);
+                            image = getVideoImgUrl(snippet.thumbnails.standard, image, thumbWidth, thumbHeight);
+                            image = getVideoImgUrl(snippet.thumbnails.high, image, thumbWidth, thumbHeight);
+                            image = getVideoImgUrl(snippet.thumbnails.medium, image, thumbWidth, thumbHeight);
+                            image = getVideoImgUrl(snippet.thumbnails.default, image, thumbWidth, thumbHeight);
+                        }
+
+                        if (item.player) embedUrl = getVideoEmbedSrc(item.player.embedHtml);
+                        if (item.status) embeddable = item.status.embeddable;
+
+                        dataHandler(item.id, url, embedUrl, image, snippet.title, tranformVideoText(snippet.description), embeddable);
+                    }
+                },
+                errorHandler);
+        }
+
+        function getVideoImgUrl(image, url, width, height) {
+            if (image && (!url || (image.width >= width && image.height >= height))) {
+                return image.url;
+            } else return url;
+        }
+
+        function getVideoId(url) {
+            if (!url) return null;
+
+            var regex = /[\.\/](youtube|vimeo)\.com(\/[a-z]+)*([?][^=]*)?[=\/]((\w|[\-]){4,})/i;
+            var result = regex.exec(url);
+
+            if (result && result.length > 4) return result[4];
+            else return null;
+        }
+
+        function getVideoEmbedSrc(html) {
+            if (html) {
+                var node = $('<div>'); node.html(html);
+                return node.find('[src]').attr('src');
+            } else return null;
+        }
+
+        function tranformVideoText(text) {
+            if (!text) return text;
+            else return text.replace(/(\r?\n)/ig, '<br>\r\n');
+        }
+
+    </script>
+}
+
+@if (ViewBag.UseDropZone != null && ViewBag.UseDropZone)
+{
+    <script type="text/javascript">
+
+        var dropzoneDragTimestamp = Date.now();
+
+        function dropzoneInit(dzSelector, fileSelector, addSelector, options, resultHandler, errorHandler) {
+            var optDefs = {
+                url: '@ModuleUrl.AdminUrl(@Html.GetController(), "UploadImage", Model.Id.ToString())',
+                clickable: false,
+                addRemoveLinks: false,
+                createImageThumbnails: false,
+                paramName: "imageUpload",
+                previewsContainer: '.dropzone-preview-box',
+                previewTemplate: '<li><div class="dz-preview dz-file-preview"><div class="dz-preview-menu"><div class="center"><a class="view_fr" title="@StringTable.Detail" target="_blank"></a><a class="image-edit edit_fr" title="@StringTable.Edit">@StringTable.Edit</a> <a class="delete_fr" data-dz-remove title="@StringTable.Delete">X</a></div></div><img data-dz-thumbnail /><div class="dz-details"><div><span data-dz-size></span></div><div><span data-dz-name></span></div></div><div class="dz-progress"><span class="dz-upload" data-dz-uploadprogress></span></div></div></li>',
+                acceptedFiles: null,
+                dropHandler: null,
+                init: function () {
+                    var me = this;
+                    this.on("success", function (file, result) {
+                        dropzoneOnSuccess(me, file, result);
+                        if (result.Status == 0) {
+                            if (resultHandler) {
+                                if (result.Images) {
+                                    for (var i = 0; i < result.Images.length; i++) {
+                                        resultHandler(result, result.Images[i].file, i);
+                                    }
+                                }
+                                else resultHandler(result, file);
+                            }
+                        } else if (errorHandler) errorHandler(file, result);
+                    });
+
+                    this.on("error", function (file, e) {
+                        if (errorHandler) errorHandler(file, typeof (e) == 'string' ? { Message: e } : e);
+                        else {
+                            console.log('error', e, file);
+                            admincommon.hideMessage();
+                            admincommon.showMessageDefault('@(StringTable.AjaxCommandErrorMessage)', '@(ActionResultStatus.Fail)');
+                        }
+
+                        me.removeFile(file);
+                    });
+
+                    this.on("drop", function (e) {
+                        dropzoneDragTimestamp = 0; $('.mask-dropzone', me.element).hide();
+                        if ($(me.element).is('.single')) me.removeAllFiles();
+                        if (me.options.dropHandler) me.options.dropHandler(me);
+                    });
+
+                    this.on("dragenter", function (e) {
+                        dropzoneDragTimestamp = Date.now();
+                        setTimeout(function () { dropzoneTimer(me); }, 500);
+                        $('.mask-dropzone', me.element).show();
+                    });
+
+                    this.on("dragover", function (e) { dropzoneDragTimestamp = Date.now(); });
+
+                    $(addSelector).click(function () { $(fileSelector).click(); });
+
+                    $(fileSelector).change(function (e) {
+                        for (var i = 0; i < this.files.length; i++)
+                            me.addFile(this.files[i]);
+
+                        if ($(me.element).is('.single'))
+                            while (me.files.length > 1) me.removeFile(me.files[0]);
+
+                        $(this).val(null);
+                    });
+                },
+                dictCancelUpload: 'Cancel upload',
+                dictCancelUploadConfirmation: 'Are you sure you want to cancel this upload?',
+                dictDefaultMessage: 'Drop files here to upload',
+                dictFallbackMessage: "Your browser does not support drag'n'drop file uploads.",
+                dictFallbackText: 'File is too big ({{filesize}}MiB). Max filesize: {{maxFilesize}}MiB.',
+                dictInvalidFileType: '@StringTable.ErrMsgFileExtension',
+                dictMaxFilesExceeded: 'You can not upload any more files.',
+                dictRemoveFile: 'Remove file',
+                dictRemoveFileConfirmation: null,
+                dictResponseError: 'Server responded with {{statusCode}} code.',
+            };
+
+            var opts = $.extend(optDefs, options || {});
+
+            if (opts.enableZipUpload && opts.url)
+                opts.url = urlMergeParams(opts.url, { enableZip: true });
+
+            return $(dzSelector).dropzone(opts);
+        }
+
+        function dropzoneAdd(dropzone, key, name, url, thumbUrl, mimeType, size) {
+            var item = { status: 'success', key: key, name: name, url: url, thumb: thumbUrl, size: size, type: mimeType };
+            dropzone.files.push(item);
+            dropzone.emit("addedfile", item);
+            if (thumbUrl) {
+                dropzone.emit("thumbnail", item, thumbUrl);
+                $(item.previewElement).find('.dz-details').hide();
+            }
+            $(item.previewElement).find('.dz-progress').hide();
+            $(item.previewElement).find('.dz-preview-menu a.view_fr').attr('href', url);
+            //console.log("dropzoneAdd", url, item);
+
+            return item;
+        }
+
+        function dropzoneOnSuccess(me, file, result) {
+            //console.log("success", result.Image, file.type, file, result);
+            if (result.Status == 0) {
+                if (result.Images) {
+                    for (var i = 0; i < result.Images.length; i++) {
+                        var item = result.Images[i];
+                        item.file = dropzoneAdd(me, item.FilePath, item.FileName, item.FilePath, item.ThumbUrl, item.MimeType, item.Size);
+                    }
+                    me.removeFile(file);
+                } else {
+                    file.key = result.Image.FilePath;
+                    file.url = result.Image.FilePath;
+                    file.thumb = result.Image.ThumbUrl;
+                    me.emit("thumbnail", file, result.Image.ThumbUrl);
+                    $(file.previewElement).find('.dz-preview-menu a.view_fr').attr('href', file.url);
+                }
+
+                $(file.previewElement).find('.dz-progress').hide();
+
+                if (file.type.indexOf('image', 0) == 0)
+                    $(file.previewElement).find('.dz-details').hide();
+
+            } else {
+                $(file.previewElement)
+                    .removeClass('dz-success').addClass('dz-error')
+                    .find('.dz-error-message').html(result.Message).show();
+
+                me.removeFile(file);
+
+                if (result.Message) {
+                    admincommon.hideMessage(); admincommon.showMessageDefault(result.Message, result.Status);
+                }
+            }
+        }
+
+        function dropzoneTimer(dzone) {
+            if (dzone.maskTimer) clearTimeout(dzone.maskTimer);
+            if (dropzoneDragTimestamp + 500 < Date.now()) {
+                $('.mask-dropzone', dzone.element).hide();
+                Dropzone.instances.forEach(function (dz) {
+                    if (dz.options.dropHandler) dz.options.dropHandler(dzone);
+                });
+                dzone.maskTimer = null;
+            } else dzone.maskTimer = setTimeout(function () { dropzoneTimer(dzone); }, 500);
+        }
+
+        $(function () {
+            Dropzone.autoDiscover = false;
+
+            $('body').addClass('dropzone').dropzone({
+                url: '/admin/',
+                clickable: false,
+                init: function () {
+                    var me = this;
+                    this.on("dragenter", function (e) {
+                        dropzoneDragTimestamp = Date.now();
+                        setTimeout(function () { dropzoneTimer(me); }, 500);
+                        if (!$('.mask-dropzone', me.element).is(':visible')) $('.mask-dropzone', me.element).show();
+                    });
+                    this.on("dragover", function (e) { dropzoneDragTimestamp = Date.now(); });
+                    this.on("drop", function (e) {
+                        e.preventDefault(); dropzoneDragTimestamp = 0; $('.mask-dropzone', me.element).hide();
+                    });
+                    this.hiddenFileInput = $('<div>')[0];
+                    this.addFile = function () { };
+                }
+            }).removeClass('dropzone');
+        });
+
+    </script>
+
+    @Html.CssBundle("~/admin/dropzone.css", ModuleUrl.ContentUrl("Scripts/dropzone/basic.css"), ModuleUrl.ContentUrl("Scripts/dropzone/dropzone.css"))
+    <script src="@ModuleUrl.ContentUrl("Scripts/dropzone/dropzone.js", true)"></script>
+}
+
+@if (ViewBag.UseInlineEdit != null && ViewBag.UseInlineEdit)
+{
+    <script type="text/javascript">
+
+        function gridOnInlineEdit(event, displayOrder, refreshRowHandler) {
+
+            var grid = event.sender, validatable = grid.editable.validatable, row = event.container, rwuid = row.attr('data-uid');
+
+            row.find('input:visible')
+                .focus(function () {
+                    validatable.hideMessages();
+                    validatable.validateInput($(this));
+                })
+                .keyup(function () {
+                    validatable.validateInput($(this));
+                });
+
+            row.find('.k-grid-Edit')
+                .addClass('inline-save')
+                .attr('title', '@StringTable.Save')
+                .unbind('click').click(function (e) {
+                    e.preventDefault();
+                    e.stopPropagation();
+
+                    //console.log('save',e);
+                    gridSaveChanges(grid);
+                });;
+
+            row.find('.k-grid-Delete')
+                .addClass('inline-cancel')
+                .attr('title', '@StringTable.Cancel')
+                .show()
+                .unbind('click').click(function (e) {
+                    grid.cancelRow(); admincommon.hideMessage();
+
+                    var newRw = $('tr[data-uid=' + rwuid + ']', grid.element);
+
+                    newRw.find('.k-grid-Edit').removeClass('inline-save')
+                        .addClass('edit_fr').attr('title', '@StringTable.Edit');
+
+                    newRw.find('.k-grid-Delete').removeClass('inline-cancel')
+                        .addClass('delete_fr').attr('title', '@StringTable.Delete');
+
+                    newRw.dblclick(function () {
+                        if (!grid.editable) grid.editRow($(this));
+                    });
+
+                    //console.log('cancel', newRw, row.selector,grid.dataItem(newRw));
+                    if (refreshRowHandler) refreshRowHandler(grid, newRw);//gridRefreshRow(grid, rowEle)
+                    //grid.refresh({ action: 'rebind', items: [grid.dataItem(newRw)] });
+                });
+
+            if (displayOrder) {
+                var dorder = row.find(displayOrder);
+                dorder.kendoNumericTextBox({
+                    format: '####',
+                    decimals: 0,
+                    upArrowText: '@StringTable.NumTxtBoxUpArrow',
+                    downArrowText: '@StringTable.NumTxtBoxDownArrow',
+                });
+
+                var numTxtBox = dorder.closest('.k-numerictextbox').find('input');
+                numTxtBox.removeClass('text-box');
+                numTxtBox.addClass('numeric-text-box sort-order');
+            }
+
+            var gridEditTimer = function () {
+                var editable = grid.editable;
+                if (editable) {
+                    if (document.hasFocus() && $('input:focus,a:focus', row).length == 0 && editable.validatable.validate()) {
+                        var node = editable.element.find('.k-grid-Edit');
+                        setTimeout(function () { node.click(); }, 200);
+                    } else setTimeout(gridEditTimer, 100);
+                }
+            };
+
+            //setTimeout(gridEditTimer, 100);
+
+            setTimeout(function () { row.find('input[type=text]:visible').first().focus(); }, 100);
+        }
+
+        function gridCmdInlineEdit(id, uid) {
+            var grid = $('#' + id).data('kendoGrid'), editable = grid.editable;
+            var row = $('tr[data-uid=' + uid + ']', grid.element);
+            if (editable) {
+                var node = editable.element.find('.k-grid-Edit');
+                if (node.hasClass('inline-save')) {
+                    editable.element.find('input[type=text]').each(function () {
+                        $(this).val($.trim($(this).val()));
+                        $(this).change();
+                    });
+                    gridSaveChanges(grid);
+                }
+            }
+            else { grid.select(row); grid.editRow(row); }
+        }
+
+        function gridSaveChanges(grid) {
+            if (!grid.clawReqStartTime || Date.now() - grid.clawReqStartTime > 15000) {
+                grid.saveRow();
+            } else setTimeout(function () {
+                console.log('save row delayed', Date.now(), grid.clawReqStartTime);
+                gridSaveChanges(grid);
+            }, 500);
+        }
+
+    </script>
+
+    <script src="@(Globals.ResolveClientUrl(LanguageMgr.KendoPath))/kendo.editable.js"></script>
+    <script src="@(Globals.ResolveClientUrl(LanguageMgr.KendoPath))/kendo.binder.js"></script>
+    <script src="@(Globals.ResolveClientUrl(LanguageMgr.KendoPath))/kendo.validator.js"></script>
+    <script src="@(Globals.ResolveClientUrl(LanguageMgr.KendoPath))/kendo.aspnetmvc.js"></script>
+}
+
+@if (ViewBag.PermissionEdit != null && ViewBag.PermissionEdit == false)
+{
+    <script type="text/javascript">
+        (function() {
+            function disableEditForm() {
+                formEnable(false);
+                $('.btn_save,.btn_delete,.btn_reset,.btn_clone', '.form-action-menu').closest('li').hide();
+
+                setTimeout(function () {
+                    console.log('disableEditForm');
+                    if ($('.langItem .css-checkbox:enabled', '#editForm').length != 0) disableEditForm();
+                }, 3000);
+            };
+            disableEditForm();
+        })();
+    </script>
+}
+
+@if (!isFrontEnd)
+{
+    @Html.JsBundle("~/admin/eshop/common.js", ScriptAttribute.Defer, ModuleUrl.ContentUrl("Scripts/admin-eshop-common.js"))
+}

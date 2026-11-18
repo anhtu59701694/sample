@@ -1,0 +1,781 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@using DM=Claw.Modules.Eshop.Domain
+@model IEnumerable<ProductModel>
+
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+    ViewBag.Title = StringTable.ManageProducts;
+    ViewBag.AddAction = "Add";
+    ViewBag.UseImgPreview = true;
+    ViewBag.ShowFilterBox = true;
+    ViewBag.UseInlineEdit = true;
+    ViewBag.UseUploadFile = true;
+    ViewBag.SearchPlaceHolder = StringTable.ProductNameOrSku;
+    var prodNormal = true;
+    var controllerName = this.ViewContext.RouteData.Values["controller"].ToString();
+    if ("bundleproduct".Equals(controllerName.ToLower()))
+    {
+        ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/bundleproduct";
+        ViewBag.ParentBreadcrumbTitle = StringTable.Bundle;
+        prodNormal = false;
+    }
+    else
+    {
+        ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/product";
+        ViewBag.ParentBreadcrumbTitle = StringTable.Product;
+    }
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var searchInfo = (ProductModel.AdvSearchModel)ViewBag.SearchInfo;
+    var category = (CategoryModel)ViewBag.Category;
+    var cateid = category == null ? 0 : category.Id;
+    var status = (StatusModel)ViewBag.Status;
+    var statusid = status == null ? null : (int?)status.Id;
+
+    ViewBag.ShowSearchBox = !searchInfo.IsSpecial;
+
+    //search
+    var Categories = (List<CategoryModel>)ViewBag.Categories;
+    var Statuses = (List<StatusModel>)ViewBag.Statuses;
+    var Manufactureres = (List<ManufacturerModel>)ViewBag.Manufactureres;
+
+    var htmlAdvSearch = Html.GetHtmlHelper(searchInfo);
+}
+
+<style type="text/css">
+    .grid-info-stat .num {color: #636262;}
+    .controls .row_content_box .clo_left {padding-bottom: 15px;}
+    #special-search {font-size: medium;font-weight: bold;color: #6C0B7E;}
+    #special-search .close-2 {color: black;font-size: small;}
+    #special-search .close-2:hover {color: red;cursor: pointer;}
+    .k-grid td .preview {line-height: 0;vertical-align: bottom;}
+    .k-grid td .preview img {float: none;}
+    .k-grid .k-grid-quantity .qty-edit, .k-grid .k-grid-displayorder .disorder-edit {display: none;}
+    .k-grid .k-grid-displayorder input {min-width: 0;margin: 0;width: 90%;}
+    .k-grid .k-grid-displayorder .k-numerictextbox{ width: 90%}
+    .k-grid .k-grid-displayorder .k-numeric-wrap{ height: 26px;}
+    .k-grid .k-grid-displayorder .k-numeric-wrap .k-input{ height: 24px;}
+
+    /*.k-grid .k-grid-quantity .qty-view {width: 133px;margin: 0;text-align: right;}
+    .k-grid .k-grid-quantity input[type=number] {padding: 0 7px !important;margin: 0 -7px !important;width: 116px !important;}*/
+
+    .k-grid td .cmd-box {position: absolute;text-align: right !important;display: none;margin-top: 2px;}
+    .k-grid td .cmd-box .wr_submit_top {width: 160px;}
+    .k-grid td .cmd-box .wr_submit_top li {height: 25px;width: 60px;margin: 3px 4px;float: right;border: 1px #999f9d solid;}
+    .k-grid td .cmd-box .wr_submit_top li input {height: 23px;margin: -5px 0px 0px -5px;text-indent: -8px;}
+    .k-grid td .error.field-validation-error {margin-top: 30px;}
+    #grid .k-grid-quantity { text-align: left !important; }
+    #grid .qty-view-combined{width: 40px;min-width: 0;height: 30px;float: right;display: inline-block;}
+    #grid .qty-view-combined[data-val='0']{display: none !important;}
+    #grid .qty-edit.combined{width: 60px !important;margin: 0;}
+    #grid .qty-view.combined{width: 50px !important;min-width: 0;height: 30px;margin: 0 0 0 4px;}
+    #grid .qty-view.combined[data-backval='0']{width: 93% !important;}
+    #grid .k-grid-location textarea {padding: 0px !important; resize: none;margin: 0;height: 60px; }
+    #grid .k-grid-location .error { margin-top: 0 }
+    #grid .shoppingqty {margin-left: 11px;font-size: small;margin-top: 2px;height:1.3em;}
+    #grid .shoppingqty[data-shoppingqty='0'] {display:none;}
+    #grid .k-grid-name.name-pro {min-width:0 !important;}
+    #grid .k-header[data-field="DisplayOrder"] .k-link {width:70px;}
+    #grid .k-header[data-field="VisibleWeb"] .k-link {width:70px;}
+    #grid .k-header[data-field="ModifiedDate"] .k-link {width:70px;}
+    #grid .k-header[data-field="Quantity"] .k-link {width:80px;}
+    #grid .k-header[data-field="Image"] .k-link {width:60px;}
+    #grid .k-header[data-field="Location"] .k-link {width:80px;}
+    #grid .k-header:not([data-field]) .k-link {width:43px;}
+    #grid .claw-action{width:40px;}
+    #grid .product-img{width:60px;}
+    #grid .emailmusers{float: right;font-size: smaller;text-align: right;font-style: italic;margin-top: 3px;}
+    #grid .emailmusers a{color: #390f3d;}
+    #grid .qtypos-detail {font-size: smaller; margin-left: 5px; text-align: right; margin-right: 3px; color: darkgray;}
+</style>
+
+@if (!ViewBag.PermissionEdit)
+{
+    <style type="text/css">
+        #grid .k-grid-quantity {text-align: center !important; }
+    </style>
+}
+
+@if (!settings.Hidden.ShoppingProduct)
+{
+    <style type="text/css">
+        #grid .shoppingqty {display:none !important;}
+    </style>
+}
+
+@if (!settings.Hidden.ProductNotifyMe)
+{
+    <style type="text/css">
+        #grid .emailmusers { display: none !important; }
+    </style>
+}
+ 
+@if (!settings.Hidden.Storage2Enabled)
+{
+    <style type="text/css">
+        #grid .qtypos-detail { display: none !important; }
+    </style>
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageProducts)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageProducts)
+}
+
+@section FilterMenuSection {
+    <section class="row_content" style="min-height:initial;">
+        @if (searchInfo.IsSpecial)
+        {
+            <div id="special-search">
+                <span class="text">@searchInfo.SpecialSearchTxt(Html, category, status)</span>
+                <span class="close-2" title="@StringTable.Close"> X </span>
+            </div>
+        }
+        @using (Html.BeginForm(null, null, FormMethod.Post, new { @id = "search-form" }))
+        {
+            <fieldset>
+                <legend class="scheduler-border adv-search" style="cursor:pointer;">@StringTable.AdvancedSearch</legend>
+                <section class="wr-search-adv" style="display:none;">
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.ProductName)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeTextBoxFor(m => m.ProductName, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.ProductName)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.CategoryId)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeDropDownListKendoFor(m => m.CategoryId, Categories.Select(x => new
+                            {
+                                x.Name,
+                                x.Id,
+                                x.HierOrder,
+                                Deep = x.Deep(),
+                                x.LangVisible,
+                                UPathHasLang = x.UpPathHasLang
+                            })
+                            .Where(x => x.UPathHasLang)
+                            .OrderBy(x => x.HierOrder).Select(x => new SelectListItem()
+                            {
+                                Value = x.Id.ToString(),
+                                Text = x.Name.DPadLeft(x.Deep * 5, '-'),
+                            }), StringTable.SelectCategory, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.CategoryId)</div>
+                        </div>
+                    </section>
+                    @if (prodNormal)
+                    {
+                        <section class="row_content_box">
+                            <section class="clo_left txt_align_r">
+                                <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.ManufacturerId)</label>
+                            </section>
+                            <div class="clo_right">
+                                @htmlAdvSearch.LocalizeDropDownListKendoFor(m => m.ManufacturerId, Manufactureres
+                                .Select(x => new SelectListItem() { Value = x.Id.ToString(), Text = x.Name, }),
+                                StringTable.SelectManufacturer, new { })
+                                <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.ManufacturerId)</div>
+                            </div>
+                        </section>
+                    }
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.Location)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeTextBoxFor(m => m.Location, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.Location)</div>
+                        </div>
+                    </section>                   
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.Status)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeDropDownListKendoFor(m => m.Status, Statuses
+                                .Select(x => new SelectListItem() { Value = x.Id.ToString(), Text = x.Name, }),
+                                StringTable.SelectStatus, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.Status)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.VisibilityWeb)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.HiddenFor(m => m.VisibilityWeb)
+                            <input id="box_Visible" checked="@(searchInfo.VisibilityWeb == true)" class="css-checkbox" type="checkbox" />
+                            <label for="box_Visible" class="css-labelcheck">@StringTable.Visible</label>
+                            <input id="box_Hidden" checked="@(searchInfo.VisibilityWeb == false)" class="css-checkbox" type="checkbox" />
+                            <label for="box_Hidden" class="css-labelcheck">@StringTable.Hidden</label>
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.VisibilityWeb)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.SelfDiscount)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.HiddenFor(m => m.SelfDiscount)
+                            <input id="SelfDiscountYes" checked="@(searchInfo.SelfDiscount == true)" class="css-checkbox" type="checkbox" />
+                            <label for="SelfDiscountYes" class="css-labelcheck">@StringTable.Yes</label>
+                            <input id="SelfDiscountNo" checked="@(searchInfo.SelfDiscount == false)" class="css-checkbox" type="checkbox" />
+                            <label for="SelfDiscountNo" class="css-labelcheck">@StringTable.No</label>
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.SelfDiscount)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.CGroupDiscount)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.HiddenFor(m => m.CGroupDiscount)
+                            <input id="CGroupDiscountYes" checked="@(searchInfo.CGroupDiscount == true)" class="css-checkbox" type="checkbox" />
+                            <label for="CGroupDiscountYes" class="css-labelcheck">@StringTable.Yes</label>
+                            <input id="CGroupDiscountNo" checked="@(searchInfo.CGroupDiscount == false)" class="css-checkbox" type="checkbox" />
+                            <label for="CGroupDiscountNo" class="css-labelcheck">@StringTable.No</label>
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.CGroupDiscount)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.Download)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.HiddenFor(m => m.Download)
+                            <input id="DownloadYes" checked="@(searchInfo.Download == true)" class="css-checkbox" type="checkbox" />
+                            <label for="DownloadYes" class="css-labelcheck">@StringTable.Yes</label>
+                            <input id="DownloadNo" checked="@(searchInfo.Download == false)" class="css-checkbox" type="checkbox" />
+                            <label for="DownloadNo" class="css-labelcheck">@StringTable.No</label>
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.Download)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.HasQtyOnly)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.HiddenFor(m => m.HasQtyOnly)
+                            <input id="HasQtyOnlyYes" checked="@(searchInfo.HasQtyOnly == true)" class="css-checkbox" type="checkbox" />
+                            <label for="HasQtyOnlyYes" class="css-labelcheck">@StringTable.Yes</label>
+                            <input id="HasQtyOnlyNo" checked="@(searchInfo.HasQtyOnly == false)" class="css-checkbox" type="checkbox" />
+                            <label for="HasQtyOnlyNo" class="css-labelcheck">@StringTable.No</label>
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.HasQtyOnly)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.NoCateOnly)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.HiddenFor(m => m.NoCateOnly)
+                            <input id="NoCateOnlyYes" checked="@(searchInfo.NoCateOnly == true)" class="css-checkbox" type="checkbox" />
+                            <label for="NoCateOnlyYes" class="css-labelcheck">@StringTable.Yes</label>
+                            <input id="NoCateOnlyNo" checked="@(searchInfo.NoCateOnly == false)" class="css-checkbox" type="checkbox" />
+                            <label for="NoCateOnlyNo" class="css-labelcheck">@StringTable.No</label>
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.NoCateOnly)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.Sku)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeTextBoxFor(m => m.Sku, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.Sku)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r">
+                            <label class="fl_r">@htmlAdvSearch.LocalizeNameFor(m => m.BarCode)</label>
+                        </section>
+                        <div class="clo_right">
+                            @htmlAdvSearch.LocalizeTextBoxFor(m => m.BarCode, new { })
+                            <div class="field-valid-msg">@htmlAdvSearch.LocalizeValidationMessageFor(m => m.BarCode)</div>
+                        </div>
+                    </section>
+                    <section class="row_content_box">
+                        <section class="clo_left txt_align_r"><label class="fl_r"> </label></section>
+                        <div class="clo_right">
+                            <ul class="wr_submit_top">
+                                <li> <input type="submit" value="@StringTable.Search" class="btn_search_t"></li>
+                                <li> <input type="button" value="@StringTable.Cancel" class="btn_cancel adv-search"></li>
+                            </ul>
+                        </div>
+                    </section>
+                </section>
+            </fieldset>
+        }
+    </section>
+}
+
+@{
+    var qtyTemp = string.Format(@"<div class='shoppingqty' data-shoppingqty='#:(ShoppingQty?1:0)#'>&nbsp;</div>
+    <input class='qty-view combined' data-type='#:Type#' value='#:Quantity#' #:(Type == 1 ? 'disabled' : '')# data-backval='#:BackOrderQty#' type='text'>
+    <input class='qty-edit combined' id='quantity_#:Id#' name='quantity_#:Id#' value='#:Quantity#' type='number' >
+    <input value='- #:BackOrderQty#' data-val='#:BackOrderQty#' class='qty-view-combined' disabled='disabled' type='text'>
+    <div class='shoppingqty' data-shoppingqty='#:(ShoppingQty?1:0)#'>#:ShoppingQty# {0}</div>
+    <div class='qtypos-detail' title='{1}: #:Quantity1#, {2}: #:Quantity2#'>#:Quantity1#/#:Quantity2#</div>
+    <div class='cmd-box'></div>
+    <span class='field-validation-valid error' data-valmsg-for='quantity_#:Id#' data-valmsg-replace='true'></span>", Html.LocalizeNameFor(m => m.ShoppingQty), StringTable.GetQtyPosName(DM.QtyPos.Qty1, settings), StringTable.GetQtyPosName(DM.QtyPos.Qty2, settings));
+
+    var infoTempl = string.Format(@"
+    <span class='text-es-table'>#:Information.InStock# {0} #:Information.Variants# {1}</span>
+    <span class='text-es-table'>#:Information.OrderLines# {2}</span>",
+    Html.LocalizeNameFor(m => m.Information.InStock), Html.LocalizeNameFor(m => m.Information.Variants), Html.LocalizeNameFor(m => m.Information.OrderLines));
+
+    var salePricetmp = @"
+    <span class='price_1 line-through'>#:safeProp(PriceInc,'Text')#</span>
+    <span class='price_2'>#:safeProp(SalePriceInc,'Text')#</span>";
+
+    var priceTempl = @"<span class='price_1 size18'>#:safeProp(PriceInc,'Text')#</span>";
+
+    var hiddenTempl = "";//string.Format("<span class='link-hiden-es'>{0}</span>", StringTable.HiddenWeb);
+
+    var imgTempl = @"<a alt='#:Name#' href='#:safePropImg(Image,'FsUrl')#' class='preview'><img src='#:safePropImg(Image,'Thumb')#'/></a>";
+    var imgBundle = "<span class='icon-bundle-grid'><img src='" + ModuleUrl.ContentUrl("Images/admin/bundle.png", true) + "'/></span>";
+}
+<form id="list-form">
+    @*@Html.AntiForgeryToken()*@
+    @{ KendoGrid<ProductModel> kgrid = null; }
+    @(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", null, null, null, settings.Display.Admin.ProductPageSize)
+    .DataSource(m => m.Id, "List", null, null, "gridGetParams")
+    .Paging(10, new int[] { 10, 20, 30, 50, 100 }, StringTable.Products)
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Image)
+            .SetTemplate(imgTempl)
+            .SetCssClass("txt_align_c product-img"),
+
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetDefaultSort(true)
+            .SetCssClass("k-grid-name name-pro")
+            .SetTemplate("<a class='grid-row-edit'>#:Name#</a> #if (IsBundle) { # " + imgBundle + " # }#  #if (EmailMUsers > 0) { # <div class='emailmusers'><a href='" + ModuleUrl.AdminUrl("EmailMarketUser", "") + "?productId=#:Id#&s302=~' target='_blank'>#:EmailMUsers# " + Html.LocalizeNameFor(m => m.EmailMUsers) + "</a></div> # }#"),
+
+       grid.Col(m => m.PriceInc,m => m.SalePriceInc, true, 70)
+            .SetTemplate("# if (SalePriceInc.Value > 0) { # "+salePricetmp+" # }  else{#" + priceTempl + "#} #"),
+
+        grid.Col(m => m.Information, false, 180)
+            .SetTemplate(infoTempl),
+
+       grid.Col(m => m.Quantity, true, 100)
+            .SetCssClass("td-center k-grid-quantity")
+            .SetTemplate(ViewBag.PermissionEdit ? qtyTemp : "#:Quantity#"),
+       
+       grid.Col(m => m.DisplayOrder, true, 100)
+            .SetCssClass("td-center k-grid-displayorder")
+            .SetTemplate(ViewBag.PermissionEdit ? "<input value='#:DisplayOrder#' type='text'>":"#:DisplayOrder#"),
+       
+       controllerName.InList("bundleproduct") 
+        ? null 
+        : grid.Col(m => m.Location, true, 100)
+            .SetCssClass("k-grid-location")
+            .SetTemplate(ViewBag.PermissionEdit ? "<textarea id='Location_#:Id#' style='display:none;' prodtype='#:Type#' name='Location_#:Id#'lines='3'>#:(Location||'')#</textarea><span class='error' data-valmsg-for='Location_#:Id#' data-valmsg-replace='true'></span>":"#:(Location||'')#"),
+
+       grid.Col(m => m.IsAccessory, true, 70)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-IsAccessory"),
+                     
+       grid.Col(m => m.VisibleWeb, false, 70)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-VisibleWeb"),
+            
+       grid.Col(m => m.ProductStatusName, true, 80)
+            .SetTemplate("<span class='status-es-table'>#:ProductStatusName#</span>")
+            .SetCssClass("last txt_align_l"),
+            
+       grid.Col(m => m.ModifiedDate, true, 90)
+            .SetTemplate("#:ModifiedDate.TextF#"),
+
+                                
+    }.Where(m => m != null).ToArray())
+    .ColumnCommand(grid => new[]
+    {
+        grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr"),
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true) : null
+    }.Where(x => x != null).ToArray(), 60)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+</form>
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    $.validator.methods.number = function (value, element) {
+        if (!value || $.trim(value) == '') return this.optional(element);
+        var regex = new RegExp('@(LanguageMgr.GetNumberRegex(LanguageMgr.FocusLang).Replace("\\", "\\\\"))');
+        return regex.test(value);
+    };
+
+    $.validator.methods.range = (function (value, element, param) {
+        param[0] = localizeParseFloat($(element).attr('data-val-range-min'));
+        param[1] = localizeParseFloat($(element).attr('data-val-range-max'));
+        var newval = localizeParseFloat(value);
+        //console.log('range', value, element, param, newval, value);
+        return this.optional(element) || (newval >= param[0] && newval <= param[1]);
+    });
+
+    var advSearchFrm = $('#search-form .wr-search-adv');
+    var grid = $('#grid'), permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+
+    if ('@(searchInfo.IsDataModelEmpty ? 1 : 0)' == '1') {
+        advSearchFrm.show();
+        $('#formSearch').hide();
+        if ('@(searchInfo.IsSpecial ? 1 : 0)' == '1') $('#search-form').hide();
+    }
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function gridCustom(grid) {
+
+        if(permEdit)
+            $('.k-grid-quantity .qty-view[data-type="0"]', grid.element).unbind('click').click(function() {
+                var row = grid.dataItem($(this).closest('tr'));
+                openEditQtyForm(row, $(this).closest('td'));
+            }).each(function() {
+                var row = grid.dataItem($(this).closest('tr'));
+                if (row && ((row.Information && row.Information.Variants > 0) /*|| row.IsBundle*/))
+                    $(this).prop('disabled', true);
+            });
+
+        initImagePreview();
+
+        gridMarkLangDisabled(grid, '.k-grid-name', function(row) { return !row.LangVisible; });
+
+        gridHideCell(grid, '.k-grid-Delete', function(row) { return row.Id == 1 || row.AnyBundleRef; });
+
+        gridDisableCheckBox(grid, function (row) { return row.Id == 1 || row.AnyBundleRef; });
+
+        initGridDisplayOrderBox(grid, '.k-grid-displayorder input', '@ModuleUrl.AdminUrl(Html.GetController(), "ChangeDisplayOrder")');
+
+        initGridLocationBox(grid, '.k-grid-location textarea:not([prodtype=1])', '@ModuleUrl.AdminUrl(Html.GetController(), "ChangeLocation")');
+
+        initGridStatusAction(grid, '.k-grid-IsAccessory', permEdit ? '@(ModuleUrl.AdminUrl(Html.GetController(), "SetAccessory"))' : '',
+            function (row) { return row.IsAccessory; }, function (row, status) { row.IsAccessory = status; },
+            function (row) { return { id: row.Id, value: row.IsAccessory }; });
+
+        initGridStatusAction(grid, '.k-grid-VisibleWeb', permEdit ? '@(ModuleUrl.AdminUrl(Html.GetController(), "SetVisibleWeb"))' : '',
+            function (row) { return row.VisibleWeb; }, function (row, status) { row.VisibleWeb = status; },
+            function (row) { return { id: row.Id, value: row.VisibleWeb }; });
+    }
+
+    function gridGetParams(grid, e) {
+        var tsValId = '@(QParam.GetField<int?>("techSpecValId",false, true))';
+        if (advSearchFrm.is(':visible')) {
+            return urlToJSON('?' + advSearchFrm.closest('form').serialize() + '&forcenamesku=true&techSpecValId=' + tsValId);
+        } else return { nameorsku: $('#inputSearch').val(), forcenamesku: true, categoryId: '@searchInfo.CategoryId', Status: '@searchInfo.Status', techSpecValId: tsValId };
+    }
+
+    $('#special-search .close-2').click(function () {
+        location.href = '@ModuleUrl.AdminUrl(Html.GetController(), "Index")';
+    });
+
+    $(".adv-search").click(function () {
+        var obj = $("#search-form").find("fieldset");
+        if (obj.hasClass("scheduler-border")) obj.removeClass("scheduler-border");
+        else obj.addClass("scheduler-border");
+
+        advSearchFrm.slideToggle(500);
+        $('#formSearch').slideToggle(500);
+    });
+
+
+    $('#search-form').submit(function () {
+        if ($(this).valid()) grid.data('kendoGrid').dataSource.page(1);
+        return false;
+    });
+
+    $('#box_Visible,#box_Hidden').change(function () {
+        var visibility = $('#@htmlAdvSearch.IdFor(m => m.VisibilityWeb)');
+        var node = $(this).prop('checked') ? $(this) : $(this).closest('.clo_right').find('input:checked');
+        if (node.prop('checked')) {
+            if (node.is('#box_Visible')) {
+                visibility.val('true');
+                $('#box_Hidden').prop('checked', false);
+            } else {
+                visibility.val('false');
+                $('#box_Visible').prop('checked', false);
+            }
+        } else visibility.val('');
+    }).change();
+
+    $('#SelfDiscountYes,#SelfDiscountNo').change(function () {
+        var selfDiscount = $('#@htmlAdvSearch.IdFor(m => m.SelfDiscount)');
+        var node = $(this).prop('checked') ? $(this) : $(this).closest('.clo_right').find('input:checked');
+        if (node.prop('checked')) {
+            if (node.is('#SelfDiscountYes')) {
+                selfDiscount.val('true');
+                $('#SelfDiscountNo').prop('checked', false);
+            } else {
+                selfDiscount.val('false');
+                $('#SelfDiscountYes').prop('checked', false);
+            }
+        } else selfDiscount.val('');
+    }).change();
+
+    $('#CGroupDiscountYes,#CGroupDiscountNo').change(function () {
+        var cgroupDiscount = $('#@htmlAdvSearch.IdFor(m => m.CGroupDiscount)');
+        var node = $(this).prop('checked') ? $(this) : $(this).closest('.clo_right').find('input:checked');
+        if (node.prop('checked')) {
+            if (node.is('#CGroupDiscountYes')) {
+                cgroupDiscount.val('true');
+                $('#CGroupDiscountNo').prop('checked', false);
+            } else {
+                cgroupDiscount.val('false');
+                $('#CGroupDiscountYes').prop('checked', false);
+            }
+        } else cgroupDiscount.val('');
+    }).change();
+
+    $('#DownloadYes,#DownloadNo').change(function () {
+        var download = $('#@htmlAdvSearch.IdFor(m => m.Download)');
+        var node = $(this).prop('checked') ? $(this) : $(this).closest('.clo_right').find('input:checked');
+        if (node.prop('checked')) {
+            if (node.is('#DownloadYes')) {
+                download.val('true');
+                $('#DownloadNo').prop('checked', false);
+            } else {
+                download.val('false');
+                $('#DownloadYes').prop('checked', false);
+            }
+        } else download.val('');
+    }).change();
+
+    $('#HasQtyOnlyYes,#HasQtyOnlyNo').change(function () {
+        var hasQtyOnly = $('#@htmlAdvSearch.IdFor(m => m.HasQtyOnly)');
+        var node = $(this).prop('checked') ? $(this) : $(this).closest('.clo_right').find('input:checked');
+        if (node.prop('checked')) {
+            if (node.is('#HasQtyOnlyYes')) {
+                hasQtyOnly.val('true');
+                $('#HasQtyOnlyNo').prop('checked', false);
+            } else {
+                hasQtyOnly.val('false');
+                $('#HasQtyOnlyYes').prop('checked', false);
+            }
+        } else hasQtyOnly.val('');
+    }).change();
+
+    $('#NoCateOnlyYes,#NoCateOnlyNo').change(function () {
+        var noCateOnly = $('#@htmlAdvSearch.IdFor(m => m.NoCateOnly)');
+        var node = $(this).prop('checked') ? $(this) : $(this).closest('.clo_right').find('input:checked');
+        if (node.prop('checked')) {
+            if (node.is('#NoCateOnlyYes')) {
+                noCateOnly.val('true');
+                $('#NoCateOnlyNo').prop('checked', false);
+            } else {
+                noCateOnly.val('false');
+                $('#NoCateOnlyYes').prop('checked', false);
+            }
+        } else noCateOnly.val('');
+    }).change();
+
+    function safePropImg(obj, propName) {
+        if (obj == null) return '@ImageModel.NoImg';
+        return obj[propName] || '';
+    }
+
+    function openEditQtyForm(row, tdNode, qtyPos) {
+        var width = Math.max(200, Math.min(500, $(window).width() - 50));
+        var height = Math.max(200, Math.min(420, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popTemplate = $("<div>").html($("#edit-qty-popup-form-templ").html());
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@Html.Raw(StringTable.EditProductQuantity)', popTemplate.html(),
+            width, height, [], null,
+            function (modal) {
+
+                if (qtyPos != null) {
+                    if (qtyPos == 2) $('#QtyPos2', modal).prop('checked', true);
+                    else $('#QtyPos1', modal).prop('checked', true);
+                }
+
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+                var reasonTmpl = $('#reason-templ').data('kendoDropDownList');
+
+                admincommon.hideMessage();
+                formUpdateValidRules(modal.find('.popupBody'));
+
+                $('#Reason', modal).change(function() {$(this).valid();}).kendoDropDownList(reasonTmpl.options);
+
+                $('#QtyAdd,#QtyRemove', modal).change(function() {
+                    var costPriceBox = $('#CostPrice', modal).closest('.controls').hide();
+                    if ($(this).valid() && parseInt($(this).val()) > 0) {
+                        var node = $(this);
+                        $('#QtyAdd,#QtyRemove', modal).each(function() {
+                            if ($(this).attr('id') != node.attr('id'))
+                                $(this).prop('disabled', true).val('0').valid();
+                        });
+
+                        if($(this).attr('id') == 'QtyAdd') costPriceBox.show();
+                    } else $('#QtyAdd,#QtyRemove', modal).prop('disabled', false);
+                });
+
+                modal.find(".btn_save").click(function () {
+                    var data = urlToJSON('?' + $('#editQtyForm').serialize());
+                    if (($('#editQtyForm').valid() ? 1 : 0) + ($('#Reason', modal).valid() ? 1 : 0) == 2)
+                        ajaxCmdStatus('@ModuleUrl.AdminUrl(Html.GetController(), "UpdateQuantity")',
+                        { id: row.Id, delta: parseInt(data.qtyadd || 0) - parseInt(data.qtyremove || 0), reason: data.reason, qtyPos: data.qtypos, CostPrice: data.costprice, note: data.note, iSeq: -1 },
+                        function(result) {
+                            row.Quantity1 = result.Quantity1; 
+                            row.Quantity2 = result.Quantity2;
+                            row.ProductStatusId = result.ProductStatusId;
+                            row.ProductStatusName = result.ProductStatusName;
+                            if (row.Information)row.Information.InStock = result.Quantity;
+                            $('.qty-view-combined', tdNode).val('- ' + (row.BackOrderQty = result.BackOrderQty));
+                            $('.qty-view', tdNode).val(row.Quantity = result.Quantity); 
+                            $('.qtypos-detail', tdNode)
+                                .attr('title', '@StringTable.GetQtyPosName(DM.QtyPos.Qty1, settings): {0}, @StringTable.GetQtyPosName(DM.QtyPos.Qty2, settings): {1}'.replace('{0}', result.Quantity1).replace('{1}', result.Quantity2))
+                                .val('{0}/{1}'.replace('{0}', result.Quantity1).replace('{1}', result.Quantity2));
+
+                            grid.data('kendoGrid').refresh({ action: 'rebind', items: [row] });
+
+                            inputErrBox.append(msgBox);
+                            popup.close(); $(window).scrollTop(scrollTop);
+                        });
+                });
+                modal.find(".btn_cancel").click(function () {
+                    inputErrBox.append(msgBox); admincommon.hideMessage();
+                    popup.close(); $(window).scrollTop(scrollTop);
+                });
+            });
+
+    }
+
+    function initGridLocationBox(grid, selector, actionUrl) {
+        $(selector, grid.element).unbind('click').click(function() {
+            if (!$(this).attr('valid-init')) {
+                $(this).attr({
+                    'data-val': 'true', 'maxlength':'210', 'data-val-length-max':'200',
+                    'data-val-length': '@string.Format(StringTable.ErrMsgLengthLimit.ModErrLocalize(), "", 200)'
+                });
+
+                formUpdateValidRules($(this).closest('td'));
+                $(this).attr('valid-init', '1');
+            }
+        }).change(function () {
+            var row = grid.dataItem($(this).closest("tr")), newVal = $(this).val();
+            if ($(this).valid()) ajaxCmd(actionUrl, { id: row.Id, value: newVal }, function (result) {
+                row.Location = newVal;
+                grid.refresh({ action: 'rebind', items: [row] });
+            });
+        }).show();
+    }
+
+</script>
+@{var htmlEditQty = Html.GetHtmlHelper(new ProductModel.EditQty());}
+<div style="display: none">
+    @Html.LocalizeDropDownListKendo("reason-templ", null, typeof(ProdQtyLogReason).LocalizeEnumValues<int>(x => !x.InList(ProdQtyLogModel.HiddenReasons)), StringTable.SelectProdEditQtyReason, new { })
+</div>
+<script type="text/x-kendo-template" id="edit-qty-popup-form-templ">
+    <style type="text/css">
+        .popupBody .k-numeric-wrap {height: 24px !important;}
+        .popupBody .field-row .left-sec, .field-row .right-sec {width: 100%;float: left;}
+        .popupBody .field-row .left-sec span.text-eshop {width: auto;}
+        .popupBody .nNote{text-indent: 0;padding-left: 10px;width:85% !important;}
+    </style>
+    <form id="editQtyForm">
+        <div class="popupBody">
+            <section id="err-message-holder" style="float: left; width: 100%;"></section>
+            <section class="row_content_box kpopup-content">
+                <section class="wr_clo1">
+                    <div class="wcontent" style="margin:0 20px; color: #390F3D;line-height:2em">
+                        <div class="htmlcontent">   
+                            @if (settings.Hidden.Storage2Enabled)
+                            {
+                                <div class="controls">
+                                    <span class="text-eshop ck-editor">@StringTable.QtyPos</span>
+                                    <ul>
+                                        <li style="display:inline-block;margin-right:15px;">
+                                            <input class="css-radio" id="QtyPos1" name="QtyPos" type="radio" value="@(DM.QtyPos.Qty1.Val())" data-val="true" data-val-required="@StringTable.ErrMsgRequiredField.ModErrLocalize()">
+                                            <label class="css-labelradio" for="QtyPos1">@StringTable.GetQtyPosName(DM.QtyPos.Qty1, settings)</label>
+                                        </li>
+                                        <li style="display:inline-block;">
+                                            <input class="css-radio" id="QtyPos2" name="QtyPos" type="radio" value="@(DM.QtyPos.Qty2.Val())" data-val="true" data-val-required="@StringTable.ErrMsgRequiredField.ModErrLocalize()">
+                                            <label class="css-labelradio" for="QtyPos2">@StringTable.GetQtyPosName(DM.QtyPos.Qty2, settings)</label>
+                                        </li>
+                                    </ul>
+                                    <section class="field-valid-msg"><span class="field-validation-valid error" data-validate="false" data-valmsg-for="QtyPos" data-valmsg-replace="true"></span></section>
+                                </div>
+                            }
+                            <section class="controls">
+                                <span class="text-eshop ck-editor">@htmlEditQty.LocalizeNameFor(m => m.QtyAdd)</span>
+                                <section>
+                                    @htmlEditQty.LocalizeTextBoxFor(x => x.QtyAdd, new {  })
+                                </section>
+                                <section class="field-valid-msg">@htmlEditQty.LocalizeValidationMessageFor(m => m.QtyAdd)</section>
+                            </section>
+                            <section class="controls">
+                                <span class="text-eshop ck-editor">@htmlEditQty.LocalizeNameFor(m => m.QtyRemove)</span>
+                                <section>
+                                    @htmlEditQty.LocalizeTextBoxFor(x => x.QtyRemove, new { })
+                                </section>
+                                <section class="field-valid-msg">@htmlEditQty.LocalizeValidationMessageFor(m => m.QtyRemove)</section>
+                            </section>
+                            <section class="controls" style="display:none;">
+                                <span class="text-eshop ck-editor">@htmlEditQty.LocalizeNameFor(m => m.CostPrice)</span>
+                                <section>
+                                    @htmlEditQty.LocalizeTextBoxFor(x => x.CostPrice, new { })
+                                </section>
+                                <section class="field-valid-msg">@htmlEditQty.LocalizeValidationMessageFor(m => m.CostPrice)</section>
+                            </section>
+                            <section class="controls">
+                                <span class="text-eshop ck-editor">@htmlEditQty.LocalizeNameFor(m => m.Reason)</span>
+                                <section>
+                                    @htmlEditQty.LocalizeTextBoxFor(x => x.Reason, new { })
+                                </section>
+                                <section class="field-valid-msg">@htmlEditQty.LocalizeValidationMessageFor(m => m.Reason)</section>
+                            </section>
+                            <section class="controls">
+                                <span class="text-eshop ck-editor">@htmlEditQty.LocalizeNameFor(m => m.Note)</span>
+                                <section>
+                                    @htmlEditQty.LocalizeTextAreaFor(x => x.Note, new { @rows = "2" })
+                                </section>
+                                <section class="field-valid-msg">@htmlEditQty.LocalizeValidationMessageFor(m => m.Note)</section>
+                            </section>
+                        </div>
+                    </div>
+                </section>
+                <section class="clear"></section>
+                <ul class="wr_submit_top form-action-menu" style="position:relative; padding:10px 0;">
+                    <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                    <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+                </ul>
+            </section>
+        </div>
+    </form>
+</script>
+
+@if (Html.GetController().InList("NotifyMeProduct"))
+{
+    <script>
+        $(function(){
+            $('.js-add-new-selector').closest('li').hide();
+        })
+    </script>
+}
+else
+{
+    <script>
+        $(document).ready(function(){
+            $(".scheduler-border.adv-search").click();
+        })
+    </script>
+}

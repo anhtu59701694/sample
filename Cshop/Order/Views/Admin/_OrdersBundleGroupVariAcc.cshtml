@@ -1,0 +1,63 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model OrderModel
+@{
+    var settings = SettingsBiz.GetSettings();
+
+    var bundleGroupAccs = Model.GetRaw().OrderDetails
+        .Where(m => m.Product.Type.InList(ProductType.Bundle) && settings.Hidden.ProdBundleGroupAccessory)
+        .SelectMany(m => m.Product.Accessories.Where(z => z.BundleGroup != null && z.AcceVariant == null && !z.BundleGroup.ShowVariant && z.Accessory.Variants.Count != 0 && m.OrderDetailBundles.Any(w => w.Product.Id == z.Accessory.Id)).Select(z => new {z.Accessory, OD = m}))
+        .Select((m, idx) => new
+        {
+            m.OD.Id, ProductId = m.Accessory.Id, Iseq = idx + 1, ProductName = m.Accessory.GetName(), m.OD.Quantity, 
+            Variants = m.Accessory.Variants.Where(z => !z.Deleted).Select(z => new { z.Id, Name = z.GetPropDesc() }),
+            VariantSelected = m.OD.OrderDetailBundles.FirstOrDefault(z => z.Product.Id == m.Accessory.Id).SafeProp(z => z.Variant)
+        }).ToList();
+
+}
+<style type="text/css">
+    .orderdetail-bgavari {margin: 20px 10px 10px 20px;}
+    .orderdetail-bgavari .od-bgavari-item {margin-top: 10px;}
+    .orderdetail-bgavari .od-bgavari-item .btn {margin:0;vertical-align: top;}
+    .orderdetail-bgavari .od-bgavari-item .qty {font-weight:bold;color:#6c0b7e;font-size:small;}
+    .orderdetail-bgavari .od-bgavari-item .bgavari {display: inline-flex;margin-left: 5px;} 
+    .orderdetail-bgavari .od-bgavari-item .k-widget.k-dropdown.k-header {min-width:200px;vertical-align: top;}
+    .orderdetail-bgavari .od-bgavari-item .k-widget.k-dropdown.k-header[aria-readonly="true"] {cursor: default;}
+    .orderdetail-bgavari .od-bgavari-item .k-widget.k-dropdown.k-header[aria-readonly="true"] .k-select {display: none;}
+</style>
+@{
+}
+<ul class="orderdetail-bgavari">
+    @foreach (var itm in bundleGroupAccs)
+    {
+        <li class="od-bgavari-item" data-id="@itm.Id" data-quantity="@itm.Quantity" data-productid="@itm.ProductId">
+            <span class="name">@itm.ProductName</span> x <span class="qty">@itm.Quantity</span>
+            <div class="bgavari">
+                @Html.Hidden("ProductId" + itm.Iseq, itm.ProductId, new { Id = "ProductId" + itm.Iseq })
+                @Html.LocalizeDropDownListKendoLang("BgaVariSel" + itm.Iseq, itm.VariantSelected.GetId(), itm.Variants.OrderBy(m => m.Name).Select(m => new DDListItem()
+                {
+                    Value = m.Id.ToString(), Text = m.Name,Active = true, LangVisible = true, id = m.Id
+                }), StringTable.SelectVariants, itm.VariantSelected == null ? (object)new { @class = "BgaVariSel" } : new { @class = "BgaVariSel", @readonly = "readonly" })
+            </div>
+        </li>
+    }
+</ul>
+<script type="text/javascript">
+  
+    function getBgaVariData() {
+        var data = [];
+
+        $('.orderdetail-bgavari .od-bgavari-item').each(function() {
+            var id = parseInt($(this).attr('data-id')), qty = parseInt($(this).attr('data-quantity'));
+            var prodId = $(this).attr('data-productid'), bgaVariSelVal = $(this).find('input[id].BgaVariSel').val();
+
+            data.push({ Id: id, Quantity: qty, ProductId: prodId, VariantId: bgaVariSelVal });
+        });
+        
+        return data;
+    }
+
+</script>

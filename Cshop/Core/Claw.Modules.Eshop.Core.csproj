@@ -1,0 +1,508 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="12.0" DefaultTargets="Build" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props" Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProductVersion>
+    </ProductVersion>
+    <SchemaVersion>2.0</SchemaVersion>
+    <ProjectGuid>{8AFFD453-B8A1-4C7E-B26E-184590F88CA2}</ProjectGuid>
+    <ProjectTypeGuids>{349c5851-65df-11da-9384-00065b846f21};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
+    <OutputType>Library</OutputType>
+    <AppDesignerFolder>Properties</AppDesignerFolder>
+    <RootNamespace>Claw.Modules.Eshop</RootNamespace>
+    <AssemblyName>Claw.Modules.Eshop.Core</AssemblyName>
+    <TargetFrameworkVersion>v4.5.1</TargetFrameworkVersion>
+    <UseIISExpress>true</UseIISExpress>
+    <IISExpressSSLPort />
+    <IISExpressAnonymousAuthentication />
+    <IISExpressWindowsAuthentication />
+    <IISExpressUseClassicPipelineMode />
+    <SolutionDir Condition="$(SolutionDir) == '' Or $(SolutionDir) == '*Undefined*'">..\..\</SolutionDir>
+    <RestorePackages>true</RestorePackages>
+    <TargetFrameworkProfile />
+    <SccProjectName>
+    </SccProjectName>
+    <SccLocalPath>
+    </SccLocalPath>
+    <SccAuxPath>
+    </SccAuxPath>
+    <SccProvider>
+    </SccProvider>
+    <NuGetPackageImportStamp>3f03cf5b</NuGetPackageImportStamp>
+    <Use64BitIISExpress />
+    <UseGlobalApplicationHostFile />
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+  <ItemGroup>
+    <Reference Include="ABCpdf, Version=9.1.2.4, Culture=neutral, PublicKeyToken=a7a0b3f5184f2169, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Lib\ABCpdf.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="AutoMapper, Version=3.2.1.0, Culture=neutral, PublicKeyToken=be96cd2c38ef1005, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\AutoMapper.3.2.1\lib\net40\AutoMapper.dll</HintPath>
+    </Reference>
+    <Reference Include="AutoMapper.Net4, Version=3.2.1.0, Culture=neutral, PublicKeyToken=be96cd2c38ef1005, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\AutoMapper.3.2.1\lib\net40\AutoMapper.Net4.dll</HintPath>
+    </Reference>
+    <Reference Include="Claw.Controls, Version=3.1.0.31663, Culture=neutral, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Lib\Claw.Controls.dll</HintPath>
+    </Reference>
+    <Reference Include="Claw.Core">
+      <HintPath>..\Lib\Claw.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Common.Logging">
+      <HintPath>..\packages\Common.Logging.3.3.1\lib\net40\Common.Logging.dll</HintPath>
+    </Reference>
+    <Reference Include="Common.Logging.Core">
+      <HintPath>..\packages\Common.Logging.Core.3.3.1\lib\net40\Common.Logging.Core.dll</HintPath>
+    </Reference>
+    <Reference Include="Eshop.Payments.BasePayment">
+      <HintPath>..\Lib\Eshop.Payments.BasePayment.dll</HintPath>
+    </Reference>
+    <Reference Include="ICSharpCode.SharpZipLib, Version=0.86.0.518, Culture=neutral, PublicKeyToken=1b03e6acf1164f73, processorArchitecture=MSIL">
+      <HintPath>..\packages\NPOI.2.1.3.1\lib\net40\ICSharpCode.SharpZipLib.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Kendo.Mvc">
+      <HintPath>..\Lib\Kendo.Mvc.dll</HintPath>
+    </Reference>
+    <Reference Include="Lucene.Net, Version=3.0.3.0, Culture=neutral, PublicKeyToken=85089178b9ac3181, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Lib\Lucene.Net.dll</HintPath>
+    </Reference>
+    <Reference Include="Lucene.Net.Contrib.Analyzers, Version=3.0.3.0, Culture=neutral, PublicKeyToken=85089178b9ac3181, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Lib\Lucene.Net.Contrib.Analyzers.dll</HintPath>
+    </Reference>
+    <Reference Include="Lucene.Net.Contrib.Highlighter, Version=2.3.2.1, Culture=neutral, PublicKeyToken=85089178b9ac3181, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Lib\Lucene.Net.Contrib.Highlighter.dll</HintPath>
+    </Reference>
+    <Reference Include="Lucene.Net.Contrib.Memory, Version=1.0.0.0, Culture=neutral, PublicKeyToken=85089178b9ac3181, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Lib\Lucene.Net.Contrib.Memory.dll</HintPath>
+    </Reference>
+    <Reference Include="Lucene.Net.Contrib.Queries">
+      <HintPath>..\Lib\Lucene.Net.Contrib.Queries.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.CSharp" />
+    <Reference Include="Microsoft.Owin, Version=3.1.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Owin.3.1.0\lib\net45\Microsoft.Owin.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Microsoft.Owin.Host.SystemWeb">
+      <HintPath>..\packages\Microsoft.Owin.Host.SystemWeb.3.0.1\lib\net45\Microsoft.Owin.Host.SystemWeb.dll</HintPath>
+    </Reference>
+    <Reference Include="Microsoft.Web.Infrastructure, Version=1.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.Web.Infrastructure.1.0.0.0\lib\net40\Microsoft.Web.Infrastructure.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Newtonsoft.Json, Version=12.0.0.0, Culture=neutral, PublicKeyToken=30ad4fe6b2a6aeed, processorArchitecture=MSIL">
+      <HintPath>..\packages\Newtonsoft.Json.12.0.1\lib\net45\Newtonsoft.Json.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="NHibernate, Version=4.0.0.4000, Culture=neutral, PublicKeyToken=aa95f207798dfdb4, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\Lib\NHibernate.dll</HintPath>
+    </Reference>
+    <Reference Include="Ninject">
+      <HintPath>..\packages\Ninject.3.2.2.0\lib\net45-full\Ninject.dll</HintPath>
+    </Reference>
+    <Reference Include="NPOI, Version=2.1.3.1, Culture=neutral, PublicKeyToken=0df73ec7942b34e1, processorArchitecture=MSIL">
+      <HintPath>..\packages\NPOI.2.1.3.1\lib\net40\NPOI.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="NPOI.OOXML, Version=2.1.3.1, Culture=neutral, PublicKeyToken=0df73ec7942b34e1, processorArchitecture=MSIL">
+      <HintPath>..\packages\NPOI.2.1.3.1\lib\net40\NPOI.OOXML.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="NPOI.OpenXml4Net, Version=2.1.3.1, Culture=neutral, PublicKeyToken=0df73ec7942b34e1, processorArchitecture=MSIL">
+      <HintPath>..\packages\NPOI.2.1.3.1\lib\net40\NPOI.OpenXml4Net.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="NPOI.OpenXmlFormats, Version=2.1.3.1, Culture=neutral, PublicKeyToken=0df73ec7942b34e1, processorArchitecture=MSIL">
+      <HintPath>..\packages\NPOI.2.1.3.1\lib\net40\NPOI.OpenXmlFormats.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="Owin">
+      <HintPath>..\packages\Owin.1.0\lib\net40\Owin.dll</HintPath>
+    </Reference>
+    <Reference Include="Quartz">
+      <HintPath>..\Lib\Quartz.dll</HintPath>
+    </Reference>
+    <Reference Include="Spire.Barcode, Version=1.2.5.21040, Culture=neutral, PublicKeyToken=663f351905198cb3, processorArchitecture=MSIL">
+      <HintPath>..\packages\Spire.BarCode.1.2.5\lib\net40\Spire.Barcode.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Net" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Net.Http.Formatting, Version=5.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Microsoft.AspNet.WebApi.Client.5.2.0\lib\net45\System.Net.Http.Formatting.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Net.Http.WebRequest" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.ServiceModel" />
+    <Reference Include="System.Web.DynamicData" />
+    <Reference Include="System.Web.Entity" />
+    <Reference Include="System.Web.ApplicationServices" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+    <Reference Include="System" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Helpers, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.0\lib\net45\System.Web.Helpers.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Web.Http, Version=5.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Microsoft.AspNet.WebApi.Core.5.2.0\lib\net45\System.Web.Http.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.Http.WebHost, Version=5.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <SpecificVersion>False</SpecificVersion>
+      <HintPath>..\packages\Microsoft.AspNet.WebApi.WebHost.5.2.0\lib\net45\System.Web.Http.WebHost.dll</HintPath>
+    </Reference>
+    <Reference Include="System.Web.Mvc, Version=5.2.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.AspNet.Mvc.5.2.0\lib\net45\System.Web.Mvc.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Web.Razor, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.AspNet.Razor.3.2.0\lib\net45\System.Web.Razor.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Web.WebPages, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.0\lib\net45\System.Web.WebPages.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Web.WebPages.Deployment, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.0\lib\net45\System.Web.WebPages.Deployment.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Web.WebPages.Razor, Version=3.0.0.0, Culture=neutral, PublicKeyToken=31bf3856ad364e35, processorArchitecture=MSIL">
+      <HintPath>..\packages\Microsoft.AspNet.WebPages.3.2.0\lib\net45\System.Web.WebPages.Razor.dll</HintPath>
+      <Private>True</Private>
+    </Reference>
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Web.Services" />
+    <Reference Include="System.EnterpriseServices" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="WindowsBase" />
+    <Reference Include="YAXLib">
+      <HintPath>..\packages\YAXLib.2.13\lib\YAXLib.dll</HintPath>
+    </Reference>
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="Properties\DataSources\System.Data.DataSet.datasource" />
+    <Content Include="Service References\SmsServiceReference\Claw.Modules.Eshop.SmsServiceReference.CatSMSsendBulkResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Content>
+    <Content Include="Service References\SmsServiceReference\Claw.Modules.Eshop.SmsServiceReference.CatSMSSendNormalResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Content>
+    <Content Include="Service References\SmsServiceReference\Claw.Modules.Eshop.SmsServiceReference.CatSMSsendResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Content>
+    <Content Include="Service References\SmsServiceReference\Claw.Modules.Eshop.SmsServiceReference.CatSMSStatusCheckResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Content>
+    <Content Include="Service References\SmsServiceReference\Claw.Modules.Eshop.SmsServiceReference.CSS_ReceivingSM.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Content>
+    <Content Include="Service References\SmsServiceReference\Claw.Modules.Eshop.SmsServiceReference.ReturnSMSReceivingResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Content>
+    <Content Include="Service References\SmsServiceReference\Claw.Modules.Eshop.SmsServiceReference.ReturnSMSUsersResponse.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Content>
+    <Content Include="Service References\SmsServiceReference\Claw.Modules.Eshop.SmsServiceReference.SMS_Sending.datasource">
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Content>
+    <None Include="Service References\SmsServiceReference\configuration91.svcinfo" />
+    <None Include="Service References\SmsServiceReference\configuration.svcinfo" />
+    <None Include="Service References\SmsServiceReference\Reference.svcmap">
+      <Generator>WCF Proxy Generator</Generator>
+      <LastGenOutput>Reference.cs</LastGenOutput>
+    </None>
+    <None Include="Service References\SmsServiceReference\service1.disco" />
+    <Content Include="web.config">
+      <SubType>Designer</SubType>
+    </Content>
+    <Content Include="Views\Admin\Web.config" />
+    <Content Include="Views\Admin\SettingsIndex.cshtml" />
+    <Content Include="Views\Admin\VatsIndex.cshtml" />
+    <Content Include="Views\Admin\EmailTemplsEdit.cshtml" />
+    <Content Include="Views\Admin\EmailTemplsIndex.cshtml" />
+    <None Include="Properties\Settings.settings">
+      <Generator>SettingsSingleFileGenerator</Generator>
+      <LastGenOutput>Settings.Designer.cs</LastGenOutput>
+    </None>
+    <Content Include="Views\Admin\ActionLogsIndex.cshtml" />
+    <Content Include="Views\Admin\TracesIndex.cshtml" />
+    <Content Include="Views\Admin\CurrenciesIndex.cshtml" />
+    <Content Include="Views\Admin\CurrenciesEdit.cshtml" />
+    <Content Include="Views\Admin\TaskLogsIndex.cshtml" />
+    <Content Include="Views\Admin\Layout\_MenuSetting.cshtml" />
+    <Content Include="Views\Admin\Layout\_SettingDisplay.cshtml" />
+    <Content Include="Views\Admin\Layout\_SettingGeneral.cshtml" />
+    <Content Include="Views\Admin\Layout\Input.cshtml" />
+    <Content Include="Views\Admin\Layout\List.cshtml" />
+    <Content Include="Views\Admin\Layout\Setting.cshtml" />
+    <Content Include="Views\Admin\PermissionsIndex.cshtml" />
+    <Content Include="Views\Admin\PermissionsEdit.cshtml" />
+    <Content Include="Views\Admin\UsersIndex.cshtml" />
+    <Content Include="Views\Admin\SettingsHidden.cshtml" />
+    <Content Include="Views\Admin\SettingsLogistics.cshtml" />
+    <Content Include="Views\Admin\Layout\_SettingAccounting.cshtml" />
+    <Content Include="Views\Admin\SettingsHiddenOther.cshtml" />
+    <None Include="Service References\SmsServiceReference\service1.wsdl" />
+    <None Include="web.Debug.config">
+      <DependentUpon>web.config</DependentUpon>
+    </None>
+    <None Include="web.Release.config">
+      <DependentUpon>web.config</DependentUpon>
+    </None>
+  </ItemGroup>
+  <ItemGroup>
+    <Compile Include="AutoMapper.cs" />
+    <Compile Include="Controllers\Admin\PermissionController.cs" />
+    <Compile Include="Controllers\Admin\CurrencyController.cs" />
+    <Compile Include="Controllers\Admin\TaskLogController.cs" />
+    <Compile Include="Controllers\Admin\TraceController.cs" />
+    <Compile Include="Controllers\Admin\BaseController.cs" />
+    <Compile Include="Controllers\Admin\CityController.cs" />
+    <Compile Include="Controllers\Admin\DistrictController.cs" />
+    <Compile Include="Controllers\Admin\EmailTemplController.cs" />
+    <Compile Include="Controllers\Admin\SettingController.cs" />
+    <Compile Include="Controllers\Admin\ActionLogController.cs" />
+    <Compile Include="Controllers\Admin\VatController.cs" />
+    <Compile Include="DAL\CountryMgr.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="DAL\CurrencyMgr.cs" />
+    <Compile Include="DAL\EshopOwnerMgr.cs" />
+    <Compile Include="DAL\DelayQueueMgr.cs" />
+    <Compile Include="DAL\Interfaces\ICouponMgr.cs" />
+    <Compile Include="DAL\Interfaces\ICustGroupMgr.cs" />
+    <Compile Include="DAL\Interfaces\ICustomerMgr.cs" />
+    <Compile Include="DAL\Interfaces\IDiscountMgr.cs" />
+    <Compile Include="DAL\Interfaces\IOrderMgr.cs" />
+    <Compile Include="DAL\Interfaces\IPaymentMethodMgr.cs" />
+    <Compile Include="DAL\Interfaces\IGiftCardMgr.cs" />
+    <Compile Include="Domain\Interfaces\IGiftCard.cs" />
+    <Compile Include="Domain\Interfaces\IOrderDetailBundle.cs" />
+    <Compile Include="Helper\ISessionHelper.cs" />
+    <Compile Include="DAL\Interfaces\IShippingMgr.cs" />
+    <Compile Include="DAL\RegionMgr.cs" />
+    <Compile Include="DAL\TaskLogMgr.cs" />
+    <Compile Include="DAL\TaskMgr.cs" />
+    <Compile Include="DAL\TaskSettingMgr.cs" />
+    <Compile Include="DAL\TraceMgr.cs" />
+    <Compile Include="DAL\BaseMgr.cs" />
+    <Compile Include="DAL\ActionLogMgr.cs" />
+    <Compile Include="DAL\LanguageMgr.cs" />
+    <Compile Include="DAL\ModuleMgr.cs" />
+    <Compile Include="DAL\EmailTemplMgr.cs" />
+    <Compile Include="DAL\SettingMgr.cs" />
+    <Compile Include="DAL\DistrictMgr.cs" />
+    <Compile Include="DAL\CityMgr.cs" />
+    <Compile Include="DAL\PermissionMgr.cs" />
+    <Compile Include="DAL\UserViewMgr.cs" />
+    <Compile Include="DAL\VatMgr.cs" />
+    <Compile Include="Domain\Base.cs" />
+    <Compile Include="Domain\City.cs" />
+    <Compile Include="Domain\EshopOwner.cs" />
+    <Compile Include="Domain\DelayQueue.cs" />
+    <Compile Include="Domain\Interfaces\ICoupon.cs" />
+    <Compile Include="Domain\Interfaces\ICustGroup.cs" />
+    <Compile Include="Domain\Interfaces\ICustomer.cs" />
+    <Compile Include="Domain\Interfaces\IDiscount.cs" />
+    <Compile Include="Domain\Interfaces\IOrder.cs" />
+    <Compile Include="Domain\Interfaces\IOrderDetail.cs" />
+    <Compile Include="Domain\Interfaces\IPaymentMethod.cs" />
+    <Compile Include="Domain\Interfaces\IProduct.cs" />
+    <Compile Include="Domain\Interfaces\IProduct2.cs" />
+    <Compile Include="Domain\Interfaces\IShipping.cs" />
+    <Compile Include="Domain\Interfaces\IShippingPayment.cs" />
+    <Compile Include="Domain\Interfaces\IShoppingCart.cs" />
+    <Compile Include="Domain\Permission.cs" />
+    <Compile Include="Domain\Region.cs" />
+    <Compile Include="Domain\RegionLang.cs" />
+    <Compile Include="Domain\Task.cs" />
+    <Compile Include="Domain\TaskLog.cs" />
+    <Compile Include="Domain\TaskSetting.cs" />
+    <Compile Include="Domain\Trace.cs" />
+    <Compile Include="Domain\CityLang.cs" />
+    <Compile Include="Domain\Country.cs" />
+    <Compile Include="Domain\CountryLang.cs" />
+    <Compile Include="Domain\ActionLog.cs" />
+    <Compile Include="Domain\Currency.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Domain\District.cs" />
+    <Compile Include="Domain\EmailTempl.cs" />
+    <Compile Include="Domain\EmailTemplLang.cs" />
+    <Compile Include="Domain\Setting.cs" />
+    <Compile Include="Domain\UserView.cs" />
+    <Compile Include="Domain\Vat.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Domain\VatCountry.cs" />
+    <Compile Include="DomExtensions.cs" />
+    <Compile Include="Helper\ClawEnumHelper.cs" />
+    <Compile Include="Helper\CacheHelper.cs" />
+    <Compile Include="Helper\CurrencyCodeType.cs" />
+    <Compile Include="Helper\DataCache.cs" />
+    <Compile Include="Helper\SmsHelper.cs" />
+    <Compile Include="Helper\ExportHelper.cs" />
+    <Compile Include="Helper\QParam.cs" />
+    <Compile Include="Helper\SettingsBiz.cs" />
+    <Compile Include="Helper\TaskJob.cs" />
+    <Compile Include="Helper\VersionHelper.cs" />
+    <Compile Include="Helper\XmlHelper.cs" />
+    <Compile Include="KendoGrid.cs" />
+    <Compile Include="KendoTree.cs" />
+    <Compile Include="Models\ActionLogModel.cs" />
+    <Compile Include="Models\CurrencyModel.cs" />
+    <Compile Include="Models\CityLangModel.cs" />
+    <Compile Include="Models\CityModel.cs" />
+    <Compile Include="Models\CountryLangModel.cs" />
+    <Compile Include="Models\CountryModel.cs" />
+    <Compile Include="Models\DiscountType.cs" />
+    <Compile Include="Models\DistrictModel.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="Models\EmailTemplateType.cs" />
+    <Compile Include="Models\EmailTemplLangModel.cs" />
+    <Compile Include="Models\EmailTemplModel.cs" />
+    <Compile Include="Models\BaseModel.cs" />
+    <Compile Include="Models\LogActionType.cs" />
+    <Compile Include="Models\MembershipType.cs" />
+    <Compile Include="Models\OrderStatus.cs" />
+    <Compile Include="Models\PermissionMask.cs" />
+    <Compile Include="Models\PermissionModel.cs" />
+    <Compile Include="Models\RecurringOrderMode.cs" />
+    <Compile Include="Models\RecurringType.cs" />
+    <Compile Include="Models\RegionLangModel.cs" />
+    <Compile Include="Models\RegionModel.cs" />
+    <Compile Include="Models\SettingModel.cs" />
+    <Compile Include="Models\TaskLogModel.cs" />
+    <Compile Include="Models\TaskModel.cs" />
+    <Compile Include="Models\TraceModel.cs" />
+    <Compile Include="Models\UserModel.cs" />
+    <Compile Include="Models\UserViewModel.cs" />
+    <Compile Include="Models\UserViewType.cs" />
+    <Compile Include="Models\VatModel.cs" />
+    <Compile Include="Models\WeightUnit.cs" />
+    <Compile Include="ModExtensions.cs" />
+    <Compile Include="ModModelBinder.cs" />
+    <Compile Include="ModuleUrl.cs">
+      <SubType>Code</SubType>
+    </Compile>
+    <Compile Include="MsTranslator.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+    <Compile Include="Properties\Settings.Designer.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTimeSharedInput>True</DesignTimeSharedInput>
+      <DependentUpon>Settings.settings</DependentUpon>
+    </Compile>
+    <Compile Include="Service References\SmsServiceReference\Reference.cs">
+      <AutoGen>True</AutoGen>
+      <DesignTime>True</DesignTime>
+      <DependentUpon>Reference.svcmap</DependentUpon>
+    </Compile>
+    <Compile Include="StringTable.cs" />
+    <Compile Include="StringTable.Mod.cs" />
+  </ItemGroup>
+  <ItemGroup>
+    <Content Include="packages.config" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\source_dev\Modules\Modules.Eshop.Payments\Eshop.Payments.BasePayment\Eshop.Payments.BasePayment.csproj">
+      <Project>{2e3fd5f1-49da-4297-ae2a-5eb747adb76e}</Project>
+      <Name>Eshop.Payments.BasePayment</Name>
+    </ProjectReference>
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadata Include="Service References\" />
+  </ItemGroup>
+  <ItemGroup>
+    <WCFMetadataStorage Include="Service References\SmsServiceReference\" />
+  </ItemGroup>
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+  </PropertyGroup>
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+  <Import Project="$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets" Condition="'$(VSToolsPath)' != ''" />
+  <Import Project="$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v10.0\WebApplications\Microsoft.WebApplication.targets" Condition="false" />
+  <ProjectExtensions>
+    <VisualStudio>
+      <FlavorProperties GUID="{349c5851-65df-11da-9384-00065b846f21}">
+        <WebProjectProperties>
+          <UseIIS>False</UseIIS>
+          <AutoAssignPort>True</AutoAssignPort>
+          <DevelopmentServerPort>51725</DevelopmentServerPort>
+          <DevelopmentServerVPath>/</DevelopmentServerVPath>
+          <IISUrl>http://localhost:60363/</IISUrl>
+          <NTLMAuthentication>False</NTLMAuthentication>
+          <UseCustomServer>False</UseCustomServer>
+          <CustomServerUrl>
+          </CustomServerUrl>
+          <SaveServerSettingsInUserFile>False</SaveServerSettingsInUserFile>
+        </WebProjectProperties>
+      </FlavorProperties>
+    </VisualStudio>
+  </ProjectExtensions>
+  <Import Project="$(SolutionDir)\.nuget\NuGet.targets" Condition="Exists('$(SolutionDir)\.nuget\NuGet.targets')" />
+  <Target Name="EnsureNuGetPackageBuildImports" BeforeTargets="PrepareForBuild">
+    <PropertyGroup>
+      <ErrorText>This project references NuGet package(s) that are missing on this computer. Enable NuGet Package Restore to download them.  For more information, see http://go.microsoft.com/fwlink/?LinkID=322105. The missing file is {0}.</ErrorText>
+    </PropertyGroup>
+    <Error Condition="!Exists('$(SolutionDir)\.nuget\NuGet.targets')" Text="$([System.String]::Format('$(ErrorText)', '$(SolutionDir)\.nuget\NuGet.targets'))" />
+  </Target>
+  <PropertyGroup>
+    <PostBuildEvent>XCOPY /s /y "$(ProjectDir)Views\*.cshtml" "$(SolutionDir)Claw.Web\Claw\Sites\Default\Modules\Eshop\"
+XCOPY /s /y "$(ProjectDir)Contents\*" "$(SolutionDir)Claw.Web\Claw\Sites\Default\Modules\Eshop\"
+XCOPY /s /y "$(ProjectDir)$(OutDir)$(TargetName).dll" "$(SolutionDir)Claw.Web\bin\"
+XCOPY /s /y "$(ProjectDir)$(OutDir)*.dll" "$(SolutionDir)Claw.Web\bin\"
+</PostBuildEvent>
+  </PropertyGroup>
+  <Import Project="..\..\packages\AutoMapper.3.2.1\tools\AutoMapper.targets" Condition="Exists('..\..\packages\AutoMapper.3.2.1\tools\AutoMapper.targets')" />
+  <PropertyGroup>
+    <PreBuildEvent>
+    </PreBuildEvent>
+  </PropertyGroup>
+  <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
+       Other similar extension points exist, see Microsoft.Common.targets.
+  <Target Name="BeforeBuild">
+  </Target>
+  <Target Name="AfterBuild">
+  </Target>
+  -->
+</Project>

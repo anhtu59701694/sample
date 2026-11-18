@@ -1,0 +1,213 @@
+﻿@using System.Linq
+@using System.Web.UI.WebControls
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model BongerModel
+
+@{
+    Layout = "Layout/Input.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.OrderEdit;
+
+    ViewBag.Title = StringTable.AddEditBonger(Model.Id);
+    //ViewBag.ShowDeleteBtn = (Model != null && Model.Id > 0 && false);
+
+    //ViewBag.UseCKEditor = true;
+    ViewBag.UseDatePicker = true;
+    ViewBag.UseImgPreview = true;
+    //ViewBag.UseDropZone = true;
+
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/Bonger";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Orders;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    //var langOpt = LanguageMgr.ValidOptLang(Model.Id);
+    //var langCode = langOpt.LanguageCode;
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageBongers)
+}
+
+@section CurrentTitleSection {
+    <a href="/admin/modules/eshop/Bonger/">@(StringTable.ManageBongers)</a>
+}
+
+@section TabTitleSection {
+    @StringTable.AddEditBonger(Model.Id)
+}
+
+<style type="text/css">
+</style>
+
+@using (@Html.BeginForm("Input", Html.GetController(), FormMethod.Post, new { @id = "editForm", enctype = "multipart/form-data" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(x => x.Id)
+    @Html.HiddenFor(x => x.CreatedDate)
+
+    <section class="row-content-lang-box">
+        <section class="row_content_box">
+            <section class="clo_right col-right-eshop">
+                <section class="clo_left txt_align_r" style="width: 100% !important; text-align: left !important;">
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Name) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.Name, new { @class = "", @style = "float:left" })
+                            <span class="error" style="display: none; float: left;">*</span>
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Name)</section>
+                    </section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Phone)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.Phone, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Phone)</section>
+                    </section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Email)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.Email, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Email)</section>
+                    </section>
+                </section>
+                <section class="controls" style="display:none;">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Address)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.Address, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Address)</section>
+                    </section>
+                </section>
+                <section class="controls" style="display:none;">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Postnr)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.Postnr, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Postnr)</section>
+                    </section>
+                </section>
+                <section class="controls" style="display:none;">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Posted)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.Posted, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Posted)</section>
+                    </section>
+                </section>
+                <section class="controls" style="display:none;">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.CountryId)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.CountryId, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.CountryId)</section>
+                    </section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Status) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeDropDownListKendoFor(m => m.Status, typeof(BongerStatus).LocalizeEnumValues<byte>(),
+                                null, new { @class = "", @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Status)</section>
+                    </section>
+                </section>
+                <section class="controls" >
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Notes)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextAreaFor(m => m.Notes, new { @rows = "3", @style = "float:left" })
+                            <div class="note-log" style="clear:both;overflow: auto;max-height: 300px;"><pre>@Model.NoteLogs</pre></div>
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Notes)</section>
+                    </section>
+                </section>
+
+                <section class="controls">
+                    <section>
+                        <section>
+                            @RenderOrdersDetails()
+                        </section>
+                    </section>
+                </section> 
+
+            </section>
+        </section>
+
+    </section>
+    <section class="wr-line-eshop"></section>
+}
+
+<script type="text/javascript">
+    var form = $('#editForm')[0];
+
+    form.customValidFields = function () {
+        return true;
+    };
+
+    function gridBongerProductCustom(grid) {
+
+        initImagePreview(false, grid.element);
+    }
+
+    function safePropImg(obj, propName) {
+        return safeProp(obj, propName) || '@ImageModel.NoImg';
+    }
+
+    $(function() {
+        gridbongerproductInit('#gridbongerproduct', true);
+    });
+
+</script>
+
+@helper RenderOrdersDetails()
+{
+    var imgTemplate = "<a href='#:safePropImg(ProductImage,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(ProductImage,\"Thumb\")#'/></a>";
+
+    <div class="wr_table_all" style="float: left; width: 100%; margin-bottom: 5px;">
+        @(Html.LocalizeGridFor<BongerProductModel>("gridbongerproduct", "Product", null, null, null, null, int.MaxValue, null, grid =>
+        {
+            grid.ButtonDelBigClass += "_bongprod";
+            grid.ButtonAddNewClass += "_bongprod";
+            grid.CheckBoxSelAllCss += "_bongprod";
+            grid.CheckBoxRowCssClass += "_bongprod";
+        })
+        .DataSource(m => m.Id, Model.Products)
+        //.ColumnCheckBox(m => m.Key)
+        .Columns(grid => new[]
+        {
+            grid.Col(m => m.ProductImage, false, 50)
+                .SetTemplate(imgTemplate)
+                .SetCssClass("txt_align_c image"),
+
+            grid.Col(m => m.ProductName, "Edit", m => m.ProductId)
+                .SetCssClass("name-pro2"),
+
+            grid.Col(m => m.ProductSku),
+
+            grid.Col(m => m.Quantity)
+                .SetCssClass("td-center")
+
+        }.Where(x => x != null).ToArray())
+        .Sortable(true)
+        .Config(grid => { grid.CustomScript = "gridBongerProductCustom"; })
+        .ToMvcHtmlString())
+    </div>
+}

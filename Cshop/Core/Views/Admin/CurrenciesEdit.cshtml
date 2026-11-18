@@ -1,0 +1,221 @@
+﻿@using System.Linq
+@using System.Web.UI.WebControls
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Core
+@model CurrencyModel
+
+@{
+    Layout = "Layout/Input.cshtml";
+
+    ViewBag.Title = StringTable.AddEditCurrency(Model.Id);
+    ViewBag.ShowDeleteBtn = (Model != null && Model.Id > 0 && !(Model.AnyOrder ?? false) && !Model.Default);
+
+    ViewBag.UseCKEditor = true;
+
+    //ViewBag.UseDatePicker = true;
+    ViewBag.UseDropZone = true;
+    ViewBag.TranslateMaxWidth = 800;
+    ViewBag.TranslateMaxHeight = 480;
+
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/setting";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Settings;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var languages = (List<Language>)ViewBag.Languages;
+
+    var langOpt = LanguageMgr.ValidOptLang(Model.Id);
+    var langCode = langOpt.LanguageCode;
+
+    ViewBag.DZItemWidth = 120;//settings.Display.Category.Icon.Width;
+    ViewBag.DZItemHeight = 100;//settings.Display.Category.Icon.Height;
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageCurrency)
+}
+
+@section CurrentTitleSection {
+    <a href="/admin/modules/eshop/currency/">@(StringTable.ManageCurrency)</a>
+}
+
+@section TabTitleSection {
+    @StringTable.AddEditCurrency(Model.Id)
+}
+
+@using (@Html.BeginForm("Input", Html.GetController(), FormMethod.Post, new { @id = "editForm", enctype = "multipart/form-data" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(x => x.Id)
+
+    <section class="row-content-lang-box">
+        <section class="row_content_box">
+            <section class="clo_left txt_align_r">
+                <h2>@StringTable.CurrencyDetail</h2>
+            </section>
+            <section class="clo_right col-right-eshop">
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Name) (*)</span>
+                    <section>
+                        <section>
+                            @(Html.LocalizeDropDownListKendoFor(m => m.Name, CurrencyMgr.Items.Select(x => new { Code = x.Key, Value = x.Value, Name = x.Value }),
+                              m => m.Value, m => m.Name, new { Code = "", Value = "", Name = StringTable.SelectValue },
+                              new { @class = "", @style = "float:left" })
+          .Events(ev => ev.Change("function(e){ $('#Code').val(e.sender.dataItem().Code); $('.error-code').remove();}")))
+                            @*<span class="error" style="display: none; float: left;">*</span>*@
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Name)</section>
+                    </section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Code) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.Code, new { @class = "js-required", @readonly = "readonly", @style = "float:left" })
+                            <span class="error" style="display: none; float: left;">*</span>
+                        </section>
+                        <section class="field-valid-msg error-code">@Html.LocalizeValidationMessageFor(x => x.Code)</section>
+                    </section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@string.Format(StringTable.CurrencyRateHint, settings.General.Currency)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.Rate, new { @class = "kendo-numeric custom-price-number js-required", @style = "float:left;width:30% !important" })
+                            <span class="error" style="display: none; float: left;">*</span>
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Rate)</section>
+                    </section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Active)</span>
+                    @Html.LocalizeRadioButtonFor(model => model.Active, "true", new { @id = "IsActiveTrue", @class = "css-radio" })
+                    <label for="IsActiveTrue" class="css-labelradio">@StringTable.Yes </label>
+                    @Html.LocalizeRadioButtonFor(model => model.Active, "false", new { @id = "IsActiveFalse", @class = "css-radio" })
+                    <label for="IsActiveFalse" class="css-labelradio">@StringTable.No</label>
+                </section>
+            </section>
+        </section>
+        <section class="wr-line-eshop"></section>
+
+        <section class="row_content_box">
+            <section class="clo_left txt_align_r">
+                <h2>@StringTable.CurrencyDisplay</h2>
+            </section>
+            <section class="clo_right col-right-eshop">
+
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Token) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.Token, new { @class = "js-required", @style = "float:left" })
+                            <span class="error" style="display: none; float: left;">*</span>
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Token)</section>
+                    </section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.Location) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeRadioButtonFor(model => model.Location, "true", new { @id = "LocationLeft", @class = "css-radio" })
+                            <label for="LocationLeft" class="css-labelradio">@StringTable.OnTheLeft</label>
+                            @Html.LocalizeRadioButtonFor(model => model.Location, "false", new { @id = "LocationRight", @class = "css-radio" })
+                            <label for="LocationRight" class="css-labelradio">@StringTable.OnTheRight</label>
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Location)</section>
+                    </section>
+                </section>
+
+                <section class="controls">
+                    <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.DecimalSep) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeDropDownListKendoFor(m => m.DecimalSep, new[] { new { V = ",", N = "," }, new { V = ".", N = "." } }
+                            .Select(x => new SelectListItem() { Text = x.N, Value = x.V }),
+                            StringTable.SelectValue, new { @style = "float:left" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.DecimalSep)</section>
+                    </section>
+                </section>
+
+                <section class="controls">
+                    <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.ThousandSep) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeDropDownListKendoFor(m => m.ThousandSep, new[] { new { V = " ", N = "Space" }, new { V = ",", N = "," }, new { V = ".", N = "." } }
+                            .Select(x => new SelectListItem() { Text = x.N, Value = x.V.EncodeBase64() }),
+                            StringTable.SelectValue, new { @style = "float:left" }).Value(Model.ThousandSep)
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.ThousandSep)</section>
+                    </section>
+                </section>
+                
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.DecimalPlaces) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.DecimalPlaces, new { @class = "js-required kendo-numeric custom-price-number", @style = "width:30% !important", @type = "number" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.DecimalPlaces)</section>
+                    </section>
+                </section>
+                <section class="controls" style="margin-bottom: 0px;">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.DisplayOrder) (*)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.DisplayOrder, new { @class = "js-required", @type = "number", @style = "float:left;" })
+                            <span class="error" style="display: none; float: left;">*</span>
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.DisplayOrder)</section>
+                    </section>
+                </section>
+
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Default)</span>
+                    @Html.LocalizeRadioButtonFor(model => model.Default, "true", new { @id = "IsDefaultTrue", @class = "css-radio" })
+                    <label for="IsDefaultTrue" class="css-labelradio">@StringTable.Yes </label>
+                    @if(Model.Default)
+                    {
+                        @Html.LocalizeRadioButtonFor(model => model.Default, "false", new { @id = "IsDefaultFalse", @class = "css-radio", @disabled = "disabled" });
+                    }
+                    else
+                    {
+                       @Html.LocalizeRadioButtonFor(model => model.Default, "false", new { @id = "IsDefaultFalse", @class = "css-radio" });
+                    }
+                    <label for="IsDefaultFalse" class="css-labelradio">@StringTable.No</label>
+                </section>
+
+            </section>
+        </section>
+    </section>
+    <section class="wr-line-eshop"></section>
+}
+
+<script type="text/javascript">
+    var form = $('#editForm')[0];
+
+    form.customValidFields = function () {
+        return true;
+    };
+
+    form.CustomLangFormSwitch = function (langcode, node, senderuid) {
+        var ownerbox = node.closest('.row_content_box');
+    };
+
+    $(function () {
+        //initKendoNumeric('#@Html.IdFor(m => m.DecimalPlaces)', { format: "n0", step: 1 });
+        //initKendoNumeric('#@Html.IdFor(m => m.Rate)', { format: "n", step: 0.01 });
+    });
+
+</script>
+
+<style>
+    input#IsDefaultFalse[disabled=disabled] + label.css-labelradio {
+        opacity: 0.5;
+        cursor: not-allowed;
+    }
+</style>

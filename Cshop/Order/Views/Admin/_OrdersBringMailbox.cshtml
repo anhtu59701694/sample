@@ -1,0 +1,94 @@
+﻿@using System.Text.RegularExpressions
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@using Bring = Eshop.Shipping.BaseProvider;
+@model BringMailBoxModel
+@{
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var errMsg = (string)ViewBag.ErrorMsg;
+}
+
+<style type="text/css">
+    .booking-service { display: inline-block; margin-right: 15px; min-width: 170px; }
+    #bring-booking-form .right { margin-top: 3px; margin-left: 2%; width: 72%; }
+    #bring-booking-form .right.link { margin-top: 7px; height: 2em; overflow: hidden; border: 1px solid #ccc; padding-left: 5px; }
+    #bring-booking-form .left { width: 22%; text-align: right; }
+    #bring-booking-form .item { margin: 0; }
+</style>
+
+<div id="bring-booking-form" style="float: left; margin-bottom: 20px;width: 100%;">
+    @Html.SimpleHiddenFor(m => m.OrderId, new { })
+
+    @if (Model.MailboxId.IsNullOrEmpty())
+    {
+        <div class="request-form">
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.WeightInGram):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.WeightInGram, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.WeightInGram)</div>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.RecipientMobile):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.RecipientMobile, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.RecipientMobile)</div>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.Rfid):</div>
+                <div class="right">
+                    @Html.LocalizeCheckBoxFor(m => m.Rfid, new { @class = "css-checkbox", @value = "true" })
+                    <label for="@Html.IdFor(m => m.Rfid)" class="css-labelcheck">&nbsp;</label>
+                    <input name="@Html.NameFor(m => m.Rfid)" value="false" type="hidden" />
+                </div>
+            </div>
+        </div>
+        <script type="text/javascript">
+            
+            formUpdateValidRules($('#bring-booking-form'));
+
+        </script>
+    }
+    else
+    {
+        <div class="result-form">
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.MailboxId):</div>
+                <div class="right">@Html.LocalizeTextBoxFor(m => m.MailboxId, new { @readonly = "readonly", @style = "width: 150px !important;min-width: 0;" })</div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.LabelUri):</div>
+                <div class="right link">
+                    <a href="@Model.LabelUri" target="_blank">@Model.LabelUri</a>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.RfidLabelUri):</div>
+                <div class="right link">
+                    <a href="@Model.RfidLabelUri" target="_blank">@Model.RfidLabelUri</a>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.WaybillUri):</div>
+                <div class="right link">
+                    <a href="@Model.WaybillUri" target="_blank">@Model.WaybillUri</a>
+                </div>
+            </div>
+        </div>
+    }
+</div>
+
+<script type="text/javascript">
+    var errMsg = '@Regex.Replace(errMsg ?? "","\\s"," ")';
+
+    setTimeout(function () {
+        if (errMsg) admincommon.showMessage(errMsg.replace(/&lt;br\/&gt;/g, '<br/>'), '@(ViewBag.ErrorCode ?? "Error")');
+    }, 500);
+
+</script>

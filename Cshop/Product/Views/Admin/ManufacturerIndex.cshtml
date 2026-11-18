@@ -1,0 +1,113 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model IEnumerable<ManufacturerModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+    ViewBag.Title = StringTable.ManageManufacturers;
+    ViewBag.AddAction = "Add";
+    ViewBag.UseInlineEdit = true;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/product";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Product;
+    ViewBag.UseImgPreview = true;
+    ViewBag.ShowSearchBox = true;
+    
+    var settings = (SettingsBiz)ViewBag.Settings;
+    //var manufacture = (ManufacturerModel)ViewBag.Manufacturer;
+    //var manufactureid = manufacture == null ? -1 : manufacture.Id;
+    //var manufactureres = (List<ManufacturerModel>)ViewBag.Manufactureres;
+}
+
+<style type="text/css">
+    .grid-info-stat .num { color: #636262; }
+    .w10Per { width: 10%; }
+    .w10Per img { max-width: 200px; }
+    .w15Per { width: 15%; }
+    .preview img.empty {width: @(Html.CalcAutoWidth())px;}
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageManufacturers)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageManufacturers)
+}
+
+@Html.AntiForgeryToken()
+
+@{
+    var urlTemplate = "<a href='#:Url#' title='#:Name#' target='_blank'>#:Url#</a>";
+    //var imageTempl = "<a href='#:ifnull(ImageThumb)#' class='preview'><img id='thumb_#:Id#' src='#:ifnull(ImageThumb)#'/></a>";
+}
+@{ KendoGrid<ManufacturerModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", "Input", null, @"(function(e){gridOnInlineEdit(e,'#DisplayOrder',gridRefreshRow);})", @settings.Display.Product.PageSize)
+    .DataSource(m => m.Id, "List", null, null, "")//gridGetParams
+    .Paging(10, new int[] { 10, 20, 30, 50, 100 }, StringTable.Manufacturers)
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+       grid.Col(m => m.ImageThumb)
+            .SetTemplate(StringTable.SimpImgTempl())
+            .SetCssClass("txt_align_c image"),
+
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetInlineEdit(true)
+            .SetDefaultSort(true)
+            .SetCssClass("name-pro")
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+
+        grid.Col(m => m.Url, m => m.Url)
+            .SetInlineEdit(true)
+            .SetTemplate(urlTemplate)
+            .SetCssClass("name-pro")
+        })
+
+    .ColumnCommand(grid => new[]
+    {
+        grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr"),
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true) : null
+    }.Where(x => x != null).ToArray(), 120)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+    
+    var grid = $('#grid'), permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function gridCustom(grid) {
+
+        initImagePreview(false, grid.element, false);
+
+        if (permEdit)
+            $('tr', grid.element).each(function() {
+                $(this).dblclick(function(e) {
+                    if (!grid.editable) grid.editRow($(this));
+                });
+            });
+    }
+    function gridRefreshRow(grid, rowEle) {
+
+        initImagePreview(false, rowEle, false);
+
+        if (permEdit)
+            rowEle.dblclick(function(e) {
+                if (!grid.editable) grid.editRow($(this));
+            });
+    }
+
+    function ifnull(obj, def) {
+        if (obj == null) return def || '';
+        return obj;
+    }
+
+</script>

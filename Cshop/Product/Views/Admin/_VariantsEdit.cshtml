@@ -1,0 +1,510 @@
+﻿@using System.Linq
+@using System.Web.UI.WebControls
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model VariantModel
+@{
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var languages = (List<Language>)ViewBag.Languages;
+    var versionSetting = Claw.Modules.Eshop.Helper.VersionHelper.GetVersionSetting();
+    if (versionSetting != null)
+    {
+        if (versionSetting.Languages.Count > 0)
+        {
+            var lstLangCode = versionSetting.Languages.Select(p => p.Code.ToLower());
+            languages = languages.Where(p => lstLangCode.Contains(p.ShortLangCode.ToLower())).ToList();
+        }
+    }
+    var langOpt = LanguageMgr.ValidOptLang(Model.Id);
+    var langCode = langOpt.LanguageCode;
+
+    var statuses = (List<StatusModel>)ViewBag.Statuses;
+
+    languages = languages.OrderBy(x => x.LanguageCode.EqualsIgCase(langCode) ? 0 : 1).ToList();
+}
+
+<style type="text/css">
+    .variant-popup-form .lang_form[data-lang=@(langCode)] .text-translator {display: none;}
+</style>
+<style type="text/css">
+    .variant-popup-form .lang_form .text-translator { display: inline; color: #333; cursor: pointer; float: right; }
+    .variant-popup-form .lang_form .text-translator:hover { text-decoration: underline; }
+    .variant-popup-form .price-group { width: 75%; }
+    .variant-popup-form .price-group .text-eshop { margin-bottom: 0 !important; }
+    .variant-popup-form .k-numeric-wrap { height: 24px !important; }
+    .variant-popup-form .img-show { min-height: 240px; margin: 0; padding: 0; width: 100%; border-top: 0; border-left: 0; border-right: 0; text-align: center; background-color: transparent; }
+    .variant-popup-form .img-show a {vertical-align: top; line-height: 230px; }
+    .variant-popup-form #image-sel {max-width: 320px;max-height: 240px;width: auto;height: auto; border: 0; float: none; vertical-align: middle; }
+    .variant-popup-form .wr-list-img-check {width: 100%;}
+    .variant-popup-form #var-BackOrderQty[value='0']{display: none}
+    .field-row .left-sec, .field-row .right-sec {width: 100%;float: left;}
+    .field-row .left-sec span.text-eshop {width: auto;}
+</style>
+
+<section class="row-content-lang-box variant-popup-form">
+    <section class="row_content_box">
+        <section class="clo_left txt_align_l var-image-list-box">
+            @{ var img = settings.Display.Product.Image;}
+            <h2>@StringTable.ProductImages</h2>  (@img.GetTitleHint())
+            <div style="float: left; width: 100%;">
+                <input id="var-imageUpload" name="imageUpload" type="file" accept="image/*" multiple="" style="display: none" />
+                <div class="wr_center wr-img-sub" style="float: left; width: 100%; padding: 0;">
+                    <div id="var-dropzone-form" class="dropzone multiple wr-upload-img-es" style="background: none; border: 1px #c8c8c8 solid; padding: inherit; width: 100%;">
+                        <div class="wr-img-show">
+                            <div class="wr-upload-img-es mask-dropzone mask-dropzone-show" style="width: 98% !important; min-height: initial; display: block;">
+                                <span>@StringTable.AddOrDropImage</span>
+                            </div>
+                            <div class="dz-message" style="display: none"></div>
+                            <div class="img-show"><a title="@StringTable.Detail" href="" target="_blank"><img id="image-sel"></a></div>
+                            <div class="wr-list-img-check" style="width: 100%;">
+                                <ul class="dropzone-preview-box" style="list-style: none; margin-bottom: 10px; padding: 0; float: left; width: 100%"></ul>
+                            </div>
+                        </div>
+                        <div class="clear_fix"></div>
+                        <ul class="wr_submit_top set-relative mb20">
+                            <li style="margin-right: 15px !important">
+                                @Html.LocalizeImageLoading(new { @id = "image-loading", @style = "vertical-align:middle" })
+                                <input id="var-add-file" value="@StringTable.UploadImage" class="btn_update" type="button">
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+                <div><span class="error image-error-msg" style="cursor: pointer"></span></div>
+            </div>
+        </section>
+        <section class="clo_right col-right-eshop">
+            @Html.HiddenFor(x => x.Id, new { @class = "variant-form-field", @id = "var-Id", @binding = "Id" })
+            <div class="tab-style">
+                <div id="var-lang-form-list">
+                    @for (int i = 0; i < languages.Count; i++)
+                    {
+                        var lang = languages[i];
+                        var curCLang = Model.Languages.FirstOrAddNew(x => x.LangCode.EqualsIgCase(lang.LanguageCode),
+                            () => new VariantLangModel() { LangCode = lang.LanguageCode, VariantId = Model.Id });
+
+                        var iseq = Model.Languages.IndexOf(curCLang);
+                        var dataValid = (curCLang.Id == 0 ? 0 : 1);
+                        var itmActived = langCode.EqualsIgCase(lang.LanguageCode);
+                        var fldId = 0;
+
+                        <div class="lang_form" data-lang="@lang.LanguageCode" data-lang-name="@lang.LanguageName"
+                             data-valid="@dataValid">
+
+                            @Html.HiddenFor(m => m.Languages[iseq].LangCode, new { @class = "lang_form_field" })
+
+                            <section class="controls field-row">
+                                <section class="left-sec">
+                                    @Html.LocalizeImageLoading(new { @id = "loading-image-" + iseq + "-" + fldId, @style = "float:left" })
+                                    <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.Languages[iseq].DescriptionV) (@(lang.LanguageName))</span>
+                                    <span class="text-translator">@StringTable.UseTextTranslator</span>
+                                </section>
+                                <section class="right-sec">
+                                    <section>
+                                        @Html.LocalizeTextAreaFor(m => m.Languages[iseq].DescriptionV,
+                                            new
+                                            {
+                                                @datavalid = dataValid,
+                                                @binding = "DescriptionV",
+                                                @id = "var-Languages_" + iseq + "_Description",
+                                                @class = "lang_form_field " + (itmActived ? "ckeditor_simple" : "sub_ckeditor_simple"),
+                                                @style = "float:left;",
+                                                @ck_height = "100px",
+                                                @loadingimg = "loading-image-" + iseq + "-" + fldId++,
+                                            })
+                                    </section>
+                                    <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Languages[iseq].DescriptionV)</section>
+                                </section>
+                            </section>
+                        </div>
+                        <script type="text/javascript">
+                            initLangFormTranslator($('.variant-popup-form .lang_form[data-lang=@(lang.LanguageCode)]'));
+                        </script>
+                    }
+                </div>
+            </div>
+            <section class="controls" style="width: 47%;">
+                <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.SKU)</span>
+                <section>
+                    @Html.LocalizeTextBoxFor(x => x.SKU, new { @class = "variant-form-field", @id = "var-SKU", @binding = "SKU" })
+                </section>
+                <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.SKU)</section>
+            </section>
+            <section class="controls" style="width: 47%;float: right;margin-right: 0;">
+                <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.BarCode)</span>
+                <section>
+                    @Html.LocalizeTextBoxFor(x => x.BarCode, new { @class = "variant-form-field", @id = "var-BarCode", @binding = "BarCode" })
+                </section>
+                <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.BarCode)</section>
+            </section>
+            <section class="controls" style="width: 47%">
+                <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.Quantity)</span>
+                <section>
+                    @Html.LocalizeTextBoxFor(x => x.Quantity, new { @class = "variant-form-field js-required", @id = "var-Quantity", @binding = "Quantity", @disabled = "disabled", @style = "min-width:0;width: 40% !important;margin: 0;" })
+                    <input class="btn" id="btn-edit-var-qty" onclick="openEditQtyForm(this, $('#var-Id'))" value="@StringTable.Edit" style="margin: 0;display: none" type="button">
+                    @Html.LocalizeTextBoxFor(x => x.BackOrderQty, new { @class = "variant-form-field", @id = "var-BackOrderQty", @binding = "BackOrderQty", @style = "min-width: 0;width: 23%;", @disabled = "disabled", @title = Html.LocalizeNameFor(m => m.BackOrderQty) })
+                    <span class="error" style="display: none; float: left;">*</span>
+                </section>
+                <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Quantity)</section>
+            </section>
+            <section class="controls" style="width: 47%;float: right;margin-right: 0">
+                <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.Location)</span>
+                <section>
+                    @(Html.LocalizeComboBox2(m => m.Location, null, "Product", "ListLocation", "Name", "Name",
+                    new { @class = "variant-form-field", @id = "var-Location", @binding = "Location", @style = "width:100%" }))
+                </section>
+                <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Location)</section>
+            </section>
+            <section class="controls price-group">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.CostPrice)</span>
+                <section class="input-col-1">
+                    <section>
+                        @Html.LocalizeTextBoxFmFor(x => x.CostPrice, new
+                        {
+                            @class = "variant-form-field",
+                            @id = "var-CostPrice",
+                            @binding = "CostPrice.Text",
+                            @placeholder = StringTable.PriceExcVat,
+                            @onchange = "varpopupCalcIncPrice('var-CostPrice', 'var-CostPriceInc')",
+                        })
+                    </section>
+                    <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.CostPrice)</section>
+                </section>
+                <section class="input-col-2">
+                    <section>
+                        @Html.LocalizeTextBoxFmFor(x => x.CostPriceInc, new
+                        {
+                            @class = "variant-form-field",
+                            @id = "var-CostPriceInc",
+                            @binding = "CostPriceInc.Text",
+                            @placeholder = StringTable.PriceIncVat,
+                            @onchange = "varpopupCalcExcPrice('var-CostPriceInc', 'var-CostPrice')",
+                        })
+                    </section>
+                    <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.CostPriceInc)</section>
+                </section>
+            </section>
+            <section class="controls price-group">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Price)</span>
+                <section class="input-col-1">
+                    <section>
+                        @Html.LocalizeTextBoxFmFor(x => x.Price, new
+                        {
+                            @class = "variant-form-field",
+                            @id = "var-Price",
+                            @binding = "Price.Text",
+                            @placeholder = StringTable.PriceExcVat,
+                            @onchange = "varpopupCalcIncPrice('var-Price', 'var-PriceInc')",
+                        })
+                    </section>
+                    <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Price)</section>
+                </section>
+                <section class="input-col-2">
+                    <section>
+                        @Html.LocalizeTextBoxFmFor(x => x.PriceInc, new
+                        {
+                            @class = "variant-form-field",
+                            @id = "var-PriceInc",
+                            @binding = "PriceInc.Text",
+                            @placeholder = StringTable.PriceIncVat,
+                            @onchange = "varpopupCalcExcPrice('var-PriceInc', 'var-Price')",
+                        })
+                    </section>
+                    <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.PriceInc)</section>
+                </section>
+            </section>
+            <section class="controls price-group">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.SalePrice)</span>
+                <section class="input-col-1">
+                    <section>
+                        @Html.LocalizeTextBoxFmFor(x => x.SalePrice, new
+                        {
+                            @class = "variant-form-field",
+                            @id = "var-SalePrice",
+                            @binding = "SalePrice.Text",
+                            @placeholder = StringTable.PriceExcVat,
+                            @onchange = "varpopupCalcIncPrice('var-SalePrice', 'var-SalePriceInc')",
+                        })
+                    </section>
+                    <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.SalePrice)</section>
+                </section>
+                <section class="input-col-2">
+                    <section>
+                        @Html.LocalizeTextBoxFmFor(x => x.SalePriceInc, new
+                        {
+                            @class = "variant-form-field",
+                            @id = "var-SalePriceInc",
+                            @binding = "SalePriceInc.Text",
+                            @placeholder = StringTable.PriceIncVat,
+                            @onchange = "varpopupCalcExcPrice('var-SalePriceInc', 'var-SalePrice')",
+                        })
+                    </section>
+                    <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.SalePriceInc)</section>
+                </section>
+            </section>
+            <section class="controls">
+                <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.ProductStatusId)</span>
+                <section>
+                    @Html.Hidden("ProductStatusName", "", new { @class = "variant-form-field", @binding = "ProductStatusName" })
+                    @(Html.LocalizeDropDownListKendoLangFor(m => m.ProductStatusId, statuses.Select(x => new DDListItem()
+                    {
+                        Value = x.Id.ToString(),
+                        Text = x.Name,
+                        Active = true,
+                        LangVisible = true
+                    }), StringTable.SelectStatus, new { @class = "variant-form-field", @id = "var-ProductStatusId", @binding = "ProductStatusId" })
+                    .Events(ev => ev.Change("function(){$('#ProductStatusName').val(this.text());}")))
+                </section>
+                <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.ProductStatusId)</section>
+                <div id="BackDate-Box">
+                    <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.BackDate)</span>
+                    <section>
+                        @Html.LocalizeDateTextBoxFor(m => m.BackDate, Model.Id, new { @class = "", id = "var-BackDate", @style = "width: 80px;" })
+                        <section class="field-valid-msg">
+                            @Html.LocalizeValidationMessageFor(m => m.BackDate)
+                        </section>
+                    </section>
+                </div>
+            </section>
+            <section class="controls">
+                <span class="text-eshop">@Html.LocalizeNameFor(m => m.Active)</span>
+                <table>
+                    <tr>
+                        <td style="vertical-align: top">
+                            @Html.LocalizeRadioButtonFor(model => model.Active, "true", new { @id = "varIsActiveTrue", @class = "variant-form-field css-radio js-required", @binding = "Active" })
+                            <label for="varIsActiveTrue" class="css-labelradio">@StringTable.Visible</label>
+                            @Html.LocalizeRadioButtonFor(model => model.Active, "false", new { @id = "varIsActiveFalse", @class = "css-radio js-required" })
+                            <label for="varIsActiveFalse" class="css-labelradio">@StringTable.Hidden</label>
+                        </td>
+                        <td>&nbsp;</td>
+                        <td><span class="error" style="display: none; float: left;">*</span></td>
+                    </tr>
+                </table>
+            </section>
+        </section>
+    </section>
+</section>
+
+<script type="text/javascript">
+
+    var variantImageFormListData = null, variantImageJsonListData = null;
+    var numNodes = $('#var-CostPrice,#var-CostPriceInc,#var-Price,#var-PriceInc,#var-SalePrice,#var-SalePriceInc', '.variant-popup-form');
+
+    function varpopupCalcIncPrice(nodeid, targetid) {
+        var node = $('#' + nodeid), nodeKd = node.data('kendoNumericTextBox');
+
+        CalIncPrice(nodeKd.value(), targetid, node);
+    }
+
+    function varpopupCalcExcPrice(nodeid, targetid) {
+        var node = $('#' + nodeid), nodeKd = node.data('kendoNumericTextBox');
+
+        CalExcPrice(nodeKd.value(), targetid, node);
+    }
+
+    function variantBindInputField(varForm, row, field, newVal) {
+        //console.log('variantBindInputField', varForm, row, field, newVal);
+        var inputField;
+        if (field.indexOf('.') != -1) {
+            eval('row.' + field + ' = newVal');
+            var bindName = field.replace(/[\[\]\.]/g, '_');
+            inputField = varForm.find('.variant-form-field[binding=' + bindName + ']');
+        } else {
+            if (typeof (row[field]) == "boolean") {
+                row[field] = newVal.toLowerCase() == 'true';
+            } else row[field] = newVal;
+            inputField = varForm.find('.variant-form-field[binding=' + field + '],.variant-lang-form-field[binding=' + field + ']');
+        }
+        inputField.val(newVal); //console.log(inputField);
+    }
+
+    function variantReloadPrice(row) {
+        numNodes.each(function () {
+            var nodeKd = $(this).data('kendoNumericTextBox');
+            if (nodeKd) nodeKd.value(row[$(this).attr('name')].Value);
+        });
+    }
+
+    function variantSyncForm(form, row) {
+        //console.log('variantSyncForm', form, row);
+        $('.variant-form-field[binding]', form).each(function () {
+            variantBindInputField(row.VariantForm, row, $(this).attr('binding'), getInputVal($(this)));
+        });
+
+        numNodes.each(function () {
+            var name = $(this).attr('name');
+            row[name].Value = $(this).data('kendoNumericTextBox').value();
+            row[name].Text = localizeMoneyToString(row[name].Value);
+        });
+
+        $('.lang_form', form).each(function () {
+            var langCode = $(this).attr('data-lang');
+            var langForm = $('.variant-lang-form[data-key=' + langCode + ']', row.VariantForm);
+            var langRow = row.Languages.find(function (itm) { return itm.LangCode == langCode; });
+            if (!langRow) {
+                row.Languages.push({ Id: 0, LangCode: langCode, Description: '' });
+                langRow = row.Languages.find(function (itm) { return itm.LangCode == langCode; });
+            }
+            if (langForm.length == 0) console.log('variantSyncForm: lang is empty', langForm);
+            else
+                $('.lang_form_field[binding]', $(this)).each(function () {
+                    variantBindInputField(langForm, langRow, $(this).attr('binding'), getInputVal($(this)));
+                });
+        });
+
+        variantSortImages(row);
+
+        if (row.Images.length > 0) {
+            var fimg = row.Images[0];
+            row.Image = fimg.FileName;
+            row.ImageFsUrl = fimg.FsUrl;
+            row.ImageThumb = fimg.Thumb;
+        } else row.Image = row.ImageFsUrl = row.ImageThumb = null;
+    }
+
+    function doAddVariantImage(file, holder, formList, itemForm, row, dropzone, index) {
+        if ($(itemForm, formList).length >= '@VariantModel.MaxImages') {
+            setImageErrMsg($('.image-error-msg', holder), '@(StringTable.ErrLimitCountMessage)');
+        } else {
+            var mxDOrder = 0;
+            for (var k = 0; k < dropzone.files.length; k++) {
+                var img = dropzone.files[k].Image;
+                if (img) mxDOrder = Math.max(mxDOrder, img.DisplayOrder || 0);
+            }
+
+            file.imageForm = varImageAdd(row.VariantForm, {
+                Key: file.url, FileName: file.url, FsUrl: file.url,
+                Thumb: file.thumb, DisplayOrder: mxDOrder + 1 + (index || 0),
+            });
+
+            var img = {
+                FileName: file.url, Thumb: file.thumb, FsUrl: file.url, Key: file.url,
+                DisplayOrder: mxDOrder + 1 + (index || 0), Title: '', Id: 0, Languages: []
+            };
+
+            row.Images.push(img);
+
+            file.Image = function () { return row.Images.find(function (itm) { return itm.Key == img.Key; }); };
+            //formUpdateValidRules(formLst.find(itemForm).last());
+        }
+    }
+
+    function variantInitPopup(row) {
+
+        window.clawInitMsTranslator();
+
+        variantImageFormListData = $('.variant-image-form-list', row.VariantForm).clone();
+        variantImageJsonListData = JSON.stringify(row.Images);
+
+        formUpdateValidRules($('.variant-popup-form').data('dataRow', row));
+
+        var imgErrMsg = $('.var-image-list-box .image-error-msg').click(function () { $(this).html(''); });
+        var dzEle = dropzoneInit('#var-dropzone-form', '#var-imageUpload', '#var-add-file',
+            {
+                acceptedFiles: '@settings.Display.Admin.Image.Extensions.GetFileExtensionDropZone(true)',
+                previewTemplate: $('#var-image-templ').html(),
+                previewsContainer: '.var-image-list-box .dropzone-preview-box',
+                dropHandler: function (dzone) { MaskDropZone('.var-image-list-box'); }, enableZipUpload: true,
+            },
+            function (result, file, index) {
+                //console.log('dropzoneInit', result, file);
+                var dzone = $('#var-dropzone-form')[0].dropzone;
+                doAddVariantImage(file, '.var-image-list-box', '.variant-image-form-list', '.variant-image-form', row, dzone, index);
+            }, function (file, e) { setImageErrMsg(imgErrMsg, e.Message + ' (' + file.name + ')'); });
+
+        var dropzone = dzEle[0].dropzone;
+        dropzone.idGenerator = 1;
+
+        dropzone.on("addedfile", function (file) {
+            clawSetTimeout(function () { return file.key; }, function () {
+                dzImageOnAdd(dropzone, file, '.var-image-list-box', '.variant-image-form');
+            }, 200, 50);
+            MaskDropZone('.var-image-list-box'); //show mask dropzon when have not image
+        });
+
+        //console.log('variantInitPopup', row, dropzone);
+
+        row.Images.forEach(function (img) {
+            var file = dropzoneAdd(dropzone, img.Key, img.FileName, img.FsUrl, img.Thumb, 'image/*');
+            file.Image = function () { return row.Images.find(function (itm) { return itm.Key == img.Key; }); };
+            dzImageOnAdd(dropzone, file, '.var-image-list-box', '.variant-image-form');
+        });
+
+        dropzone.on("removedfile", function (file) {
+            //console.log("removedfile", file);
+            //var imgKey = $('#Html.IdFor(m => m.ImageKey)');
+
+            if (dropzone.destroying) return;
+
+            $('.variant-image-form[data-img-url="' + file.key + '"] input').each(function () {
+                $(this).attr('datavalid', 0);
+                $(this).val('');
+            });
+
+            if ($('.var-image-list-box .image-sel').attr('key') == file.key)
+                $('.var-image-list-box .image-sel').removeAttr('src');
+
+            if ($('#image-sel', '.var-image-list-box').attr('key') == file.key)
+                $('#image-sel', '.var-image-list-box').removeAttr('src').closest('.img-show').find('a').attr('href', null);
+            //if (imgKey.val() == file.key) imgKey.val('');
+
+            row.Images = row.Images.filter(function (img) { return img.Key != file.key; });
+
+            MaskDropZone('.var-image-list-box'); //show mask dropzon when have not image
+        });
+
+        dropzone.on("reset", function (e) {
+            console.log("reset", e);
+            $('.es-noimg-show', '.var-image-list-box').show();
+            setTimeout(function () { imgErrMsg.html(''); }, 10000);
+        });
+
+        $('#var-Price,#var-PriceInc,#var-SalePrice,#var-SalePriceInc')
+            .change(function () { validateVariantPrices(); })
+            .focusout(function () { validateVariantPrices(); });
+
+        $('#var-ProductStatusId', '.variant-popup-form').change(function() {
+            if ($(this).val() == '3') $('#BackDate-Box').show();
+            else $('#BackDate-Box').hide();
+        }).change();
+
+        numNodes.removeClass('input-validation-error');
+        initKendoNumeric(numNodes, { format: '@settings.Display.Others.GetPriceFormat()', step: '@settings.Display.Others.PriceStep' });
+        initSort(dropzone, '.var-image-list-box');
+        initEditor($('.ckeditor_simple,.sub_ckeditor_simple', '#var-lang-form-list'));
+        initDatePicker($('#var-BackDate', '.variant-popup-form'));
+
+        setTimeout(function () { variantReloadPrice(row); }, 2000);
+    }
+
+    function validateVariantPrices() {
+        var form = $('.variant-popup-form').closest('form');
+        return validatePrices($('#var-PriceInc', form), $('#var-SalePriceInc', form), form);
+    }
+
+    function variantSortImages(row) {
+        row.Images = row.Images.filter(function () { return true; })
+            .sort(function (a, b) {
+                var aVal = a.DisplayOrder, bVal = b.DisplayOrder;
+                //console.log('variantSortImages', aVal, bVal);
+                return aVal == bVal ? 0 : (aVal < bVal ? -1 : 1);
+            });
+    }
+
+    $.fn.getRemoteValidArgs = function (args) {
+
+        var otherItems = [$('#@Html.IdFor(m => m.SKU)').val()], meId = '@Model.Id';
+
+        $('.var-sku').each(function () { if ($(this).attr('data_id') != meId) otherItems.push($(this).val()); });
+
+        args.data['Id'] = meId;
+        args.data['OtherSKUs'] = otherItems;
+
+        return args;
+    };
+
+</script>

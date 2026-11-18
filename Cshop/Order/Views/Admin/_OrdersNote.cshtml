@@ -1,0 +1,229 @@
+﻿@using System.Linq
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model OrderModel
+@{
+    //var langCode = (string)ViewData["LangCode"];
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var noteHtml = Html.GetHtmlHelper<OrderNoteModel>();
+
+    var paydata = Model.Id != 0 && Model.GetRaw() != null && Model.GetRaw().OrderDetails.SafeCount() == 0 ? Model.GetRaw().SafeProp(m => m.PaymentData).SafeProp(m => m.IsNullOrEmpty() ? null : Eshop.Payments.BasePayment.PaymentData.Deserialize(m)) : null;
+    var payPostData = paydata.SafeInvokeProperty<string>("PostData");
+}
+
+@if (paydata != null)
+{
+    var db = new Claw.Modules.Eshop.DAL.DefaultDb();
+    var payType = paydata.GetType();
+    var culture = System.Globalization.CultureInfo.InvariantCulture;
+    var odItems = new[] { new { item = new { product = new Claw.Modules.Eshop.Domain.ProductBase(), variant = new Claw.Modules.Eshop.Domain.VariantBase(), sourceId = 0 }, name = "", quantity = 0, unitPrice = 0, incVat = false } }.Take(0).ToList();
+    Func<string, System.Tuple<int, int, int>> fGetProdId = x =>
+    {
+        var arr = x.Split('-');
+        return new System.Tuple<int, int, int>(arr[1].TryParseInt() ?? 0, arr.Length == 3 ? arr[2].TryParseInt() ?? 0 : 0, arr[0].TryParseInt() ?? 0);
+    };
+    if (payType == typeof(Eshop.Payment.DIBS.DIBSPaymentData))
+    {
+        var order = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(payPostData, new { order = new { items = new Eshop.Payment.DIBS.Data.OrderItem[0] } });
+        odItems = order.order.items.Where(m => !m.reference.InList("PAYEMNT", "SHIPPING"))
+            .Select(m => new { item = fGetProdId(m.reference).SafeProp(z => new { product = db.DataService.GetObject<Claw.Modules.Eshop.Domain.ProductBase>(z.Item1), variant = z.Item2 == 0 ? null : db.DataService.GetObject<Claw.Modules.Eshop.Domain.VariantBase>(z.Item2), sourceId = z.Item3 }), m.name, m.quantity, m.unitPrice, incVat = false }).ToList();
+    }
+    else if (payType == typeof(Eshop.Payments.Svea.SveaPaymentData))
+    {
+        var order = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(payPostData, new { cart = new { Items = new Eshop.Payments.Svea.OrderRow[0] } });
+        odItems = order.cart.Items.Where(m => !m.ArticleNumber.InList("PAYMENT", "SHIPPING"))
+            .Select(m => new { item = fGetProdId(m.ArticleNumber).SafeProp(z => new { product = db.DataService.GetObject<Claw.Modules.Eshop.Domain.ProductBase>(z.Item1), variant = z.Item2 == 0 ? null : db.DataService.GetObject<Claw.Modules.Eshop.Domain.VariantBase>(z.Item2), sourceId = z.Item3 }), name = m.Name, quantity = (int)m.Quantity / 100, unitPrice = (int)m.UnitPrice, incVat = true }).ToList();
+    }
+    else if (payType == typeof(Eshop.Payments.Vipps.VippsPaymentData))
+    {
+        var orderItems = paydata.SafeInvokeProperty<List<Eshop.Payments.Vipps.ItemDescription>>("Items") ?? new List<Eshop.Payments.Vipps.ItemDescription>();
+        odItems = orderItems.Where(m => !m.reference.InList("PAYEMNT", "SHIPPING"))
+            .Select(m => new { item = fGetProdId(m.reference).SafeProp(z => new { product = db.DataService.GetObject<Claw.Modules.Eshop.Domain.ProductBase>(z.Item1), variant = z.Item2 == 0 ? null : db.DataService.GetObject<Claw.Modules.Eshop.Domain.VariantBase>(z.Item2), sourceId = z.Item3 }), name = m.product, m.quantity, m.unitPrice, incVat = false }).ToList();
+    }
+    else if (payType == typeof(Eshop.Payments.KlarnaPayments.KlarnaPaymentData))
+    {
+        var order = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(payPostData, new { order_lines = new Eshop.Payments.KlarnaPayments.OrderLine[0] });
+        odItems = order.order_lines.Where(m => !m.reference.InList("PAYEMNT", "SHIPPING"))
+            .Select(m => new { item = fGetProdId(m.reference).SafeProp(z => new { product = db.DataService.GetObject<Claw.Modules.Eshop.Domain.ProductBase>(z.Item1), variant = z.Item2 == 0 ? null : db.DataService.GetObject<Claw.Modules.Eshop.Domain.VariantBase>(z.Item2), sourceId = z.Item3 }), m.name, m.quantity, unitPrice = m.unit_price, incVat = true }).ToList();
+    }
+    else if (payType == typeof(Eshop.Payments.KlarnaCheckout.KlarnaCheckoutPaymentData))
+    {
+        var order = Newtonsoft.Json.JsonConvert.DeserializeAnonymousType(payPostData, new { order_lines = new Eshop.Payments.KlarnaCheckout.OrderLine[0] });
+        odItems = order.order_lines.Where(m => !m.reference.InList("PAYEMNT", "SHIPPING"))
+            .Select(m => new { item = fGetProdId(m.reference).SafeProp(z => new { product = db.DataService.GetObject<Claw.Modules.Eshop.Domain.ProductBase>(z.Item1), variant = z.Item2 == 0 ? null : db.DataService.GetObject<Claw.Modules.Eshop.Domain.VariantBase>(z.Item2), sourceId = z.Item3 }), m.name, m.quantity, unitPrice = m.unit_price, incVat = true }).ToList();
+    }
+
+    var items = odItems.Select(m => string.Format("({0}, {1}, '{2}', {3}, {4}, {5}, 0, 0, 0, {6}, {7}, {8}, {9}, {10}, {11}, {12}, {13})",
+                Model.Id, m.item.product.Id, m.item.product.GetName(m.item.variant), m.quantity, ((double?)m.item.product.CombinedSalePrice(m.item.variant) ?? 0).ToString(culture),
+                ((double)m.item.product.Vat.Value).ToString(culture), m.item.product.ShippingType, ((double)m.item.product.Weight).ToString(culture),
+                ((object)m.item.product.CombinedCostPrice(m.item.variant)).SafeProp(z => ((double)(decimal)z).ToString(culture), "null"), m.item.product.WUnit, m.item.product.SKU.SafeProp(z => "'" + z + "'", "null"),
+                (m.unitPrice / ((1 + (double)(m.incVat ? m.item.product.Vat.Value : 0)) * 100.0)).ToString(culture), m.item.sourceId, ((double?)m.item.product.CombinedPrice(m.item.variant) ?? 0).ToString(culture))).ToList();
+
+    if (items.Count != 0)
+    {
+        <div style="margin-bottom: 10px;">
+            <button onclick="$(this).parent().find('pre').toggle()" type="button">Show sql</button>
+            <pre style="display:none;">
+
+        INSERT eshop.OrderDetails(OrderId, ProductId, ProductName, Quantity, Price, Vat, DiscountValue, CouponValue, Delivered,
+               ProductShippingType, ProductWeight, CostPrice, ProductWUnit, ProductSKU, PriceFE, SourceId, PriceOrigin) VALUES
+        @(items.ToString(", \r\n        "))
+        </pre>
+        </div>
+    }
+}
+
+@if (Model.Id != 0 && !Model.OrderStatus.InList(OrderStatus.Cancelled, OrderStatus.New, OrderStatus.PaymentWaiting))
+{
+    <div style="margin-bottom: 10px;">
+        <button onclick="tripletexRePush()" type="button">@("Re-push to tripletex".ModLocalize())</button>
+    </div>
+ }
+<style type="text/css">
+    #gridordernote .subject {
+        font-size: small;
+        font-weight: bold;
+        color: #555;
+    }
+
+    #gridordernote .body {
+        font-size: small;
+    }
+    #gridordernote .form-link { text-decoration: underline; }
+</style>
+@{
+    var orderedDateTempl = string.Format(@"#:safeProp(CreatedDate,'TextF')#");
+    var OrderStatusTxtTempl = string.Format(@"#:safeProp(OrderStatusTxt,'Text')#");
+}
+<div class="wr_table_all" id="order-notes" style="float: left; width: 100%; margin-bottom: 5px;">
+    @(noteHtml.LocalizeGridFor<OrderNoteModel>("gridordernote", "OrderNote", "Delete", null, null, null,
+        null, null, grid =>
+        {
+            grid.ButtonDelBigClass += "_note";
+            grid.ButtonAddNewClass += "_note";
+            grid.CheckBoxSelAllCss += "_note";
+            grid.CheckBoxRowCssClass += "_note";
+        })
+        .DataSource(m => m.Id, "List", null, null, "gridOrderNoteGetParams")
+        .Paging(10, new[] { 10, 20, 30, 50, 100 })
+        //.ColumnCheckBox(m => m.Id)
+        .Columns(grid => new[]
+        {
+            grid.Col(m => m.CreatedDate, false, 150)
+                .SetTemplate(orderedDateTempl).SetCssClass("td-center"),
+            grid.Col(m => m.NoticeCustomer)
+                .SetTemplate(StringTable.BoolTempl)
+                .SetCssClass("td-center  k-grid-status"),
+            grid.Col(m => m.OrderStatusTxt)
+                .SetTemplate(OrderStatusTxtTempl)
+                .SetCssClass("td-center"),
+            grid.Col(m => m.Message)
+                .SetTemplate("<div class='subject'>#=Subject#</div><div class='body'>#=Body#</div><div class='body'>#=AuditInfo#</div>"),
+            grid.Col(m => m.Subject),
+            grid.Col(m => m.Body)
+                .SetInputTag("TextArea"),
+
+        })
+            //.ColumnCommand(grid => new[]
+            //{
+            //    grid.Cmd(m => m.Id, "(function(uid){ gridCmdInlineEdit('gridordernote',uid); })", "Edit", "edit_fr", false, null, true),
+            //    grid.Cmd(m => m.Id, "Delete", "Delete", "delete_fr", true)
+            //}, 120)
+        .Sortable(true)
+        .Config(grid => { grid.CustomScript = "gridOrderNoteCustom"; })
+        .ToMvcHtmlString())
+</div>
+<div style="height: 15px; float: left; width: 100%;">
+    <section id="grid-note-massage" class="show_massage" style="display: none" data-status="">
+        <span class="nNote"></span><a title="@StringTable.Close" class="close" href="javascript:void(0)">X</a>
+    </section>
+</div>
+<script type="text/javascript">
+
+    var gridordernote = $('#gridordernote');
+
+    $(function () {
+        gridordernoteInit('#gridordernote', true);
+
+        var grid = gridordernote.data('kendoGrid');
+        var subject = gridGetColumn(grid, 'Subject');
+        var body = gridGetColumn(grid, 'Body');
+        var message = gridGetColumn(grid, 'Message');
+
+        grid.hideColumn(subject.field);
+        grid.hideColumn(body.field);
+
+        //message.editor = subject.editor + '<br/>' + body.editor;
+    });
+
+    function gridOrderNoteCustom(grid) {
+
+        initGridStatusAction(grid, '.k-grid-status', function (){},
+            function (row) { return row.NoticeCustomer; }, function (row, status) { row.NoticeCustomer = status; },
+            function (row) { return { id: row.Id, NoticeCustomer: row.NoticeCustomer }; });
+
+        $('.k-grid-status a', grid.element).attr({ 'title': null, href: null }).closest('td').unbind('click');
+
+        //$('tr', grid.element).each(function () {
+        //    $(this).dblclick(function (e) {
+        //        if (!grid.editable) grid.editRow($(this));
+        //    });
+        //});
+
+        $(function () {
+            //$('.js-add-new-selector_note').unbind('click').click(function () {
+            //    grid.addRow();
+            //}).attr('type', 'button');
+        });
+
+        grid.showMessage = function (message, status) { gridShowMessage(grid, '#grid-note-massage', message, status); };
+
+        //if ($('.table_all > tbody:parent').length == 0) $(".wr_table_all").css('border', 'none');
+        //else $('.wr_table_all').removeAttr("style");
+    }
+
+    function gridOrderNoteRefreshRow(grid, rowEle) {
+
+        //initGridStatusAction(grid, rowEle.find('.k-grid-status'), statusActUrl,
+        //    function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+        //    function (row) { return { id: row.Id, active: row.Active }; });
+
+        //gridHideCell(grid, rowEle.find('.k-grid-Delete'), function (row) { return row.AnyChild; });
+
+        //gridDisableCheckBox(grid, function (row) { return row.AnyChild; }, rowEle.find('.row-checkbox'));
+
+        //rowEle.dblclick(function (e) {
+        //    if (!grid.editable) grid.editRow($(this));
+        //});
+    }
+
+    function gridOrderNoteOnInlineEdit(e) {
+        console.log(e);
+        e.model.InlineEdit = true;
+        e.model.OrderId = '@Model.Id';
+    }
+
+    function gridOrderNoteGetParams(grid, e) {
+        return { OrderId: '@Model.Id' };
+    }
+
+    function gridGetColumn(grid, name) {
+        return grid.columns.filter(function (itm) { return itm.field == name; })[0];
+    }
+
+    function tripletexRePush() {
+        ajaxCmdStatus('@(ModuleUrl.AdminUrl("tripletex","push", Model.Id))', {});
+    }
+</script>
+
+<script id="template-ooo" type="text/x-kendo-template">
+    <tr data-uid="#= uid #">
+        <td colspan="5">
+            <strong>#: Subject #</strong>
+            <strong>#: Body #</strong>
+        </td>
+    </tr>
+</script>

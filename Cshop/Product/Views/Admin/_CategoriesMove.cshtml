@@ -1,0 +1,154 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model CategoryModel
+
+@{
+    var cate = (CategoryModel)ViewBag.Category;
+    var listMove = new List<SelectListItem>();
+
+    listMove.Add(new SelectListItem() { Text = StringTable.Top, Value = "1", Selected = true });
+    listMove.Add(new SelectListItem() { Text = StringTable.Bottom, Value = "2" });
+    listMove.Add(new SelectListItem() { Text = StringTable.Before, Value = "4" });
+    listMove.Add(new SelectListItem() { Text = StringTable.After, Value = "3" });
+}
+
+<script type="text/javascript">
+
+    var colorChildSel = 'darkblue', cateTreeErrMsg = $('#cate-tree').closest('.clo_right').find('.error');
+    function cateTreeDataBound() {
+        var kendoTree = this, kendoEle = this.element;
+        var items = kendoEle.find('.k-item:not([data-id])');
+
+        if (this.dataSource.total() == 0) this.element.hide();
+
+        items.each(function () {
+            var row = kendoTree.dataItem($(this));
+
+            $(this).attr('data-id', row.id);
+            $(this).attr('data-deep', row.Deep);
+            $(this).attr('data-name', row.Name);
+
+            if (row.Deep < 3) kendoTree.expand($(this));
+
+            if (row.Id == '@cate.Id') {
+                setNodeColor($(this), true);
+
+                var kin = $(this).find('.k-in');
+                kin.html($('<span class="current-grid-item">').html(kin.html()));
+                kin.find('.current-grid-item').click(function (e) {
+                    e.preventDefault(); e.stopPropagation();
+                });
+            }
+        });
+
+        var kinTxt = kendoEle.find('.k-item .k-in');
+
+        kinTxt.each(function () {
+            var row = kendoTree.dataItem($(this).closest('.k-item'));
+            var status = row.LangVisible && row.Active;
+            $(this).attr('title', row.Active ? (row.LangVisible ? '' : '@StringTable.ItemLanguageDisabled') : '@StringTable.ItemDeactivated');
+            if (!status) {
+                $(this).css({ 'font-style': 'italic', 'text-decoration': row.Active ? 'underline' : '', 'color': 'gray' });
+            }
+        });
+
+        ////set height auto popup
+        var objTree = $("#cate-tree");
+        PopUpSetHeightTree(objTree, objTree.height(), true);
+        ////end
+    }
+    //set height auto popup
+    function PopUpSetHeightTree(objGrid, fGridH, treeView) {
+
+        var fullH = $(window).outerHeight();
+        var objWin = $('.k-widget.k-window');
+
+        var temp = objWin.outerHeight();
+        var myVar = setInterval(function () {
+            //set height
+            if (treeView) {
+                objGrid.removeAttr('style');
+                objWin.css({ 'height': 'auto', "min-height": "auto" });
+            }
+            if (fullH > objWin.outerHeight()) {
+                objGrid.height() > fGridH ? objGrid.css("max-height", objGrid.height()) : "";
+                objWin.css({ "height": (objGrid.height() > fGridH ? objWin.height() : 'auto'), "top": ((fullH - objWin.outerHeight()) / 2) });
+            } else {
+                objWin.css({ "height": (fullH - 30), "top": 0 });
+                objGrid.height() > fGridH ? objGrid.css("max-height", fullH - 170) : "";
+            }
+            //clear Interval
+            if (temp < objWin.outerHeight() || treeView) {
+                clearInterval(myVar);
+            }
+        }, 100);
+    }
+
+    function setNodeColor(node, show) {
+        var parent = node.find('div');
+        if (parent.length > 0) {
+            $(parent[0]).find('.k-in').css('color', show ? colorChildSel : 'inherit');
+            //console.log(node.attr('data-id') + ':setNodeColor:' + node.attr('data-type') + ':' + show);
+
+
+        }
+
+    }
+
+    function cateTreeGetSelect() {
+        var kendoTree = $('#cate-tree').data('kendoTreeView');
+        var selTR = kendoTree.select();
+        if (selTR) return kendoTree.dataItem(selTR);
+        return null;
+    }
+
+    function cateTreeItemSelect(e) {
+        //var row = e.sender.dataItem(e.node);
+        //console.log(row);
+        cateTreeErrMsg.html('');
+    }
+
+    function onChange() {
+        //var value = $("#listMove").val();
+        //if (parseInt(value) > 2) $(".movecate").show();
+        //else $(".movecate").hide();
+    }
+
+</script>
+
+<section class="row_content_box">
+    <section class="clo_left txt_align_r">
+        <label class="fl_r">@StringTable.MoveCategoryTo:</label>
+    </section>
+    <section class="clo_right">
+        <section class="controls">
+            @Html.Kendo().DropDownList().Name("listMove").DataTextField("Text").DataValueField("Value").Events(e => e.Change("onChange")).BindTo(listMove).Value("1")
+            @*@Html.DropDownList("listMove", new SelectList(listMove, "Value", "Text"), new { @class = "select_l", @style = "width:248px; background-image:none;", @onchange = "onChange()" })*@
+        </section>
+        <section>@StringTable.SelectAnOptionToMoveThisCategory</section>
+    </section>
+</section>
+<section class="row_content_box" style="min-height:10px"></section>
+@{ var dataHandler = "function() { return { lang: getFocusLang(), categoryid:'" + cate.Id + "' }; }";}
+<div class="row_content_box movecate">
+    <section class="clo_left txt_align_r">
+        <label class="fl_r">@StringTable.TargetCategory:</label>
+    </section>
+    <section class="clo_right">
+        <section class="controls">
+            <input type="hidden" id="movcateid" value="@cate.Id" />
+            @*@Html.LocalizeDropDownListKendoLang("cateddbox", null, "ListDD", Html.GetController(), "movcateid", null, new { @class = "width250" })*@
+            @(Html.LocalizeTree<CategoryModel>("cate-tree", @Html.GetController())
+                  .DataSource(m => m.Id, m => m.AnyChild, "ListTree", null, dataHandler)
+                  .DataTextField(m => m.Name)
+                  .Checkboxes(false, false)
+                  .OnDataBound("cateTreeDataBound")
+                  .OnSelect("cateTreeItemSelect")
+                    //.HtmlAttributes(new { @style = "display: inline-block; min-width: 340px; /*max-height: 270px;*/ text-align: left; /*background-color: transparent;*/border-width:1px" })
+                  .ToMvcHtmlString())
+        </section>
+        <section><span class="error"></span></section>
+    </section>
+</div>

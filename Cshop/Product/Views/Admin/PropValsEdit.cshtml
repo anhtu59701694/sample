@@ -1,0 +1,320 @@
+﻿@using System.Linq
+@using System.Web.UI.WebControls
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model PropValModel
+
+@{
+    Layout = "Layout/Input.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+    ViewBag.Title = StringTable.AddEditPropVal(Model.Id);
+    ViewBag.ShowDeleteBtn = (Model != null && Model.Id > 0);
+    ViewBag.UseCKEditor = true;
+    //ViewBag.UseDatePicker = true;
+
+    ViewBag.UseDropZone = true;
+    ViewBag.TranslateMaxWidth = 700;
+    ViewBag.TranslateMaxHeight = 220;
+    
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/product";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Product;
+    
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var properties = (List<PropertyModel>)ViewBag.Properties;
+    var languages = (List<Language>)ViewBag.Languages;
+    var versionSetting = Claw.Modules.Eshop.Helper.VersionHelper.GetVersionSetting();
+    if (versionSetting != null)
+    {
+        if (versionSetting.Languages.Count > 0)
+        {
+            var lstLangCode = versionSetting.Languages.Select(p => p.Code.ToLower());
+            languages = languages.Where(p => lstLangCode.Contains(p.ShortLangCode.ToLower())).ToList();
+        }
+    }
+    var langOpt = LanguageMgr.ValidOptLang(Model.Id);
+    var langCode = langOpt.LanguageCode;
+
+    ViewBag.DZItemWidth = 120;//settings.Display.Category.Icon.Width;
+    ViewBag.DZItemHeight = 100;//settings.Display.Category.Icon.Height;
+}
+
+@if (!ViewBag.PermissionEdit)
+{
+    <style type="text/css">
+        .dz-preview-menu a {display: none;}
+    </style>
+}
+
+@section MainTitleSection {
+    @(StringTable.ManagePropVals)
+}
+
+@section CurrentTitleSection {
+    <a href="/admin/modules/eshop/propval/">@(StringTable.ManagePropVals)</a>
+}
+
+@section TabTitleSection {
+    @StringTable.AddEditPropVal(Model.Id)
+}
+
+@using (@Html.BeginForm("Input", Html.GetController(), FormMethod.Post, new { @id = "editForm", enctype = "multipart/form-data" }))
+{
+    Model.Languages.RemoveAll(m => languages.All(x => !x.LanguageCode.EqualsIgCase(m.LangCode)));
+
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(x => x.Id)
+
+    @Html.HiddenFor(x => x.Icon)
+    @Html.HiddenFor(x => x.ImageThumb)
+    @Html.HiddenFor(x => x.ImageFsUrl)
+
+    <section class="row-content-lang-box">
+        <section class="row_content_box">
+            <section class="clo_left txt_align_r">
+                <label class="font14 clear_fix mt_10">@StringTable.Icon (50x50)</label>
+                <div>
+                    <input id="imageUpload" name="imageUpload" type="file" accept="image/*" style="display: none" />
+                    <div class="wr-img-sub">
+                        <div id="dropzone-form" class="dropzone single wr-upload-img-es" style="">
+                            <div class="wr-img-show">
+                                <div class="wr-upload-img-es mask-dropzone mask-dropzone-show" style="">
+                                    <span>@StringTable.AddOrDropImage</span>
+                                </div>
+                                <div class="dz-message" style="display: none"></div>
+                                <ul class="dropzone-preview-box" style=""></ul>
+                            </div>
+                            <div class="clear_fix"></div>
+                            <ul class="btn_center set-relative mb10">
+                                <li>
+                                    <input id="add-file" value="@StringTable.UploadImage" class="btn_update" type="button">
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div style="float: right"><span id="image-error-msg" class="error" style="cursor: pointer"></span></div>
+                </div>
+            </section>
+            <section class="clo_right col-right-eshop">
+                <div class="tab-style">
+                    <div id="lang-form-list">
+                        @for (int i = 0; i < languages.Count; i++)
+                        {
+                            var lang = languages[i];
+                            var curCLang = Model.Languages.FirstOrAddNew(x => x.LangCode.EqualsIgCase(lang.LanguageCode),
+                                () => new PropValLangModel() { LangCode = lang.LanguageCode, PropValId = Model.Id, PropertyId = Model.PropertyId });
+
+                            var iseq = Model.Languages.IndexOf(curCLang);
+                            var dataValid = (curCLang.Id == 0 ? 0 : 1);
+                            var itmActived = langCode.EqualsIgCase(lang.LanguageCode);
+                            var fldId = 0;
+                            
+                            <div class="lang_form" data-lang="@lang.LanguageCode" data-lang-name="@lang.LanguageName"
+                                 data-valid="@dataValid" style="display: @(langCode.EqualsIgCase(lang.LanguageCode) ? "block" : "none");">
+
+                                @Html.HiddenFor(m => m.Languages[iseq].Visible, new { @class = "lang_form_visible lang_form_field", @lang = lang.LanguageCode })
+                                @Html.HiddenFor(m => m.Languages[iseq].LangCode, new { @class = "lang_form_field" })
+                                @Html.HiddenFor(m => m.Languages[iseq].PropValId, new { @class = "lang_form_field" })
+                                @Html.HiddenFor(m => m.Languages[iseq].PropertyId, new { @class = "lang_form_field lang_form_propertyid" })
+                                @Html.HiddenFor(m => m.Languages[iseq].Id, new { @class = "lang_form_id lang_form_field" })
+
+                                <section class="controls field-row">
+                                    <section class="left-sec">
+                                        @Html.LocalizeImageLoading(new { @id = "loading-image-" + iseq + "-" + fldId, @style = "float:left" })
+                                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Languages[iseq].Name) (*)</span>
+                                        <span class="text-translator">@StringTable.UseTextTranslator</span>
+                                    </section>
+                                    <section class="right-sec">
+                                        <section>
+                                            @Html.LocalizeTextBoxFor(m => m.Languages[iseq].Name,
+                                                new
+                                                {
+                                                    @datavalid = dataValid,
+                                                    @class = "js-required lang_form_field lang_form_name",
+                                                    @style = "float:left;",
+                                                    @loadingimg = "loading-image-" + iseq + "-" + fldId++,
+                                                    @onblur = itmActived ? string.Format("translateAlias(this,'Code',{0})", Model.Id == 0 ? "true" : "false") : ""
+                                                })
+                                            <span class="error" style="display: none; float: left;">*</span>
+                                        </section>
+                                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Languages[iseq].Name)</section>
+                                    </section>
+                                </section>
+                                <script type="text/custom-initializer">
+                                    setTimeout(function(){
+                                    var langForm = $('#popupForm .lang_form');
+                                    initFieldLeftCharCountStat(langForm); initLangFormTranslator(langForm);
+                                    }, 1000);
+                                </script>
+                            </div>
+                        }
+                    </div>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.PropertyId)</span>
+                        <section>
+                            <section>
+                                @Html.LocalizeDropDownListKendoLangFor(m => m.PropertyId, properties.Select(x => new DDListItem()
+                                    {
+                                        Value = x.Id.ToString(),
+                                        Text = x.Name,
+                                        Active = true,
+                                        LangVisible = x.LangVisible
+                                    }), StringTable.SelectProperty,
+                                    new { @onchange = "langFormValidDependants(this, '.lang_form_propertyid', '.lang_form_name,#" + Html.IdFor(m => m.Code) + "')" })
+                            </section>
+                            <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.PropertyId)</section>
+                        </section>
+                    </section>
+                    <section class="controls" style="display:none">
+                        <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.Code)</span>
+                        <section>
+                            @Html.LocalizeTextBoxFor(x => x.Code, new { @class = "js-required", @readonly = (Model.Id != 0 ? "readonly" : null) })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Code)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Active)</span>
+                        <table>
+                            <tr>
+                                <td style="vertical-align: top">
+                                    @Html.LocalizeRadioButtonFor(model => model.Active, "true", new { @id = "IsActiveTrue", @class = "css-radio" })
+                                    <label for="IsActiveTrue" class="css-labelradio">@StringTable.Visible</label>
+                                    @Html.LocalizeRadioButtonFor(model => model.Active, "false", new { @id = "IsActiveFalse", @class = "css-radio" })
+                                    <label for="IsActiveFalse" class="css-labelradio">@StringTable.Hidden</label>
+                                </td>
+                                <td>&nbsp;</td>
+                                @*<td><span class="error" style="display: none; float: left;">*</span></td>*@
+                            </tr>
+                        </table>
+                    </section>
+                    <section class="controls" style="margin-bottom: 0px;">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.DisplayOrder)</span>
+                        <section>
+                            <section>
+                                @Html.LocalizeTextBoxFor(m => m.DisplayOrder, new { @class = "js-required", @type = "number", @style = "float:left;" })
+                                @*<span class="error" style="display: none; float: left;">*</span>*@
+                            </section>
+                            <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.DisplayOrder)</section>
+                        </section>
+                    </section>
+                </div>
+            </section>
+        </section>
+        <section class="wr-line-eshop" style="display: @(languages.Count > 1 ? "" : "none")"></section>
+        <section class="row_content_box" style="display: @(languages.Count > 1 ? "" : "none")">
+            <section class="clo_left txt_align_r">
+                <h2>@StringTable.VisibilityInLanguages</h2>
+                <label></label>
+            </section>
+            <section class="clo_right col-right-eshop">
+                @RenderLangMedTabs(languages, langOpt, Model.Languages.Cast<ILanguage2>().ToList())
+            </section>
+        </section>
+
+
+    </section>
+    <section class="wr-line-eshop"></section>
+}
+
+<script type="text/javascript">
+    var form = $('#editForm')[0];
+
+    form.customValidFields = function () {
+        return true;
+    };
+
+    form.CustomLangFormSwitch = function (langcode, node, senderuid) {
+        var ownerbox = node.closest('.row_content_box');
+    };
+
+    //upload image
+    $(function () {
+        var img = $('#@Html.IdFor(m => m.Icon)');
+        var imgThumb = $('#@Html.IdFor(m => m.ImageThumb)');
+        var imgFsUrl = $('#@Html.IdFor(m => m.ImageFsUrl)');
+        var imgErrMsg = $('#image-error-msg').click(function () { $(this).html(''); });
+
+        var dzEle = dropzoneInit('#dropzone-form', '#imageUpload', '#add-file',
+            { acceptedFiles: '@settings.Display.Admin.Image.Extensions.GetFileExtensionDropZone(false)' },
+            function (result) {
+                $("#dropzone-form .mask-dropzone-show").hide();
+                img.val(result.Image.FileName);
+                imgThumb.val(result.Image.ThumbUrl);
+                imgFsUrl.val(result.Image.FilePath);
+            }, function (file, e) {
+                $("#dropzone-form .mask-dropzone-show").show(); img.val(''); imgThumb.val(''); imgFsUrl.val('');
+                setImageErrMsg(imgErrMsg, e.Message + ' (' + file.name + ')');
+            });
+
+
+
+
+        //remove file
+        var dropzone = dzEle[0].dropzone;
+        dropzone.on("removedfile", function (file) {
+            if (file.status == "success") {
+                $("#dropzone-form .mask-dropzone-show").show();
+                img.val("");
+                imgThumb.val("");
+                imgFsUrl.val("");
+                $('#editform-change-state').val(1).change();
+            }
+        });
+
+        dropzone.on("addedfile", function (file) {
+            var node = $(file.previewElement).find('img[data-dz-thumbnail]');
+            $(file.previewElement).find('.image-edit').unbind('click').click(function () {
+                //console.log('click', node, file);
+                aviaryInit($('#@Html.IdFor(m => m.ImageFsUrl)'), [$('#@Html.IdFor(m => m.Icon)'), $('#@Html.IdFor(m => m.ImageThumb)'), node]);
+            });
+            //console.log('addedfile', node,node.attr('id'), file, $(file.previewElement).find('.image-edit'));
+        });
+
+        if ($.trim(img.val()) != '') {
+            $("#dropzone-form .mask-dropzone-show").hide();
+            dropzoneAdd(dzEle[0].dropzone, imgFsUrl.val(), img.val(), imgFsUrl.val(), imgThumb.val(), 'image/*');
+        }
+
+        setTimeout(function () { initMsTranslator('no-loading-image'); }, 1000);
+    });
+    function setImageErrMsg(node, msg) {
+        node.html(msg);
+        setTimeout(function () { node.html(''); }, 10000);
+    }
+
+</script>
+
+@Html.JsBundle("~/claw/page.claw.plugin.js", false, "~/content/plugin/aviary/feather.js",
+    "~/scripts/claw.page/page.edit.plugin.js")
+
+@helper RenderLangMedTabs(List<Language> languages, Language actLang, List<ILanguage2> modelLangs)
+{
+    <div class="tab-big-2">
+        <ul class="inputLang">
+            @foreach (var lang in languages.OrderBy(x => x.LanguageCode.EqualsIgCase(actLang.LanguageCode) ? 0 : 1))
+            {
+                var active = lang.LanguageCode.EqualsIgCase(actLang.LanguageCode);
+                var itmChecked = modelLangs.Any(x => x.Visible && x.LangCode.EqualsIgCase(lang.LanguageCode));
+                <li class="controls langItem @(active ? "active-lang" : "")" data-lang="@lang.LanguageCode"
+                    title="@lang.LanguageName">
+                    <input id="med_lang_@lang.Id" class="css-checkbox" name="med_lang_@lang.Id" @Html.Raw(Model.AllLangForcedActive ? "disabled='disabled'" : "") @Html.Raw(itmChecked ? "checked='checked'" : "") type="checkbox">
+                    <label for="med_lang_@lang.Id" class="css-labelcheck">@lang.LanguageName</label>
+                    <div class="lang-cmd-box" style="display: none">
+                        <span class="inline-flag">
+                            <i></i>
+                            <a href="javascript:void(0)">
+                                <span class="es-show-tranglate">@StringTable.TranslateInfo</span>
+                                <img src="@ModuleUrl.LangIcon(lang.LanguageCode)" alt="@lang.LanguageCode" />
+                            </a>
+                        </span>
+                    </div>
+                </li>
+            }
+        </ul>
+    </div>
+}
+

@@ -1,0 +1,522 @@
+﻿@using System.Text.RegularExpressions
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@using Logistra = Eshop.Shipping.Logistra;
+@model LogistraBookingModel
+@{
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var errMsg = (string)ViewBag.ErrorMsg;
+    var transportAgreement = (Logistra.Agreement)ViewBag.TransportAgreement;
+    var printers = (Logistra.Printer[])ViewBag.Printers;
+    var servicePartners = (Logistra.ServicePartner[])ViewBag.ServicePartners  ?? new Logistra.ServicePartner[0];
+    var defaultProductName = "";
+    var defaultFirstPickupPoint = false;
+
+    if (!defaultProductName.IsNullOrEmpty() && Model.ProductId.IsNullOrEmpty())
+    {
+        Model.ProductId = transportAgreement.Products
+            .Where(x => x.Name.EqualsIgCase(defaultProductName) && x.ItemTypes.Any(z => z.Id.EqualsIgCase("package")))
+            .Select(m => m.Identifier).FirstOrDefault();
+    }
+    
+    //printers = new [] {new Logistra.Printer() {Id = "00", Name = "test"}};
+    
+    if (Model.CarrierName.IsNullOrEmpty())
+    {
+        Model.CarrierName = "PostNord";
+    }
+
+    if (!Model.Currency.IsNullOrEmpty())
+    {
+        Model.Currency = Model.Currency.ToLower();
+    }
+
+    var strCmp = StringComparison.OrdinalIgnoreCase;
+    var carriers = LogistraMgr.GetTransportAgreements()
+        .Select(m => new { m.CarrierName, m.CarrierId })
+        .Where(m => m.CarrierId != null && (m.CarrierId.StartsWith("bring", strCmp) || m.CarrierId.StartsWith("tollpost_globe", strCmp) || m.CarrierId.StartsWith("dhl_express", strCmp)))
+        .Distinct(m => m.CarrierName).ToList();
+
+    var dictTOD = new Dictionary<string, string>();
+    dictTOD.Add("EXW", "Ex Works");
+    dictTOD.Add("FCA", "Free Carrier seller's premises");
+    dictTOD.Add("CPT", "Carriage Paid To buyer's premises");
+    dictTOD.Add("CIP", "Carriage and Insurance Paid to buyer's premises");
+    dictTOD.Add("DAT", "Delivered At Terminal");
+    dictTOD.Add("DAP", "Delivered At Place");
+    dictTOD.Add("DDP", "Delivered buyer's premises Duty Paid");
+    dictTOD.Add("FAS", "Free alongside ship");
+    dictTOD.Add("FOB", "Free on board");
+    dictTOD.Add("CFR", "Cost and freight");
+    dictTOD.Add("CIF", "Cost insurance and freight");
+
+    var lstTOD = new List<DDListItem>();
+    foreach (var dict in dictTOD)
+    {
+        var text = ("hdl_tod_" + Globals.GenerateAlias(dict.Value)).ModLocalize(dict.Value);
+        lstTOD.Add(new DDListItem() { Text = text, Value = dict.Key, Active = true, LangVisible = true });
+    }
+
+    var bundleNotAnyDone = Model.Items.SafeCount() != 0 && Model.Items.Any(m => m.BookingNumber.IsNullOrEmpty() && m.ErrMsg.IsNullOrEmpty());
+
+    if (LogistraMgr.FuncFixBookNumber == null)
+    {
+        LogistraMgr.FuncFixBookNumber = (trackingUrl, bookingNumber) =>
+        {
+            if (trackingUrl.IsNullOrEmpty()) return bookingNumber;
+
+            if (trackingUrl.IndexOf(".bring.", StringComparison.OrdinalIgnoreCase) != -1)
+            {
+                bookingNumber = trackingUrl.Split(new[] { '?', '&' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(m => m.Split('='))
+                    .Where(m => m.Length == 2 && m[0].EqualsIgCase("q"))
+                    .Select(m => m[1]).LastOrDefault();
+				if(bookingNumber == null && trackingUrl.IndexOf("/sporing/", StringComparison.OrdinalIgnoreCase) != -1)
+				{
+					bookingNumber = trackingUrl.Split(new[] { "/sporing/" }, StringSplitOptions.RemoveEmptyEntries).LastOrDefault();
+				}
+			}
+            else if (trackingUrl.IndexOf(".postnord.", StringComparison.OrdinalIgnoreCase) != -1)
+            {
+                bookingNumber = trackingUrl.Split(new[] { '?', '&' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(m => m.Split('='))
+                    .Where(m => m.Length == 2 && m[0].InList("shipmentid", "searchquery"))
+                    .Select(m => m[1]).LastOrDefault();
+
+                if (bookingNumber.IsNullOrEmpty() && trackingUrl.IndexOfAny(new[] { '?', '&', '#' }) == -1)
+                {
+                    bookingNumber = trackingUrl.Split('/').LastOrDefault();
+                }
+            }
+            else if (trackingUrl.IndexOf(".dhl.", StringComparison.OrdinalIgnoreCase) != -1)
+            {
+                bookingNumber = trackingUrl.Split(new[] { '?', '&' }, StringSplitOptions.RemoveEmptyEntries)
+                    .Select(m => m.Split('='))
+                    .Where(m => m.Length == 2 && m[0].EqualsIgCase("AWB"))
+                    .Select(m => m[1]).LastOrDefault();
+            }
+
+            return bookingNumber;
+        };
+    }
+
+}
+
+<style type="text/css">
+    .booking-service { display: inline-block; margin-right: 15px; min-width: 170px; }
+    #logistra-booking-form .right { margin-top: 3px; margin-left: 2%; width: 72%; }
+    #logistra-booking-form .right input { width: auto !important;}
+    #logistra-booking-form .right.link { margin-top: 7px; height: 2em; overflow: hidden; border: 1px solid #ccc; padding-left: 5px; }
+    #logistra-booking-form .left { width: 22%; text-align: right; }
+    #logistra-booking-form .item {margin: 0;}
+    #bring-booking-form .item.disabled { display: none !important;  }
+    table.order-item-list .order-item a{color:#390f3d;}
+    table.order-item-list .order-item .nSuccess {background-color:transparent;border:none;}
+    table.order-item-list tr{border-bottom:1px solid rgb(197, 197, 197);}
+    table.order-item-list tr:last-child{border-bottom:none;}
+    table.order-item-list tr.header td{font-weight:bold;color:rebeccapurple;}
+</style>
+
+<div id="logistra-booking-form" style="float: left; margin-bottom: 20px; overflow: hidden;width:100%;">
+    @Html.SimpleHiddenFor(m => m.OrderId, new { @class = "" })
+    @Html.SimpleHiddenFor(m => m.ProductName, new { @class = "" })
+    @Html.SimpleHiddenFor(m => m.Description, new { })
+    @Html.SimpleHiddenFor(m => m.TransportAgreementId, new { })
+
+    @if ((Model.BookingNumber.IsNullOrEmpty() && Model.Items.SafeCount() == 0) || bundleNotAnyDone)
+    {
+        <div class="request-form">
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.CarrierName):</div>
+                <div class="right">
+                    @Html.LocalizeDropDownListKendoFor(m => m.CarrierName, carriers.Select((x, idx) => new SelectListItem()
+                    {
+                        Text = string.Format("{0}", x.CarrierName),
+                        Value = x.CarrierName,
+                    }), null, new { @style = "" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.CarrierName)</div>
+                </div>
+            </div>
+            <div class="item">
+                <div class="left">@Html.LocalizeNameFor(m => m.ProductId):</div>
+                <div class="right">
+                    @Html.LocalizeDropDownListKendoLangFor(m => m.ProductId, transportAgreement.Products
+                        .Where(x => x.ItemTypes.Any(z => z.Id.EqualsIgCase("package"))).Select((x, idx) => new DDListItem()
+                        {
+                            Text = x.Name,
+                            Value = x.Identifier,
+                            Active = true,
+                            LangVisible = true,
+                            Model = x,
+                            id = idx + 1
+                        }), StringTable.SelectProduct, new { @style = "min-width:450px" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.ProductId)</div>
+                </div>
+            </div>
+            <div class="item" id="pickup-point-box" style="display: none">
+                <div class="left">@Html.LocalizeNameFor(m => m.PickupPointId):</div>
+                <div class="right">
+                    @Html.LocalizeDropDownListKendoLangFor(m => m.PickupPointId, servicePartners.Select(x => new DDListItem()
+                    {
+                        Text = string.Format("{0}, {1}, {3} {4}", x.Name, x.Address1, x.Address2, x.City, x.Postcode, x.Country),
+                        Value = x.Number,
+                        Active = true,
+                        LangVisible = true,
+                        Model = x,
+                    }), StringTable.SelectPickupPoint, new { @style = "min-width:450px" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.PickupPointId)</div>
+                </div>
+            </div>
+            <div class="item" id="terms-of-delivery-box" style="display: none">
+                <div class="left">@Html.LocalizeNameFor(m => m.TermsOfDelivery):</div>
+                <div class="right">
+                    @Html.LocalizeDropDownListKendoLangFor(m => m.TermsOfDelivery, lstTOD, StringTable.SelectTermOfDelivery, new { @style = "min-width:450px" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.TermsOfDelivery)</div>
+                </div>
+            </div>
+            <div class="item" id="consignee-customer-number-box" style="display: none">
+                <div class="left">@Html.LocalizeNameFor(m => m.ConsigneeCustomerNumber):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.ConsigneeCustomerNumber, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.ConsigneeCustomerNumber)</div>
+                </div>
+            </div>
+            <div class="item" id="freight-payer-customer-number-box" style="display: none">
+                <div class="left" style="line-height: 1.3em;margin-top: -7px;">@Html.LocalizeNameFor(m => m.FreightPayerCustomerNumber):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.FreightPayerCustomerNumber, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.FreightPayerCustomerNumber)</div>
+                </div>
+            </div>
+            <div class="item" style="display: none">
+                <div class="left">@Html.LocalizeNameFor(m => m.Amount):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.Amount, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Amount)</div>
+                </div>
+            </div>
+            <div class="item" style="display: none">
+                <div class="left">@Html.LocalizeNameFor(m => m.Currency):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.Currency, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Currency)</div>
+                </div>
+            </div>
+            <div class="item" style="display: none">
+                <div class="left">@Html.LocalizeNameFor(m => m.WeightInKg):</div>
+                <div class="right">
+                    @Html.LocalizeTextBoxFor(m => m.WeightInKg, new { @style = "width: 150px !important;min-width: 0;" })
+                    <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.WeightInKg)</div>
+                </div>
+            </div>
+
+            <div class="item service-box" style="display: none">
+                <div class="left">@StringTable.BookingServices:</div>
+                <div class="right" style="margin-top: 5px">
+                    <ul>
+                        <li class="booking-service">
+                            <input id="postnord_notification_sms" type="hidden" />
+                            <input id="bring_sms_advisering" type="hidden" />
+                            @Html.LocalizeCheckBoxFor(m => m.NotiSms, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.NotiSms)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.NotiSms)</label>
+                            <input name="@Html.NameFor(m => m.NotiSms)" value="false" type="hidden" />
+                        </li>
+                        <li class="booking-service">
+                            <input id="postnord_notification_email" type="hidden" />
+                            @Html.LocalizeCheckBoxFor(m => m.NotiEmail, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.NotiEmail)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.NotiEmail)</label>
+                            <input name="@Html.NameFor(m => m.NotiEmail)" value="false" type="hidden" />
+                        </li>
+                        <li class="booking-service">
+                            <input id="tg_etterkrav" type="hidden" />
+                            <input id="bring_oppkrav" type="hidden" />
+                            @Html.LocalizeCheckBoxFor(m => m.ServiceCod, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.ServiceCod)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.ServiceCod)</label>
+                            <input name="@Html.NameFor(m => m.ServiceCod)" value="false" type="hidden" />
+                        </li>
+                        <li class="booking-service">
+                            <input id="tg_insurance" type="hidden" />
+                            <input id="bring_insurance_single_item" type="hidden" />
+                            <input id="dhl_express_insurance" type="hidden" />
+                            @Html.LocalizeCheckBoxFor(m => m.ServiceInsurance, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.ServiceInsurance)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.ServiceInsurance)</label>
+                            <input name="@Html.NameFor(m => m.ServiceInsurance)" value="false" type="hidden" />
+                        </li>
+                        <li class="booking-service">
+                            <input id="dhl_express_customs_value" type="hidden" />
+                            @Html.LocalizeCheckBoxFor(m => m.ServiceCustomsValue, new { @class = "css-checkbox", @value = "true" })
+                            <label for="@Html.IdFor(m => m.ServiceCustomsValue)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.ServiceCustomsValue)</label>
+                            <input name="@Html.NameFor(m => m.ServiceCustomsValue)" value="false" type="hidden" />
+                        </li>
+                    </ul>
+                </div>
+            </div>
+
+            @if (Model.Items != null)
+            {
+                <div class="order-item-list" style="display:none;">
+                    @for (var i = 0; i < Model.Items.Count; i++)
+                    {
+                        var idx = i;
+                        <div class="order-item">
+                            @Html.SimpleHiddenFor(m => m.Items[idx].Amount, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].Currency, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].Description, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].OrderId, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].PickupPointId, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].ServiceCod, new { })
+                            @Html.SimpleHiddenFor(m => m.Items[idx].WeightInKg, new { })
+                        </div>
+                    }
+                </div>
+            }
+        </div>
+        <script type="text/javascript">
+            var bookingServices = {};
+            var productId = $('#@Html.IdFor(m => m.ProductId)', '#logistra-booking-form');
+            var isBundle = @(Model.Items.SafeCount() == 0 ? 0 : 1);
+
+            formUpdateValidRules($('#logistra-booking-form'));
+
+            $('.service-box .booking-service input[type=hidden][id]').each(function () { bookingServices[$(this).attr('id')] = true; });
+
+            productId.change(function () {
+                var value = $(this).val(), kdNode = $(this).data("kendoDropDownList"), holder = '#logistra-booking-form';
+
+                //console.log('productid', $(this).val(), kdNode);
+
+                $('#@Html.IdFor(m => m.ProductName)', holder).val(kdNode.text());
+
+                kdNode.dataSource.data().forEach(function (itm) {
+                    if (itm.Value == value) {
+                        var pickupPoint = $('#@Html.IdFor(m => m.PickupPointId)', holder).data("kendoDropDownList");
+                        var termsOfDelivery = $('#@Html.IdFor(m => m.TermsOfDelivery)', holder).data("kendoDropDownList");
+                        var weightBox = $('#@Html.IdFor(m => m.WeightInKg)', holder).closest('.item').hide();
+                        var amountBox = $('#@Html.IdFor(m => m.Amount)', holder).closest('.item').hide();
+                        var currencyBox = $('#@Html.IdFor(m => m.Currency)', holder).closest('.item').hide();
+                        var consigneeCustBox = $('#@Html.IdFor(m => m.ConsigneeCustomerNumber)', holder).closest('.item').hide();
+                        var freightPayerCustBox = $('#@Html.IdFor(m => m.FreightPayerCustomerNumber)', holder).closest('.item').hide();
+
+                        console.log('product', JSON.stringify(itm));
+
+                        $('.service-box', holder).show();
+                        $('li.booking-service', holder).hide().find('input[type=checkbox]').prop('disabled', true);
+                        $('.booking-service input[type=checkbox]:checked', holder).prop('check', false);
+
+                        if (itm.Model.Services)
+                            itm.Model.Services.forEach(function (srv) {
+
+                                if (!bookingServices[srv.Identifier]) return;
+
+                                $('.booking-service #' + srv.Identifier, holder).closest('li').show().find('input[type=checkbox]').prop('disabled', false).prop('readonly', true);
+
+
+                                if (srv.Attributes) {
+                                    if (srv.Identifier == 'dhl_express_customs_value')
+                                        $('.booking-service #' + srv.Identifier, holder).closest('li').find('input[type=checkbox]').prop('checked', true);
+
+                                    srv.Attributes.forEach(function (attr) {
+                                        if (attr.Identifier == 'amount' && !isBundle) amountBox.show();
+                                        else if (attr.Identifier == 'currency' && !isBundle) currencyBox.show();
+                                    });
+                                }
+                            });
+
+                        if ($('.booking-service:visible', holder).length == 0) $('.service-box', holder).hide();
+
+                        if (itm.Model.ServicePartnerPossible && !isBundle) {
+                            $('#pickup-point-box', holder).show(); pickupPoint.enable(true);
+                            if(@(defaultFirstPickupPoint ? 1 : 0) == 1) pickupPoint.select(1);
+                        } else {
+                            $('#pickup-point-box', holder).hide(); pickupPoint.enable(false);
+                        }
+
+                        if (itm.Model.RequiresTermsOfDelivery) {
+                            $('#terms-of-delivery-box', holder).show(); termsOfDelivery.enable(true);
+                        } else {
+                            $('#terms-of-delivery-box', holder).hide(); termsOfDelivery.enable(false);
+                        }
+
+                        if (itm.Model.RequiresWeightOrVolume && !isBundle) weightBox.show();
+                        if (itm.Model.RequiresConsigneeFreightPayerCustomerNumber) consigneeCustBox.show();
+                        if (itm.Model.ThirdPartyFreightPayerRequired) freightPayerCustBox.show();
+
+                        formDisableValidation(pickupPoint.element, !itm.Model.RequiresServicePartner || isBundle);
+                        formDisableValidation(weightBox.find('input'), !weightBox.is(':visible'));
+                        formDisableValidation(amountBox.find('input'), !amountBox.is(':visible'));
+                        formDisableValidation(currencyBox.find('input'), !currencyBox.is(':visible'));
+                        formDisableValidation(consigneeCustBox.find('input'), !consigneeCustBox.is(':visible'));
+                        formDisableValidation(freightPayerCustBox.find('input'), !freightPayerCustBox.is(':visible'));
+                    }
+                });
+            });
+
+            setTimeout(function () {
+                if (productId.val()) productId.change();
+            }, 500);
+
+        </script>
+    }
+    else
+    {        
+        <div class="result-form">
+            @if (Model.Items == null)
+            {
+                Model.BookingNumber = LogistraMgr.FuncFixBookNumber(Model.BookingTrackingUrl, Model.BookingNumber);
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.BookingId):</div>
+                    <div class="right">@Html.LocalizeTextBoxFor(m => m.BookingId, new { @readonly = "readonly", @style = "width: 190px !important;min-width: 0;" })</div>
+                </div>
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.BookingNumber):</div>
+                    <div class="right">@Html.LocalizeTextBoxFor(m => m.BookingNumber, new { @readonly = "readonly", @style = "width: 190px !important;min-width: 0;" })</div>
+                </div>
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.BookingCreatedAt):</div>
+                    <div class="right">@Html.LocalizeTextBoxFor(m => m.BookingCreatedAt.TextF, new { @readonly = "readonly", @style = "width: 150px !important;min-width: 0;" })</div>
+                </div>
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.BookingConsignmentPdf):</div>
+                    <div class="right link">
+                        <a href="@ModuleUrl.AdminUrl(Html.GetController(), "DownloadPdf", new RouteValueDictionary(new { @url = Model.BookingConsignmentPdf }))" target="_blank">
+                            @Model.BookingConsignmentPdf
+                        </a>
+                    </div>
+                </div>
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.BookingWaybillPdf):</div>
+                    <div class="right link">
+                        <a href="@ModuleUrl.AdminUrl(Html.GetController(), "DownloadPdf", new RouteValueDictionary(new { @url = Model.BookingWaybillPdf }))" target="_blank">
+                            @Model.BookingWaybillPdf
+                        </a>
+                    </div>
+                </div>
+                <div class="item">
+                    <div class="left">@Html.LocalizeNameFor(m => m.BookingTrackingUrl):</div>
+                    <div class="right link">
+                        <a href="@Model.BookingTrackingUrl" target="_blank">@Model.BookingTrackingUrl</a>
+                    </div>
+                </div>
+                if (printers != null && printers.Length != 0 && !Model.BookingNumber.IsNullOrEmpty())
+                {
+                    <div class="item">
+                        <div class="left">@Html.LocalizeNameFor(m => m.BookingPrinter):</div>
+                        <div class="right">
+                            @Html.LocalizeDropDownListKendoFor(m => m.BookingPrinter, printers.OrderBy(m => m.Name).Select((x, idx) => new DDListItem()
+                            {
+                                Text = x.Name,
+                                Value = x.Id.ToString(),
+                                Active = true,
+                                LangVisible = true,
+                                Model = x,
+                            }), m => m.Value, m => m.Text, null, new { @style = "min-width:100px" })
+                            <input onclick="printBooking()" class="btn" style="margin: 0;width: 40px !important;" type="button" value="@StringTable.BookingPrint" />
+                            <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.BookingPrinter)</div>
+                        </div>
+                    </div>
+                    <script type="text/javascript">
+                        function printBooking() {
+                            var consignmentId = $('#@Html.IdFor(m => m.BookingId)');
+                            var printer = $('#@Html.IdFor(m => m.BookingPrinter)');
+
+                            if (!printer.valid() || !consignmentId.val()) return;
+
+                            ajaxCmdStatus('@ModuleUrl.AdminUrl(Html.GetController(), "PrintBooking")', {
+                                consignmentId: consignmentId.val(), printerId: printer.val()
+                            }, function () {
+                                if (window.LogistraBookingForm) window.LogistraBookingForm.find(".btn_cancel").click();
+                            });
+                        }
+                    </script>
+                }
+            }
+            else
+            {
+                <table class="order-item-list" style="width: 90%;margin-left: 5%;">
+                    <tr class="header">
+                        <td style="width:100px;">@Html.LocalizeNameFor(m => m.OrderId)</td>
+                        <td style="width:200px;">@Html.LocalizeNameFor(m => m.BookingNumber)</td>
+                        <td>@Html.LocalizeName(new BringBookingItemModel(), m => m.ErrMsg) / @Html.LocalizeNameFor(m => m.BookingConsignmentPdf)</td>
+                    </tr>
+                    @for (var i = 0; i < Model.Items.Count; i++)
+                    {
+                        <tr class="order-item">
+                            <td>
+                                <input class="order-item-orderid" value="@Model.Items[i].OrderId" data-bookid="@Model.Items[i].BookingId" data-consignment="@(Model.Items[i].BookingNumber.IsNullOrEmpty() ? 0 : 1)" type="hidden" />
+                                <a class="link" href="@ModuleUrl.AdminUrl("Order", "Input", Model.Items[i].OrderId)">@Model.Items[i].OrderId</a>
+                            </td>
+                            <td>@Model.Items[i].BookingNumber</td>
+                            <td style="line-height:1.4em;">
+                                @if (Model.Items[i].BookingNumber.IsNullOrEmpty())
+                                {
+                                    <span class="error">@Model.Items[i].ErrMsg</span>
+                                }
+                                else
+                                {
+                                    <a href="@ModuleUrl.AdminUrl(Html.GetController(), "DownloadPdf", new RouteValueDictionary(new { @url = Model.Items[i].BookingConsignmentPdf }))" target="_blank">
+                                        @Model.Items[i].BookingConsignmentPdf
+                                    </a>
+                                }
+                            </td>
+                        </tr>
+                    }
+                    @if (printers != null && printers.Length != 0)
+                    {
+                        <tr class="printer-box" style="padding-top: 5px;border-top: 10px solid transparent;display:none;">
+                            <td>@Html.LocalizeNameFor(m => m.BookingPrinter):</td>
+                            <td colspan="2">
+                                @Html.LocalizeDropDownListKendoFor(m => m.BookingPrinter, printers.OrderBy(m => m.Name).Select((x, idx) => new DDListItem()
+                                {
+                                    Text = x.Name, Value = x.Id.ToString(), Active = true, LangVisible = true, Model = x,
+                                }), m => m.Value, m => m.Text, null, new { @style = "min-width:100px" })
+                                <div class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.BookingPrinter)</div>                                
+                            </td>
+                        </tr>
+                    }
+                </table>
+                <script type="text/javascript">
+                    window.refreshGrid = function () {
+                        if (grid && grid.attr('bactionurl') == '/admin/modules/eshop/order') {
+                            var gridKd = grid.data('kendoGrid');
+                            if (gridKd) gridKd.dataSource.page(gridKd.dataSource.page())
+                        }
+                    };
+
+                    function getBookingNumbers(modal){
+                        var ret = [];
+                        var rows = modal.find('input.order-item-orderid[data-consignment=1]');
+                        rows.each(function () {
+                            ret.push($(this).attr('data-bookid')); 
+                        });
+                        return ret;
+                    }
+
+                    window.printBooking = function (consignmentIds, fDone) {
+                        var printer = $('#@Html.IdFor(m => m.BookingPrinter)');
+
+                        if (!printer.valid() || !consignmentIds || consignmentIds.length == 0) return;
+
+                        ajaxCmdStatus('@ModuleUrl.AdminUrl(Html.GetController(), "PrintBooking")', {
+                            consignmentIds: consignmentIds, printerId: printer.val()
+                        }, function (result) {
+                            if (fDone) fDone(result);
+                        }, true, false);
+                    }
+                </script>
+            }
+        </div>
+    }
+</div>
+
+<script type="text/javascript">
+    var errMsg = '@Regex.Replace(errMsg ?? "","\\s"," ")';
+
+    setTimeout(function () {
+        if (errMsg) admincommon.showMessage(errMsg, 'Error');
+    }, 500);
+
+</script>

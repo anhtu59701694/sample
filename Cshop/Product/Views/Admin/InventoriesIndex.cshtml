@@ -1,0 +1,73 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model IEnumerable<InventoryModel>
+
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+    ViewBag.Title = StringTable.ManageInventories;
+    //ViewBag.UseImgPreview = true;
+    ViewBag.ShowSearchBox = true;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/inventory";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Report;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+
+<style type="text/css">
+    .controls .row_content_box .clo_left {padding-bottom: 15px;}
+    a.export.download_fr {background-position: 0 -31px !important;}
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageInventories)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageInventories)
+}
+
+@{ KendoGrid<InventoryModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", null, null, null, settings.Display.Admin.ProductPageSize)
+    .DataSource(m => m.Id, "List", null, null)
+    .Paging(10, new[] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.CreatedDate)
+            .SetTemplate("#:safeProp(CreatedDate,'TextF')#"), 
+        grid.Col(m => m.Type)
+            .SetTemplate("#:TypeTxt#"),
+        grid.Col(m => m.UserName),
+    })
+    .ColumnCommand(grid => new[]
+    {
+        grid.Cmd(m => m.Id, "gridExport", "Export2Excel", "export download_fr",false, StringTable.ExportExcel, true),
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true, StringTable.Delete) : null,
+    }.Where(x => x != null).ToArray(), 120)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid');
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function gridCustom(grid) {
+
+    }
+
+    function gridExport(uid) {
+        var row = grid.data('kendoGrid').dataSource.getByUid(uid);
+        location.href = '@ModuleUrl.AdminUrl(Html.GetController(), "Export")/' + row.Id;
+    }
+
+</script>

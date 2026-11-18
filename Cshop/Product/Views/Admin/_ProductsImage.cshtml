@@ -1,0 +1,49 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model ProductModel
+@{
+    var languages = (List<Language>)ViewData["Languages"];
+    var index = (int)ViewData["ImageIndex"];
+    var langCode = (string)ViewData["LangCode"];
+
+    while (index >= Model.Images.Count && Model.Images.Count < ProductModel.MaxImages)
+    {
+        Model.Images.Add(new ImageModel() { Languages = new List<ImageLangModel>() });
+    }
+
+    Model.Images[index].Languages.RemoveAll(m => languages.All(x => !x.LanguageCode.EqualsIgCase(m.LangCode)));
+}
+
+<div class="multi-lang-image-form multi-lang-item-form" data-index="@index" data-id="@(Model.Images[index].Id)"
+     data-img-url="@(Model.Images[index].Key)" style="display:none">
+    @Html.SimpleHiddenFor(m => m.Images[index].Id, new { @class = "image_form_id lang_form_field" })
+    @Html.SimpleHiddenFor(m => m.Images[index].Thumb, new { @class = "lang_form_field lang_form_thumb" })
+    @Html.SimpleHiddenFor(m => m.Images[index].FsUrl, new { @class = "lang_form_field lang_form_fsurl" })
+    @Html.SimpleHiddenFor(m => m.Images[index].FileName, new { @class = "image_form_file_name lang_form_field" })
+
+    @Html.HiddenFor(m => m.Images[index].DisplayOrder, new { @class = "lang_form_field lang_form_displayorder" })
+    @Html.LocalizeValidationMessageFor(m => m.Images[index].DisplayOrder)
+
+    @for (int i = 0; i < languages.Count; i++)
+    {
+        var lang = languages[i];
+        var curPLang = Model.Images[index].Languages.FirstOrDefault(x => x.LangCode.EqualsIgCase(lang.LanguageCode));
+        if (curPLang == null)
+        {
+            curPLang = new ImageLangModel() { LangCode = lang.LanguageCode };
+            Model.Images[index].Languages.Add(curPLang);
+        }
+        var iseq = Model.Images[index].Languages.IndexOf(curPLang);
+        var dataValid = (curPLang.Id == 0 ? 0 : 1);
+
+        <div class="lang_form" data-lang="@lang.LanguageCode" data-lang-index="@iseq" data-lang-name="@lang.LanguageName"
+             style="display:none">
+            @Html.SimpleHiddenFor(m => m.Images[index].Languages[iseq].LangCode, new { @class = "lang_form_field" })
+            @Html.SimpleHiddenFor(m => m.Images[index].Languages[iseq].Id, new { @class = "lang_form_id lang_form_field" })
+            @Html.HiddenFor(m => m.Images[index].Languages[iseq].Title, new {@datavalid = dataValid, @class = "lang_form_field txtTitle"})
+            @Html.LocalizeValidationMessageFor(m => m.Images[index].Languages[iseq].Title)
+        </div>
+    }
+</div>

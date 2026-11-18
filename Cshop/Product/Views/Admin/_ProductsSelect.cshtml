@@ -1,0 +1,277 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model object
+@{
+    var langCode = (string)ViewData["LangCode"];
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+<style type="text/css">
+ 
+    #gridprodsel .k-pager-sizes.k-label {
+        white-space: nowrap;
+    }
+
+</style>
+
+@{
+    var imgTemplate = "<a href='#:safePropImg(ProductImage,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(ProductImage,\"Thumb\")#'/></a>";
+    var imgTemplateN = "<a href='#:safePropImg(Image,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(Image,\"Thumb\")#'/></a>";
+    var imgVariantTempl = "<a href='#:ImageFsUrl#' class='preview'><img id='vari_thumb_#:Id#' src='#:ImageThumb#'/></a>";
+    var imgTemplatePopup = "<a href='#:safePropImg(Image,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(Image,\"Thumb\")#'/></a>";
+
+    var salePricetmp = @"
+    <span class='line-through'>#:safeProp(PriceInc,'Text')#</span>
+    <span class='price_2'>#:safeProp(SalePriceInc,'Text')#</span>";
+
+    var salePricetmp1 = @"
+            <span class='line-through'>#:safeProp(PriceInc,'Text')#</span>
+            <span class='price_2'>#:safeProp(SalePriceInc,'Text')#</span>";
+
+    var priceTempl = @"<span>#:safeProp(PriceInc,'Text')#</span>";
+    var priceTempl1 = @"<span>#:safeProp(PriceInc,'Text')#</span>";
+    var listPriceTitle = "eshop_adm_product_priceinc, eshop".Localize("List price");
+    var quantityInStokTitle = "eshop_adm_product_quantity, eshop".Localize("Quanity in stock");
+}
+
+<div id="prodsel-templ" style="display: none">
+    @(Html.LocalizeGridFor<ProductModel>("gridprodsel", "Product", null, null, null, null, null,
+    "gridProdSelInitDetail", grid =>
+    {
+        grid.ButtonDelBigClass += "_prosel";
+        grid.CheckBoxSelAllCss += "_prosel";
+        grid.CheckBoxRowCssClass += "_prosel";
+        grid.InputSearchId += "_prodsel";
+        grid.FormSearchId += "_prodsel";
+    })
+    .DataSource(m => m.Id, "List", null, null, "gridProdSelGetParams")
+    .Paging(4, new int[] { 10, 20, 30, 50, 100 }, StringTable.Products)
+    .ColumnCheckBox(m => m.Id, 20, "_prodsel")
+    .Columns(grid => new[] {
+        grid.Col(m => m.Image, false, 50)
+            .SetTemplate(imgTemplateN)
+            .SetCssClass("txt_align_c image"),
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetCssClass("name-pro2")
+            .SetTemplate(StringTable.NewWinEditTempl(Html, "Name"))
+            .SetDefaultSort(true),
+
+        //grid.Col(m => m.CostPrice, true, 100)
+        //    .SetCssClass("td-right")
+        //    .SetTemplate("#:safeProp(CostPrice,'Text')#"),
+
+        grid.Col(m => m.PriceInc, true, 100)
+            .SetCssClass("td-right")
+            .SetTemplate("# if (parseFloat(safeProp(SalePriceInc,'Value')) > 0) { # "+salePricetmp1 + " # }  else{#" + priceTempl1 + "#} #"),
+
+        grid.Col(m => m.Quantity, false, 150)
+            .SetCssClass("td-right"),
+        //grid.Col(m => m.SKU, false, 120),
+    })
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridProdSelCustom"; })
+    .ToMvcHtmlString(false, false))
+</div>
+<div id="variantsel-templ" style="display: none">
+    @(Html.LocalizeGridFor<VariantModel>("gridvariantsel", "Variant", null, null, null, null, null,
+    null, grid => { grid.CheckBoxSelAllCss += "_varsel"; grid.CheckBoxRowCssClass += "_varsel"; grid.ButtonDelBigClass += "_varsel"; })
+    .DataSource(m => m.Id, "List", null, null, "gridVariantSelGetParams")
+    .Paging(2, new int[] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id, 20, "_varsel")
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.ImageThumb, false, 50)
+            .SetTemplate(imgVariantTempl)
+            .SetCssClass("txt_align_c image"),
+        grid.Col(m => m.PropDesc),
+
+        //grid.Col(m => m.CostPrice, true, 100)
+        //    .SetCssClass("td-right")
+        //    .SetTemplate("#:safeProp(CostPrice,'Text')#"),
+
+         grid.Col(m => m.PriceInc,listPriceTitle, true, 100)
+                .SetCssClass("td-right")
+                .SetTemplate("# if (parseFloat(safeProp(SalePriceInc,'Value')) > 0) { # "+salePricetmp1 + " # }  else{#" + priceTempl1 + "#} #"),
+
+        grid.Col(m => m.Quantity,quantityInStokTitle, false, 150)
+            .SetCssClass("td-right"),
+        //grid.Col(m => m.SKU, false, 120),
+    })
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridVariantSelCustom"; })
+    .ToMvcHtmlString(false, false))
+</div>
+<script type="text/javascript">
+
+    $(function () {
+        $('#gridprodsel').attr('id', 'gridprodsel-templ');
+    });
+
+    function gridProdSelCustom(grid) {
+
+        gridHideCell(grid, '.k-hierarchy-cell .k-icon.k-plus', function (row) { return row.VariantCount == 0; });
+        gridDisableCheckBox(grid, function (row) { return row.VariantCount > 0; }, '.row-checkbox_prosel');
+
+        initImagePreview(false, grid.element);
+
+        gridAdjustPopup(grid, '.wcontent', '.wr_clo1', null, null, null, 40);
+
+        $('.row-checkbox_prosel', grid.element).change(function () {
+            if ($(this).prop('checked')) {
+                $('.row-checkbox_prosel:checked,.row-checkbox_varsel:checked', grid.element).prop('checked', false);
+                $(this).prop('checked', true);
+            }
+        })
+
+    }
+
+    function gridProdSelGetParams() {
+        return { exceptids: $('#ProductId').val(), exceptVariantIds: $('#VariantId').val(), type: '@((int)ProductType.Normal)', countVariant: 'true' };
+    }
+
+    function gridVariantSelCustom(grid) {
+
+        initImagePreview(false, grid.element);
+
+        gridAdjustPopup($('#gridprodsel').data('kendoGrid'), '.wcontent', '.wr_clo1', null, null, null, 30);
+        
+        $('.row-checkbox_varsel', grid.element).change(function () {
+            if ($(this).prop('checked')) {
+                $('.row-checkbox_prosel:checked,.row-checkbox_varsel:checked').prop('checked', false);
+                $(this).prop('checked', true);
+            }
+        })
+    }
+
+    function gridVariantSelGetParams(gridOwner, e) {
+        var productid = gridOwner.element.attr('data-id');
+        return { productid: productid, exceptids: $('#VariantId').val(), fullMode: true };
+    }
+
+    function gridProdSelFirstRun() {
+        var grid = $('#gridprodsel'), headerRow = grid.find('thead > tr');
+
+        headerRow.append('<th class="k-hierarchy-cell k-header" style="display:none"></th>');
+        // { 0: 0, 2: 5, 3: 2, 4: 3, 5: 4 }
+        gridSwapElements(headerRow, 'th', { 0: 0, 2: 5, 3: 2, 4: 3, 5: 4 },
+            function (i, node) { if (i == 3) $(node).attr('colspan', '2'); });
+        grid.attr('data-deep', '0');
+
+        var gridTempl = grid.clone();
+
+        gridTempl.attr('id', '');
+        gridprodselInit('#gridprodsel', true);
+
+        var gridColGroup = grid.find('colgroup');
+        gridSwapElements(gridColGroup, 'col', { 0: 1, 1: 2, 2: 0 }, function (i, node) { if (i == 0) $(node).css('width', '56px'); });
+
+        var cols = gridColGroup.html(), gridData = grid.data('kendoGrid');
+
+        gridData.rowTemplate = gridGetRowTemplate(gridData, false, { 0: 1, 1: 2, 2: 0 });
+        gridData.altRowTemplate = gridGetRowTemplate(gridData, true, { 0: 1, 1: 2, 2: 0 });
+
+        grid.data({ 'clawGridTempl': gridTempl, 'clawGridCols': cols });
+    }
+
+    function gridProdSelInitDetail(e) {
+        var gridTempl = $('#gridvariantsel');
+        var gridDiv = gridTempl.clone(), selAll = gridDiv.find('#SelectAll');
+
+        gridDiv.attr('id', 'grid-' + e.data.id);
+        gridDiv.attr('data-id', e.data.id);
+        gridDiv.attr('data-deep', parseInt(e.sender.element.attr('data-deep')) + 1);
+
+        selAll.attr('id', 'SelectAll-' + e.data.id);
+        selAll.closest('div').find('label').attr('for', 'SelectAll-' + e.data.id);
+
+        e.detailCell.append(gridDiv);
+        e.detailRow.find('.k-hierarchy-cell').remove();
+        e.detailRow.find('.k-detail-cell').attr('colspan', '7');
+
+        gridvariantselInit('#' + gridDiv.attr('id'), false);
+    }
+
+    function openAssignForm(resultFunc) {
+        var width = Math.max(200, Math.min(770, $(window).width() - 50));
+        var height = Math.max(200, Math.min(2048, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popTemplate = $("<div>").html($("#cateprod-popup-form-templ").html());
+        popTemplate.find('.htmlcontent .wr_table_all').html($('#gridprodsel-templ').clone().attr('id', 'gridprodsel').wrap('<p>').parent().html());
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@StringTable.SearchProducts', popTemplate.html(),
+            width, height, [], null,
+            function (modal) {
+
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+
+                $('#gridprodsel #SelectAll', modal).attr('id', 'SelectAll_prodsel').closest('div')
+                    .find('label').attr('for', 'SelectAll_prodsel');
+
+                //gridprodselInit('#gridprodsel', true);
+                gridProdSelFirstRun();
+
+                var gridProdSel = $('#gridprodsel').data('kendoGrid');
+
+                modal.find(".btn_save").click(function () {
+
+                    var selCBox = $('.row-checkbox_prosel:checked,.row-checkbox_varsel:checked', gridProdSel.element);
+
+                    selCBox.each(function () {
+                        var owner = $(this).closest('div.k-grid').data('kendoGrid');
+                        var row = owner.dataItem($(this).closest('tr'));
+                        resultFunc(row);
+                    });
+
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close();
+                    $(window).scrollTop(scrollTop);
+                });
+                modal.find(".btn_cancel").click(function () {
+
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close();
+                    $(window).scrollTop(scrollTop);
+                });
+            });
+
+    }
+
+    function safePropImg(obj, propName) {
+        return safeProp(obj, propName) || '@ImageModel.NoImg';
+    }
+
+</script>
+
+<script type="text/x-kendo-template" id="cateprod-popup-form-templ">
+    <div class="popupBody">
+        <section id="err-message-holder" style="float: left; width: 100%;"></section>
+        <section class="row_content_box kpopup-content">
+            <section class="wr_clo1">
+                <div class="wcontent" style="margin:0 20px; color: #390F3D;line-height:2em">
+                    <div class="htmlcontent">
+                        <form id="formSearch_prodsel" style="margin-bottom:10px">
+                            <section class="wr-search-eshop" style="margin-left:0;">
+                                <input type="text" placeholder="@StringTable.SearchProducts" class="text-l" id="inputSearch_prodsel">
+                                <input type="submit" value="" class="button-l" name="button">
+                            </section>
+                        </form>
+                        <section class="clear"></section>
+                        <div class="wr_table_all" style="margin:0"></div>
+                    </div>
+                </div>
+            </section>
+            <section class="clear"></section>
+            <ul class="wr_submit_top form-action-menu" style="position:relative; padding:10px 0;">
+                <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+            </ul>
+        </section>
+    </div>
+</script>

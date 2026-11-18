@@ -1,0 +1,698 @@
+﻿@using System.Linq
+@using System.Web.UI.WebControls
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model CategoryModel
+
+@{
+    Layout = "Layout/Input.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+    ViewBag.Title = StringTable.AddEditCategory(Model.Id);
+    ViewBag.ShowDeleteBtn = (Model != null && Model.Id > 0);
+    ViewBag.UseCKEditor = true;
+    ViewBag.UseDatePicker = true;
+    ViewBag.UseDropZone = true;
+    ViewBag.UseImgPreview = true;
+    ViewBag.TranslateMaxWidth = 800;
+    ViewBag.TranslateMaxHeight = 700;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/product";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Product;
+
+    var isFrontEnd = QParam.IsFontEnd;
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var languages = (List<Language>)ViewBag.Languages;
+    var versionSetting = Claw.Modules.Eshop.Helper.VersionHelper.GetVersionSetting();
+    if (versionSetting != null)
+    {
+        if (versionSetting.Languages.Count > 0)
+        {
+            var lstLangCode = versionSetting.Languages.Select(p => p.Code.ToLower());
+            languages = languages.Where(p => lstLangCode.Contains(p.ShortLangCode.ToLower())).ToList();
+        }
+    }
+    var langOpt = LanguageMgr.ValidOptLang(Model.Id);
+    var langCode = langOpt.LanguageCode;
+
+    var cates = (List<CategoryModel>)ViewBag.Categories;
+
+    ViewBag.DZItemWidth = 200;//settings.Display.Category.Icon.Width;
+    ViewBag.DZItemHeight = 180;//settings.Display.Category.Icon.Height;
+
+    if (Model != null)
+    {
+        Model.PagingSz = Model.PagingSz ?? settings.Display.Product.PageSize;
+        Model.Sorting = Model.Sorting ?? (int)settings.Display.Product.Sorting;
+        Model.IncSubCate = Model.IncSubCate ?? settings.Display.Category.IncSubCate;
+    }
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageCategories)
+}
+
+@section CurrentTitleSection {
+    <a href="/admin/modules/eshop/category/">
+        @(StringTable.ManageCategories)
+    </a>
+}
+
+@section TabTitleSection {
+    @StringTable.AddEditCategory(Model.Id)
+}
+
+@using (@Html.BeginForm("Input", Html.GetController(), FormMethod.Post, new { @id = "editForm", enctype = "multipart/form-data" }))
+{
+    Model.Languages.RemoveAll(m => languages.All(x => !x.LanguageCode.EqualsIgCase(m.LangCode)));
+
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(x => x.Id)
+    @Html.HiddenFor(x => x.Image)
+    @Html.HiddenFor(x => x.ImageThumb)
+    @Html.HiddenFor(x => x.ImageFsUrl)
+    @Html.HiddenFor(x => x.Banner0)
+    @Html.HiddenFor(x => x.Banner0Thumb)
+    @Html.HiddenFor(x => x.Banner0FsUrl)
+    @Html.HiddenFor(x => x.Banner1)
+    @Html.HiddenFor(x => x.Banner1Thumb)
+    @Html.HiddenFor(x => x.Banner1FsUrl)
+    @Html.HiddenFor(x => x.Banner2)
+    @Html.HiddenFor(x => x.Banner2Thumb)
+    @Html.HiddenFor(x => x.Banner2FsUrl)
+
+    <section class="row-content-lang-box">
+        <section class="row_content_box">
+            <section class="clo_left txt_align_r">
+                <label>@StringTable.NameDescHint</label>
+                @if (Model.Id != 0)
+                {
+                    <ul class="wr_submit_top mt70 set-relative">
+                        <li class="mr0">
+                            @*<input id="view-in-your-store" value="@StringTable.ViewInYourStore" class="btn-view-sub" type="button" />*@
+                            <a href="@ModuleUrl.GetFrontEndViewUrl(Html.GetController(), Model.Alias, Model)" target="_blank" style="padding: 0px 35px 0px 10px;" class="btn-view-sub">@StringTable.ViewInYourStore</a>
+                        </li>
+                    </ul>
+                    <section class="clear_fix"></section>
+                }
+                <div>
+                    <input id="imageUpload" name="imageUpload" accept="image/*" type="file" style="display: none" />
+                    <div class="padding-top20 wr-img-sub">
+                        <div id="dropzone-form" class="dropzone single wr-upload-img-es" style="">
+                            <div class="wr-img-show">
+                                <div class="wr-upload-img-es mask-dropzone mask-dropzone-show" style="">
+                                    <span>@StringTable.AddOrDropImage</span>
+                                </div>
+                                <div class="dz-message" style="display: none"></div>
+                                <ul class="dropzone-preview-box" style=""></ul>
+                            </div>
+                            <div class="clear_fix"></div>
+                            <ul class="btn_center set-relative mb10">
+                                <li style="margin-right:15px !important">
+                                    <input id="add-file" value="@StringTable.UploadImage" class="btn_update" type="button">
+                                </li>
+                            </ul>
+                        </div>
+                    </div>
+                    @{ var img = settings.Display.Category.Icon;}
+                    <label class="font14 clear_fix mt_10">@StringTable.CategoryIcon (@img.GetTitleHint())</label>
+                    <div style="float: right"><span id="image-error-msg" class="error" style="cursor: pointer"></span></div>
+                </div>
+            </section>
+            <section class="clo_right col-right-eshop">
+                <div class="tab-style">
+                    <div id="lang-form-list">
+                        @for (int i = 0; i < languages.Count; i++)
+                        {
+                            var lang = languages[i];
+                            var curCLang = Model.Languages.FirstOrAddNew(x => x.LangCode.EqualsIgCase(lang.LanguageCode),
+                                () => new CategoryLangModel() { LangCode = lang.LanguageCode, CategoryId = Model.Id });
+
+                            var iseq = Model.Languages.IndexOf(curCLang);
+                            var dataValid = (curCLang.Id == 0 ? 0 : 1);
+                            var itmActived = langCode.EqualsIgCase(lang.LanguageCode);
+                            var fldId = 0;
+
+                            <div class="lang_form" data-lang="@lang.LanguageCode" data-lang-name="@lang.LanguageName"
+                                 data-valid="@dataValid" style="display: @(langCode.EqualsIgCase(lang.LanguageCode) ? "block" : "none");">
+
+                                @Html.HiddenFor(m => m.Languages[iseq].LangCode, new { @class = "lang_form_field" })
+                                @Html.HiddenFor(m => m.Languages[iseq].CategoryId, new { @class = "lang_form_field" })
+                                @Html.HiddenFor(m => m.Languages[iseq].ParentId, new { @class = "lang_form_field lang_form_parentid" })
+                                @Html.HiddenFor(m => m.Languages[iseq].Visible, new { @class = "lang_form_visible lang_form_field", @lang = lang.LanguageCode })
+                                @Html.HiddenFor(m => m.Languages[iseq].Id, new { @class = "lang_form_id lang_form_field" })
+
+                                <section class="controls field-row">
+                                    <section class="left-sec">
+                                        @Html.LocalizeImageLoading(new { @id = "loading-image-" + iseq + "-" + fldId, @style = "float:left" })
+                                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Languages[iseq].Name) (*)</span>
+                                        <span class="text-translator">@StringTable.UseTextTranslator</span>
+                                    </section>
+                                    <section class="right-sec">
+                                        <section>
+                                            @Html.LocalizeTextBoxFor(m => m.Languages[iseq].Name,
+                                                new
+                                                {
+                                                    @datavalid = dataValid,
+                                                    @class = "js-required lang_form_field lang_form_name",
+                                                    @style = "float:left;",
+                                                    @loadingimg = "loading-image-" + iseq + "-" + fldId++,
+                                                    @onblur = string.Format("translateAlias(this, '{1}', {0})", Model.Id == 0 ? "true" : "false", Html.IdFor(m => m.Languages[iseq].Alias))
+                                                })
+                                            <span class="error" style="display: none; float: left;">*</span>
+                                        </section>
+                                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Languages[iseq].Name)</section>
+                                    </section>
+                                </section>
+                                <section class="controls field-row">
+                                    <section class="left-sec">
+                                        @Html.LocalizeImageLoading(new { @id = "loading-image-" + iseq + "-" + fldId, @style = "float:left" })
+                                        <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.Languages[iseq].Description)</span>
+                                        <span class="text-translator">@StringTable.UseTextTranslator</span>
+                                    </section>
+                                    <section class="right-sec">
+                                        <section>
+                                            @Html.LocalizeTextAreaFor(m => m.Languages[iseq].Description,
+                                                new
+                                                {
+                                                    @datavalid = dataValid,
+                                                    @style = "float:left;",
+                                                    @loadingimg = "loading-image-" + iseq + "-" + fldId++,
+                                                    @class = "lang_form_field " + (itmActived ? "ckeditor_standard" : "sub_ckeditor_standard")
+                                                })
+                                        </section>
+                                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Languages[iseq].Description)</section>
+                                    </section>
+                                </section>
+                                <section class="controls field-row">
+                                    <section class="left-sec">
+                                        <span class="text-eshop ck-editor">@Html.LocalizeNameFor(m => m.Languages[iseq].Alias) (*)</span>
+                                    </section>
+                                    <section class="right-sec">
+                                        <section>
+                                            @Html.LocalizeTextBoxFor(m => m.Languages[iseq].Alias, new { @class = "js-required url-handle lang_form_field", @style = "float:left;", @lang = lang.ShortLangCode })
+                                            <span class="error" style="display: none; float: left;">*</span>
+                                            @Html.LocalizeImageLoading(new { @id = "loading-image-" + iseq + "-" + fldId, @class = "alias-hint-loading", @style = "vertical-align: middle;" })
+                                        </section>
+                                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Languages[iseq].Alias)</section>
+                                    </section>
+                                    <label class="url-handle right-sec"></label>
+                                </section>
+                                <section class="controls field-row">
+                                    <section class="left-sec">
+                                        @Html.LocalizeImageLoading(new { @id = "loading-image-" + iseq + "-" + fldId, @style = "float:left" })
+                                        <span class="text-eshop no100">@Html.LocalizeNameFor(m => m.Languages[iseq].PageTitle)</span>
+                                        <label class="text-eshop-ita-2 char-count-stat"></label>
+                                        <span class="text-translator">@StringTable.UseTextTranslator</span>
+                                    </section>
+                                    <section class="right-sec">
+                                        <section>
+                                            @Html.LocalizeTextBoxFor(m => m.Languages[iseq].PageTitle, new
+                                            {
+                                                @datavalid = dataValid,
+                                                @class = "lang_form_field",
+                                                @style = "float:left;",
+                                                @loadingimg = "loading-image-" + iseq + "-" + fldId++,
+                                            })
+                                        </section>
+                                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Languages[iseq].PageTitle)</section>
+                                    </section>
+                                </section>
+                                <section class="controls field-row">
+                                    <section class="left-sec">
+                                        @Html.LocalizeImageLoading(new { @id = "loading-image-" + iseq + "-" + fldId, @style = "float:left" })
+                                        <span class="text-eshop no100">@Html.LocalizeNameFor(m => m.Languages[iseq].MetaDesc)</span>
+                                        <label class="text-eshop-ita-2 char-count-stat"></label>
+                                        <span class="text-translator">@StringTable.UseTextTranslator</span>
+                                    </section>
+                                    <section class="right-sec">
+                                        <section>
+                                            @Html.LocalizeTextBoxFor(m => m.Languages[iseq].MetaDesc, new
+                                            {
+                                                @datavalid = dataValid,
+                                                @class = "lang_form_field",
+                                                @style = "float:left;",
+                                                @loadingimg = "loading-image-" + iseq + "-" + fldId++,
+                                            })
+                                        </section>
+                                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.Languages[iseq].MetaDesc)</section>
+                                    </section>
+                                </section>
+                                <script type='text/custom-initializer'>
+                                    setTimeout(function(){
+                                        var langForm = $('#popupForm .lang_form');
+                                        initFieldLeftCharCountStat(langForm); initLangFormTranslator(langForm);
+                                        initUrlHandle(langForm); $('#@Html.IdFor(m => m.Languages[iseq].Name)').blur();
+                                    }, 1000);
+                                </script>
+                            </div>
+                        }
+                    </div>
+                </div>
+                @*@{var hierOrder = Model.HierOrder + '/';}*@
+                <section class="controls assign-cate-box">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.ParentId)</span>
+                    <section>
+                        <section>
+                            @*@Html.LocalizeDropDownListKendoLangFor(m => m.ParentId, cates.Select(x => new
+                            {
+                                x.Name, x.Id, x.HierOrder, Deep = x.Deep(), x.LangVisible, UPathHasLang = x.UpPathHasLang
+                            })
+                            .Where(x => x.Id != Model.Id && x.Deep + 1 < CategoryModel.MaxDeep && x.HierOrder.IndexOf(hierOrder) != 0 && x.UPathHasLang)
+                            .OrderBy(x => x.HierOrder).Select(x => new DDListItem()
+                            {
+                                Value = x.Id.ToString(),
+                                Text = x.Name.DPadLeft(x.Deep * 5, '-'),
+                                Active = true, LangVisible = x.LangVisible
+                            }), StringTable.SelectCategory,
+                            new { @onchange = "langFormValidDependants(this, '.lang_form_parentid', '.lang_form_name,#" + Html.IdFor(m => m.Alias) + "')" })*@
+                            <input id="ParentText" value="@(Model.GetRaw().SafeProp(m => m.Parent).HierOrder(false))" style="width:60%" disabled type="text" />
+                            @Html.LocalizeTextBoxFor(m => m.ParentId, new { @style = "display:none;", @onchange = "langFormValidDependants(this, '.lang_form_parentid', '.lang_form_name,#" + Html.IdFor(m => m.Alias) + "')" })
+                            <button class="btn" style="@(isFrontEnd ? "display:none;" : "");margin:0" onclick="openSelectParent($(this))" type="button">@("Browse category".ModLocalize("Browse"))</button>
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.ParentId)</section>
+                    </section>
+                </section>
+                <section class="controls" style="margin-bottom: 0px;">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.DisplayOrder)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.DisplayOrder, new { @class = "js-required", @type = "number", @style = "float:left;" })
+                            <span class="error" style="display: none; float: left;">*</span>
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.DisplayOrder)</section>
+                    </section>
+                </section>
+            </section>
+        </section>
+
+        <section class="wr-line-eshop" ></section>
+        <section class="row_content_box">
+            <section class="clo_left txt_align_r">
+                <h2>@StringTable.Banners</h2>
+                <label></label>
+            </section>
+            <section class="clo_right col-right-eshop">
+                <ul class="controls">
+                    @for (var i = 0; i < 3; i++)
+                    {
+                        <li style="display: inline-block;vertical-align: top;min-width:222px;padding-right:20px;">
+                            @{
+                                var banner = (SettingsBiz.SizeBiz)settings.Display.Category.GetType().GetProperty("Banner" + i).GetValue(settings.Display.Category);
+                                var bannerFile = (string) Model.GetType().GetProperty("Banner" + i).GetValue(Model);
+                            }                      
+                            <div>
+                                <input id="banner@(i)check" @(!bannerFile.IsNullOrEmpty() ? "checked=checked" : "") class="css-checkbox" type="checkbox" />
+                                <label for="banner@(i)check" class="css-labelcheck">@(("Banner" + i + "Thumb").GetDisplayName(Model)) (@banner.GetTitleHint())</label>
+                            </div>
+                            <div class="banner-box">
+                                <input id="imageUpload@(i)" name="imageUpload@(i)" accept="image/*" type="file" style="display: none" />
+                                <div class="wr-img-sub">
+                                    <div id="dropzone-form-@(i)" class="dropzone single wr-upload-img-es" style="padding: 0;">
+                                        <div class="wr-img-show">
+                                            <div class="wr-upload-img-es mask-dropzone mask-dropzone-show" style="">
+                                                <span>@StringTable.AddOrDropImage</span>
+                                            </div>
+                                            <div class="dz-message" style="display: none"></div>
+                                            <ul class="dropzone-preview-box-@(i)" style=""></ul>
+                                        </div>
+                                        <div class="clear_fix"></div>
+                                        <ul class="btn_center set-relative mb10">
+                                            <li style="margin-right:15px !important">
+                                                <input id="add-file-@(i)" value="@StringTable.UploadImage" class="btn_update" type="button">
+                                            </li>
+                                        </ul>
+                                    </div>
+                                </div>
+                                <div style="float: right"><span id="image-error-msg-@(i)" class="error" style="cursor: pointer"></span></div>
+                                <section>
+                                    @{
+                                        switch (i)
+                                        {
+                                            case 0:
+                                                @Html.LocalizeTextBoxFor(m => m.BannerUrl0, new {@class = "", @placeholder = Html.LocalizeNameFor(m => m.BannerUrl0), @style = "margin-right: 0;width: 100%;"})
+                                                <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.BannerUrl0)</section>
+                                                break;
+                                            case 1:
+                                                @Html.LocalizeTextBoxFor(m => m.BannerUrl1, new {@class = "", @placeholder = Html.LocalizeNameFor(m => m.BannerUrl1), @style = "margin-right: 0;width: 100%;"})
+                                                <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.BannerUrl1)</section>
+                                                break;
+                                            case 2:
+                                                @Html.LocalizeTextBoxFor(m => m.BannerUrl2, new {@class = "", @placeholder = Html.LocalizeNameFor(m => m.BannerUrl2), @style = "margin-right: 0;width: 100%;"})
+                                                <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(m => m.BannerUrl2)</section>
+                                                break;
+                                        }
+                                    }
+                                </section>                                
+                            </div>
+                        </li>
+                    }
+                </ul>               
+            </section>
+            <script type="text/javascript">
+                $(function () {
+                    $('#banner0check,#banner1check,#banner2check').change(function () {
+                        if ($(this).prop('checked')) { $(this).closest('li').find('.banner-box').show(); }
+                        else $(this).closest('li').find('.banner-box').hide();
+                    }).change();
+                })
+            </script>
+        </section>
+
+        <section class="wr-line-eshop" style="display: @(languages.Count > 1 ? "" : "none")"></section>
+
+        <section class="row_content_box" style="display: @(languages.Count > 1 ? "" : "none")">
+            <section class="clo_left txt_align_r">
+                <h2>@StringTable.VisibilityInLanguages</h2>
+                <label></label>
+            </section>
+            <section class="clo_right col-right-eshop">
+                @RenderLangMedTabs(languages, langOpt, Model.Languages.Cast<ILanguage2>().ToList())
+            </section>
+        </section>
+    </section>
+
+    <section class="wr-line-eshop"></section>
+    
+    if (Model.Products != null)
+    {
+         <section class="row_content_box">
+             <section class="clo_left txt_align_r">
+                 <h2>@StringTable.Product</h2>
+                 <label>@StringTable.CateAssignProductHint</label>
+                 <label class="font14 clear_fix ">@Html.LocalizeNameFor(m => m.Sorting):</label>
+                 <section style="float: right; clear:both;">
+                     @Html.LocalizeDropDownListKendoFor(m => m.Sorting, typeof (SortingBiz).LocalizeEnumValues().OrderBy(x => x.Text), null, new {@style = "", @onchange = "gridProdCateSort($(this).val())"})
+                 </section>
+                 <div class="clear_fix"></div>
+                 <ul class="wr_submit_top set-relative  mt_10">
+                     <li class="mr0"><input value="@StringTable.AddProductToCategory" class="btn_add" onclick="openAssignForm();" type="button"></li>
+                 </ul>
+                 <ul class="wr_submit_top set-relative mb20 mt_10" style="display: @(Model.Id > 0 && Model.Products.SafeCount() != 0 ? "block" : "none")">
+                     <li class="mr0"><input value="@StringTable.UpdateProductPrice" class="btn_update" onclick="openUpdateProductPrice();" type="button"></li>
+                 </ul>
+             </section>
+             <section class="clo_right col-right-eshop">
+                 <div class="controls">
+                     @{
+                         ViewData["LangCode"] = langCode;
+                         Html.ClawRenderPartial("Admin/_CategoriesProduct.cshtml", Model, ViewData);
+                         Html.ClawRenderPartial("Admin/_CategoriesEditPrice.cshtml", Model, ViewData);
+                     }
+                 </div>
+                 <div class="controls">
+                     <div class="" style="float:left;">
+                         <span class="text-eshop wauto mr15">@Html.LocalizeNameFor(m => m.IncSubCate)</span>
+                         @Html.LocalizeDropDownListKendoFor(m => m.IncSubCate, new[]
+                         {
+                             new SelectListItem() {Value = "True", Text = StringTable.Yes}, new SelectListItem() {Value = "False", Text = StringTable.No}
+                         }, null, new {@style = ""})
+                     </div>
+                     <ul class="wr_submit_top" style="position:relative;">
+                         <li class="mr0 delete_big" style="padding:inherit;"><input class="btn_delete" value="@StringTable.RemoveFromCategory" type="button"></li>
+                     </ul>
+                 </div>
+                 <div class="controls">
+                     <span class="text-eshop wauto mr15" style="float: left; line-height: 30px;">@Html.LocalizeNameFor(m => m.PagingSz)</span>
+                     @Html.LocalizeTextBoxFor(m => m.PagingSz, new {@style = "float: left; width: 100px; min-width: 0px;", @placeholder = StringTable.Inherit})
+                     <section class="field-valid-msg" style="clear: initial; margin-top: 5px;">@Html.LocalizeValidationMessageFor(m => m.PagingSz)</section>
+                 </div>
+             </section>
+         </section>
+         <section class="wr-line-eshop"></section>
+    }
+    if (settings.Hidden.EnableCustomerDiscount)
+    {
+        <section class="row_content_box customer-discount-box">
+            <section class="clo_left txt_align_r">
+                <h2>@Html.LocalizeNameFor(m => m.CustomerDiscounts)</h2>
+                <label></label>
+            </section>
+            <section class="clo_right col-right-eshop">
+                <div class="controls">
+                    @{
+                        ViewData["LangCode"] = langCode;
+                        Html.ClawRenderPartial("Admin/_CategoriesCustomer.cshtml", Model, ViewData);
+                      }
+                </div>
+            </section>
+        </section>
+        <section class="wr-line-eshop customer-discount-box"></section>
+    }
+    <section class="row_content_box">
+        <section class="clo_left txt_align_r">
+            <h2>@Html.LocalizeNameFor(m => m.Visibility)</h2>
+            <label></label>
+        </section>
+        <section class="clo_right col-right-eshop">
+            <div class="controls">
+                <div class="input-col-1">
+                    <h2 class="td-es">@Html.LocalizeNameFor(m => m.VisibleWeb)</h2>
+                    <div class="controls">
+                        <div style="float:left;width:100%;height:28px">
+                            <div style="float: left">
+                                @Html.LocalizeRadioButtonFor(model => model.VisibleWeb, "true", new { @id = "VisibleWebTrue", @class = "css-radio js-required" })
+                                <label class="css-labelradio" for="VisibleWebTrue">@StringTable.Visible</label>
+                            </div>
+                            <section id="published-date-box" style="float: left">
+                                <div class="text-eshop-ita-2" style="float:left;padding:0px 5px;margin-top: 1px;">@StringTable.AsOf</div>
+                                <section style="float: left">
+                                    @Html.LocalizeDateTextBoxFor(m => m.PublishedDate, Model.Id, new { @class = "", @style = "width: 80px;" })
+                                    <section class="field-valid-msg">
+                                        @Html.LocalizeValidationMessageFor(m => m.PublishedDate)
+                                    </section>
+                                </section>
+                            </section>
+                        </div>
+                        <div>
+                            @Html.LocalizeRadioButtonFor(model => model.VisibleWeb, "false", new { @id = "VisibleWebFalse", @class = "css-radio js-required" })
+                            <label class="css-labelradio" for="VisibleWebFalse">@StringTable.Hidden</label>
+                        </div>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(model => model.VisibleWeb)</section>
+                    </div>
+                </div>
+                <div class="input-col-2">
+                    <h2 class="td-es">@Html.LocalizeNameFor(m => m.VisiblePos)</h2>
+                    <div class="controls">
+                        @Html.LocalizeRadioButtonFor(model => model.VisiblePos, "true", new { @id = "VisiblePosTrue", @class = "css-radio js-required" })
+                        <label class="css-labelradio" for="VisiblePosTrue">@StringTable.Visible</label><br>
+                        @Html.LocalizeRadioButtonFor(model => model.VisiblePos, "false", new { @id = "VisiblePosFalse", @class = "css-radio js-required" })
+                        <label class="css-labelradio" for="VisiblePosFalse">@StringTable.Hidden</label>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(model => model.VisiblePos)</section>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </section>
+    <section class="row_content_box">
+        @*<section class="clo_left txt_align_r">
+                <h2>@StringTable.SearchEngines</h2>
+
+                <label class="font14 mb20 text-hint">@StringTable.SearchEngineHint</label>
+                <span class="text-lang">@StringTable.TranslateTo:</span>
+                    <section class="wr-lang-left">
+                        <div class="wr-line-lang">
+                            <input id="demo_box_a" class="css-checkbox" name="demo_lbl_a" type="checkbox">
+                            <label for="demo_box_a" class="css-labelcheck">Norway</label>
+                        </div>
+                        <div class="wr-line-lang">
+                            <input id="demo_box_d" class="css-checkbox" name="demo_lbld" type="checkbox">
+                            <label for="demo_box_d" class="css-labelcheck">French</label>
+                            <span class="es-show-tranglate">@StringTable.TranslateTo<a href="#" title="">French</a></span> </div>
+                    </section>
+            </section>*@
+        <section class="clo_right col-right-eshop"></section>
+    </section>
+}
+
+<script type="text/javascript">
+    var form = $('#editForm')[0];
+
+    form.customValidFields = function () {
+        return true;
+    };
+
+    form.CustomLangFormSwitch = function (langcode, node, senderuid) {
+        var ownerbox = node.closest('.row_content_box');
+    };
+
+    function InitImageUpload(url, img, imgThumb, imgFsUrl, imgErrMsg, dropzoneForm, imageUpload, addFile, previewsContainer) {
+
+        imgErrMsg.click(function () { $(this).html(''); });
+
+        var dzEle = dropzoneInit(dropzoneForm, imageUpload, addFile,
+            {
+                acceptedFiles: '@settings.Display.Admin.Image.Extensions.GetFileExtensionDropZone(false)',
+                previewsContainer: previewsContainer,
+                url: url
+            },
+            function (result) {
+                $(".mask-dropzone-show", dropzoneForm).hide();
+                img.val(result.Image.FileName);
+                imgThumb.val(result.Image.ThumbUrl);
+                imgFsUrl.val(result.Image.FilePath);
+            }, function (file, e) {
+                img.val(''); imgThumb.val(''); imgFsUrl.val('');
+                setImageErrMsg(imgErrMsg, e.Message + ' (' + file.name + ')');
+            });
+
+        //remove file
+        var dropzone = dzEle[0].dropzone;
+        dropzone.on("removedfile", function (file) {
+            if (file.status == "success") {
+                $(".mask-dropzone-show", dropzoneForm).show();
+                img.val("");
+                imgThumb.val("");
+                imgFsUrl.val("");
+                $('#editform-change-state').val(1).change();
+            }
+        });
+
+        dropzone.on("addedfile", function (file) {
+            var node = $(file.previewElement).find('img[data-dz-thumbnail]');
+            $(file.previewElement).find('.image-edit').unbind('click').click(function () {
+                //console.log('click', node, file);
+                aviaryInit(imgFsUrl, [img, imgThumb, node]);
+            });
+            //console.log('addedfile', node,node.attr('id'), file, $(file.previewElement).find('.image-edit'));
+        });
+
+        if ($.trim(img.val()) != '') {
+            $(".mask-dropzone-show", dropzoneForm).hide();
+            dropzoneAdd(dzEle[0].dropzone, imgFsUrl.val(), img.val(), imgFsUrl.val(), imgThumb.val(), 'image/*');
+        }
+    }
+
+    function setImageErrMsg(node, msg) {
+        node.html(msg);
+        setTimeout(function () { node.html(''); }, 10000);
+    }
+
+    $(document).ready(function () {
+
+        $('input[name=@Html.NameFor(m => m.VisibleWeb)]').change(function () {
+            var box = $('#published-date-box');
+            if ($('#VisibleWebTrue').prop('checked')) box.show(); else box.hide();
+        }).change();
+
+        @*$('#view-in-your-store').unbind('click').click(function () {
+            location.href = window.open('@ModuleUrl.CategoryUrl(Model.Alias)', '_blank');
+            return true;
+        });*@
+
+        $('#@Html.IdFor(m => m.Sorting)').change();
+
+        setTimeout(function () { initMsTranslator('no-loading-image'); }, 1000);
+
+        setTimeout(function () { $('.inputLang li.langItem input[disabled]').prop('disabled', false); }, 1000);
+
+        InitImageUpload('@ModuleUrl.AdminUrl(Html.GetController(), "uploadimage", Model.Id)',$('#@Html.IdFor(m => m.Image)'), $('#@Html.IdFor(m => m.ImageThumb)'),
+            $('#@Html.IdFor(m => m.ImageFsUrl)'), $('#image-error-msg'), '#dropzone-form', '#imageUpload', '#add-file', '.dropzone-preview-box');
+
+        for(var i = 0; i < 3; i++)
+            InitImageUpload('@ModuleUrl.AdminUrl(Html.GetController(), "uploadimage", Model.Id)'.replace('/@Html.GetController()/', '/CateBanner' + i + '/'),
+                $('#Banner' + i), $('#Banner' + i + 'Thumb'), $('#Banner' + i + 'FsUrl'), $('#image-error-msg-' + i),
+                '#dropzone-form-' + i, '#imageUpload' + i, '#add-file-' + i, '.dropzone-preview-box-' + i);
+    });
+
+</script>
+
+@if (!isFrontEnd)
+{
+    <script type="text/javascript">
+
+    function openSelectParent(node) {
+
+        if ('@(ViewBag.PermissionEdit ? 0 : 1)' == '1') return;
+
+        ajaxCmdHtml('@ModuleUrl.AdminUrl("Category", "GetBrowseForm")', { id: '@Model.Id', parentId: $('#@Html.IdFor(m => m.ParentId)').val() },
+            function (result, customTag) {
+                openBrowseCate('@Model.Id', null, result);
+            });
+    }
+
+    function openBrowseCate(id, actionurl, formHtml) {
+        var width = Math.max(200, Math.min(600, $(window).width() - 50));
+        var height = Math.max(200, Math.min(300, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popup = new ClawModal("", "modal-mask");
+        var popTemplate = $('<div>').html($("#browse-cate-templ").html());
+        popTemplate.find('#form-html').html(formHtml);
+
+        var formTitle = '@StringTable.SelectCategory';
+
+        var windowModal = popup.showCustomModal("#window", formTitle, popTemplate.html(), width, height, [], null,
+            function (modal) {
+                var treeview = modal.find("#catetree");
+
+                modal.find(".btn_save").click(function () {
+                        var selected = getSelected(treeview);
+                        console.log(selected);
+                        //$('#@Html.IdFor(m => m.ParentId)').data('kendoDropDownList').value(selected.id);
+                        $('#@Html.IdFor(m => m.ParentId)').val(selected.id).change();// 
+                        $('#ParentText').val(selected.hierOrder);
+
+                        popup.close(); $(window).scrollTop(scrollTop);
+                        $('#editform-change-state').val(1).change();
+                    });
+
+                    modal.find(".btn_cancel").click(function () { popup.close(); $(window).scrollTop(scrollTop); });
+                });
+        }
+
+    </script>
+}
+
+<script id="browse-cate-templ" type="text/kendo-template">
+    <div class="popupBody">
+        <section id="err-message-holder"></section>
+        <section class="row_content_box kpopup-content">
+            <section class="wr_clo1" style="margin: 20px 20px 10px 20px;background-color: #f7f7f7;border: 1px solid #ccc;">
+                <div class="wcontent">
+                    <div class="htmlcontent">
+                        <div id="form-html"></div>
+                    </div>
+                </div>
+            </section>
+            <section class="clear"></section>
+            <ul class="wr_submit_top form-action-menu" style="position:relative; padding:5px 0;">
+                <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                <li style="margin-right:20px;"><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+            </ul>
+
+        </section>
+    </div>
+</script>
+
+@helper RenderLangMedTabs(List<Language> languages, Language actLang, List<ILanguage2> modelLangs)
+{
+    <div class="tab-big-2">
+        <ul class="inputLang">
+            @foreach (var lang in languages.OrderBy(x => x.LanguageCode.EqualsIgCase(actLang.LanguageCode) ? 0 : 1))
+            {
+                var active = lang.LanguageCode.EqualsIgCase(actLang.LanguageCode);
+                var itmChecked = modelLangs.Any(x => x.Visible && x.LangCode.EqualsIgCase(lang.LanguageCode));
+                <li class="controls langItem @(active ? "active-lang" : "")" data-lang="@lang.LanguageCode"
+                    title="@lang.LanguageName">
+                    <input id="med_lang_@lang.Id" class="css-checkbox" name="med_lang_@lang.Id" @Html.Raw(Model.AllLangForcedActive ? "disabled='disabled'" : "") @Html.Raw(itmChecked ? "checked='checked'" : "") type="checkbox">
+                    <label for="med_lang_@lang.Id" class="css-labelcheck">@lang.LanguageName</label>
+                    <div class="lang-cmd-box" style="display: none">
+
+                        <span class="inline-flag">
+                            <i></i>
+                            <a href="javascript:void(0)">
+                                <span class="es-show-tranglate">@StringTable.TranslateInfo</span>
+                                <img src="@ModuleUrl.LangIcon(lang.LanguageCode)" alt="@lang.LanguageCode" />
+                            </a>
+                        </span>
+                    </div>
+                </li>
+            }
+        </ul>
+    </div>
+}
+

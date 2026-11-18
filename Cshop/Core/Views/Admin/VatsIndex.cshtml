@@ -1,0 +1,162 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Core
+@model IEnumerable<VatModel>
+@{
+    Layout = "Layout/List.cshtml";
+    ViewBag.ControlSetting = true;
+    
+    ViewBag.Title = StringTable.ManageProductTaxes;
+    ViewBag.AddAction = "Add";
+    ViewBag.UseInlineEdit = true;
+    ViewBag.AutoAddNewHandler = false;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/setting";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Settings;
+    
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+<style type="text/css">
+    #grid td .k-numeric-wrap { height: 26px; }
+    #grid td .k-numerictextbox input.k-input { width: 100%; border: 0; height: 25px; }
+</style>
+@section MainTitleSection {
+    @(StringTable.ManageProductTaxes)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageProductTaxes)
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<VatModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", "Input", "Input",
+    "(function(e){gridOnInlineEditCustom(e);gridOnInlineEdit(e, null, gridRefreshRow);})", @settings.Display.Product.PageSize)
+    .DataSource(m => m.Id, "List", null, null, null)
+    .Paging(10, new int[] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Name, true)
+            .SetInlineEdit(true)
+            .SetDefaultSort(true)
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+
+       grid.Col(m => m.ValTxt, true, 150)
+            .SetInlineEdit(true)
+            .SetCssClass("td-center")
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+            
+        grid.Col(m => m.TakeAway, false, 120)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-takeaway"),
+            
+            grid.Col(m => m.Default, false, 100)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-default"),   
+               
+        grid.Col(m => m.Active, false, 80)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-status"),
+    })
+    .ColumnCommand(grid => new[]
+    {
+        grid.Cmd(m => m.Id, "(function(uid){ gridCmdInlineEdit('grid',uid); })", "Edit", "edit_fr", false, null, true),
+        grid.Cmd(m => m.Id, "Delete", "Delete", "delete_fr", true)
+    }, 120)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid'); 
+    var statusActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "Enable"))';
+    var takeAwayActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "SetTakeAway"))';
+    var defaultActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "SetDefault"))';
+    
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+    
+    grid.data("kendoGrid").bind("save", function(e) {
+        if (!e.model.id && e.model.Default) setTimeout(function () { e.sender.dataSource.read(); }, 1000);
+    });
+
+    function gridOnInlineEditCustom(e) {
+        e.model.InlineEdit = true;
+        $('#ValTxt', e.container).attr({
+            'data-val-number': '@StringTable.ErrMsgRequireNumber.ModErrLocalize()',
+            'data-val-regex-pattern': '@LanguageMgr.GetNumberRegex(LanguageMgr.FocusLang).Trim(new []{'^','$'}).Replace("\\","\\\\")',
+                'data-val-regex': '@StringTable.ErrMsgRequireNumber.ModErrLocalize()'
+    })
+    .val(e.model.Value && e.model.Value.Value != null ? localizeFloatToString(e.model.Value.Value * 100, 'n2') : '')
+    .closest('td').append(' %');
+    }
+
+    function gridCustom(grid) {
+
+        initGridStatusAction(grid, '.k-grid-status', statusActUrl,
+           function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+           function (row) { return { id: row.Id, active: row.Active }; });
+
+        initGridStatusAction(grid, '.k-grid-takeaway', takeAwayActUrl,
+           function (row) { return row.TakeAway; }, function (row, value) { row.TakeAway = value; },
+           function (row) { return { id: row.Id, value: row.TakeAway }; });
+
+        initGridStatusAction(grid, '.k-grid-default', defaultActUrl,
+           function (row) { return row.Default; }, function (row, value) { row.Default = value; },
+           function (row) { if (row.Default) setTimeout(function () { grid.clawSkipHideMsg = true; grid.dataSource.read(); }, 1000); return { id: row.Id, value: row.Default }; });
+
+        //gridMarkLangDisabled(grid, '.k-grid-name', function (row) { return !row.LangVisible; });
+
+        gridHideCell(grid, '.k-grid-Delete', function (row) { return (row.AnyDepend); });
+
+        gridDisableCheckBox(grid, function (row) { return (row.AnyDepend); });
+
+        $('tr', grid.element).each(function () {
+            $(this).dblclick(function (e) {
+                if (!grid.editable) grid.editRow($(this));
+            });
+        });
+
+        setTimeout(function() {
+            $('.js-add-new-selector').unbind('click').click(function () {
+                grid.addRow();
+            }).attr('type', 'button');
+        }, 1);
+    }
+
+    function gridRefreshRow(grid, rowEle) {
+
+        initGridStatusAction(grid, rowEle.find('.k-grid-status'), statusActUrl,
+            function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+            function (row) { return { id: row.Id, active: row.Active }; });
+
+        initGridStatusAction(grid, rowEle.find('.k-grid-takeaway'), takeAwayActUrl,
+           function (row) { return row.TakeAway; }, function (row, value) { row.TakeAway = value; },
+           function (row) { return { id: row.Id, value: row.TakeAway }; });
+
+        initGridStatusAction(grid, rowEle.find('.k-grid-default'), defaultActUrl,
+           function (row) { return row.Default; }, function(row, value) { row.Default = value; },
+           function (row) { if (row.Default) setTimeout(function () { grid.dataSource.read(); }, 1000); return { id: row.Id, value: row.Default }; });
+
+        gridHideCell(grid, rowEle.find('.k-grid-Delete'), function (row) { return row.AnyDepend; });
+
+        gridDisableCheckBox(grid, function (row) { return row.AnyDepend; }, rowEle.find('.row-checkbox'));
+
+        rowEle.dblclick(function (e) {
+            if (!grid.editable) grid.editRow($(this));
+        });
+    }
+
+    //function gridGetParams(grid, e) {
+    //    return { propertyid: $('#propertyid').val() };
+    //}
+
+    //function onFilterChange() {
+    //    grid.data('kendoGrid').dataSource.page(1);
+    //}
+
+</script>

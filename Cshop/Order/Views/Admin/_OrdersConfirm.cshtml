@@ -1,0 +1,141 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model OrderModel
+@{
+    var settings = (SettingsBiz)ViewBag.Settings ?? SettingsBiz.GetSettings();
+    var barLen = settings.Display.BarCode.CharLength + 1;
+
+    var confirmItems = Model.GetRaw().OrderDetails
+        .SelectMany(m => m.GetConfirmQty())
+        .Select((m, idx) => new
+        {
+            Id = m.Item4, Iseq = idx + 1, ProductName = m.Item1.GetName(m.Item2), Quantity = m.Item3,
+            ProductId = m.Item1.Id, VariantId = m.Item2.GetId(), ConfirmBarcode = m.Item5
+        }).ToList();
+    var confirmCount = 0;
+}
+<style type="text/css">
+    .orderdetail-confirm {margin: 0 10px 10px 20px;}
+    .orderdetail-confirm .od-confirm-item {margin-top: 10px;}
+    .orderdetail-confirm .od-confirm-item .css-labelcheck {vertical-align: top;}
+    .orderdetail-confirm .od-confirm-item .name {display:inline-block;width: 520px;}
+    .orderdetail-confirm .od-confirm-item .name.no-value { font-style: italic;color:#390f3d;}
+    .orderdetail-confirm .od-confirm-item .confirm-barcode {width: 100px; min-width: 0;margin-left: 5px;margin-top: -5px;vertical-align: top;}
+</style>
+@{
+}
+<form onsubmit="return false;" style="padding-left: 20px; padding-bottom: 5px;">
+   <div style="display: inline-block; line-height:36px; vertical-align: top; ">
+        <input id="BarCode" name="BarCode" style="min-width: 0; width: 150px;" placeholder="@(StringTable.ProductBarcode)" type="text"/>
+        <button class="btn" onclick="addConfirm(this)" style="margin: 0;" type="submit">@StringTable.Add</button>
+   </div>
+    <div id="confirm-count-msg" style="display: inline-block; margin-left: 5px; line-height: 36px; margin-top: 0px; font-size: large; "></div>
+</form>
+<ul class="orderdetail-confirm">
+    @foreach (var itm in confirmItems)
+    {
+        for (var i = 0; i < itm.Quantity; i++)
+        {
+            confirmCount++;
+            <li class="od-confirm-item" data-id="@itm.Id" data-quantity="@itm.Quantity" data-barcode="@itm.ConfirmBarcode" data-productname="@itm.ProductName" data-productid="@itm.ProductId">
+                <input id="CheckBarCode-@(itm.Id)-@i" onclick="return false;" class="check-barcode css-checkbox" type="checkbox" />
+                <label class="css-labelcheck" for="CheckBarCode-@(itm.Id)-@i"></label>
+                <div class="name @(itm.ConfirmBarcode.IsNullOrEmpty() ? "no-value" : "")">@itm.ProductName@(itm.ConfirmBarcode.IsNullOrEmpty() ? string.Format(" ({0})", "No barcode".ModLocalize()) : "")</div>
+                <input name="ConfirmBarCode" class="confirm-barcode" onchange="updateConfirmSel(this)"/>
+            </li>
+        }
+    }
+</ul>
+<script type="text/javascript">
+
+    var confirmMsg = '@("confirm_count_msg".ModLocalize("Scannet {0} av {1} produkt").Replace("{1}", confirmCount.ToString()))';
+
+    $(function () {
+        $('.btn_yes', '#modal').hide();
+        $('#BarCode', '#modal').focus();
+        $('.show_massage', '#modal ').css('position', 'absolute');
+
+        $('#confirm-count-msg').html(confirmMsg.replace('{0}', 0));
+
+    })
+
+    function cmpBarcode(val0, val1)
+    {
+        var barLen = @(barLen);
+
+        if (val0 == val1) return true;
+
+        return val0 && val1 && val0.length == barLen && val1.length == barLen && val0.substring(0, barLen - 1) == val1.substring(0, barLen - 1);
+    }
+
+    function addConfirm(node) {
+        var barcode = $(node).parent().find('#BarCode');
+        var value = $.trim(barcode.val()), barLen = @(barLen);
+        
+        if (!value) return;
+
+        if (value.length < barLen) value = value.padStart(barLen, '0');
+
+        var lst = $('.od-confirm-item', '.orderdetail-confirm').filter(function () { return cmpBarcode($(this).attr('data-barcode'), value) && !$(this).find('.check-barcode').is(':checked'); });
+        if (lst.length != 0) {
+            lst.first().find('input.confirm-barcode').val(value);
+            lst.first().find('input.check-barcode').prop('checked', true);
+            barcode.val(''); admincommon.hideMessage();
+        }
+        else admincommon.showMessage('@(StringTable.ItemNotFound)', 1, 5000);
+        
+        if ($('.od-confirm-item .check-barcode:not(:checked)', '.orderdetail-confirm').length == 0)
+            $('.btn_yes', '#modal').show();
+        else $('.btn_yes', '#modal').hide();
+
+        $('#confirm-count-msg').html(confirmMsg.replace('{0}', $('.od-confirm-item .check-barcode:checked', '.orderdetail-confirm').length));
+    }
+
+    function updateConfirmSel(node) {
+        var value = $.trim($(node).val()), holder = $(node).closest('li');
+        var checkBarcode = holder.attr('data-barcode'), barLen = @(barLen);
+        
+        if (value && value.length < barLen) value = value.padStart(barLen, '0');
+
+        found = value && (!checkBarcode || cmpBarcode(value, checkBarcode));
+        holder.find('input.check-barcode').prop('checked', found);
+
+        if (found) admincommon.hideMessage();
+        else if(value) admincommon.showMessage('@(StringTable.ItemNotFound)', 1, 5000);
+
+        if ($('.od-confirm-item .check-barcode:not(:checked)', '.orderdetail-confirm').length == 0)
+            $('.btn_yes', '#modal').show();
+        else $('.btn_yes', '#modal').hide();
+
+        $('#confirm-count-msg').html(confirmMsg.replace('{0}', $('.od-confirm-item .check-barcode:checked', '.orderdetail-confirm').length));
+    }
+
+    function getConfirmData() {
+        var data = [], dic = {};
+
+        $('.orderdetail-confirm .od-confirm-item .check-barcode:checked').each(function () {
+            var holder = $(this).closest('li'), barcode = $.trim(holder.find('input.confirm-barcode').val());
+            var itm = dic[barcode];
+            if(!itm) { 
+                data.push(itm = dic[barcode] = { Barcode: barcode, Count: 0, Id: holder.attr('data-id'), Name: holder.attr('data-productname'), ProductId: holder.attr('data-productid') });
+            }
+            
+            itm.Count += 1;
+        })
+        
+        return data;
+    }
+
+</script>
+
+@if (Model.Type.InList(OrderType.Pos) && confirmItems.Any(m => !m.ConfirmBarcode.IsNullOrEmpty()))
+{
+    <script>
+        $(function () {
+            $('.btn_yes', '#modal').hide();
+        })
+    </script>
+}

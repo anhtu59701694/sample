@@ -1,0 +1,230 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model IEnumerable<CustomerModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.OrderEdit;
+    ViewBag.Title = StringTable.ManageCustomers;
+    //ViewBag.AddAction = "Add";
+    ViewBag.UseInlineEdit = true;
+    ViewBag.ShowFilterBox = true;
+    ViewBag.ShowSearchBox = true;
+    
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/Eshop/customer";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Customers;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var groups = (List<CustGroupModel>)ViewBag.Groups;
+
+    var companyId = QParam.GetField<int?>("companyId", false, true);
+    var company = CompanyMgr.GetDom(new DefaultDb(), companyId ?? 0);
+}
+
+<style type="text/css">
+    .k-grid-group-edit .k-dropdown-wrap { width: 147px;}
+    .k-grid-group-view { width: 200px;}
+    .cust-group-item { /*white-space: nowrap;*/float: left;width: 50%;min-height: 40px;}
+    .wr_table_all .cust-group-item input[type="checkbox"].css-checkbox+label.css-labelcheck {padding-left: 20px !important;margin-left: 0 !important;}
+    #grid .company{color: #999; font-style: italic;}
+
+    #special-search {font-size: medium;font-weight: bold;color: #6C0B7E;clear: both;margin-top: 10px;float: left;}
+    #special-search .close-2 {color: black;font-size: small;}
+    #special-search .close-2:hover {color: red;cursor: pointer;}
+    
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageCustomers)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageCustomers)
+}
+
+@section ExtraTopActionMenuSection {
+    <li class="export-customer">
+        <input type="button" class="btn_export" onclick="javascript:void(0);" value="@(StringTable.ExportExcel)" title="@(StringTable.ExportExcel)">
+    </li>
+}
+
+@section FilterMenuSection
+{
+    <ul class="filter-box">
+        <li>
+            <span class="filter-title">
+                @StringTable.CustGroup:
+            </span>
+            @Html.LocalizeDropDownListKendo("groupid", QParam.GetField<int?>("groupid", false), 
+                groups.Select(x => new SelectListItem() { Value = x.Id.ToString(), Text = x.Name, }), 
+                StringTable.SelectGroup, new { @class = "filter-dropdown", @onchange = "onFilterChange()" })
+        </li>
+        @if (true || !settings.Hidden.CustomerDefaultStatus.InList(CustStatus.Active) || !settings.Hidden.CompanyCustomerDefaultStatus.InList(CustStatus.Active))
+        {
+            <li>
+                <span class="filter-title">
+                    @StringTable.Status:
+                </span>
+                @Html.LocalizeDropDownListKendo("status", QParam.GetField<int?>("status", false),
+                    typeof (CustStatus).LocalizeEnumValues<int>(m => !m.InList(CustStatus.Deleted)),
+                    StringTable.SelectStatus, new {@class = "filter-dropdown", @onchange = "onFilterChange()"})
+            </li>
+        }
+    </ul>
+    @if (companyId != null)
+    {
+        <div id="special-search">
+            <span class="text">@company.SafeProp(m => m.Name) (@company.SafeProp(m => m.OrgNumber))</span>
+            <span class="close-2" title="@StringTable.Close"> X </span>
+        </div>
+    }
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<CustomerModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController())
+    .DataSource(m => m.Id, "List", null, null, "gridGetParams")
+    .Paging(10, new [] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.DeliverName, "Edit", m => m.Id, true)
+            .SetTemplate("<a class='grid-row-edit'>#:(DeliverName || '')# #=renderCompany(CompanyName, OrgNumber)#</a>"),
+        grid.Col(m => m.Email, true)
+            .SetTemplate("<a class='k-grid-link' href='mailto\\:#:Email#'>#:Email#</a>"),
+            
+        false && settings.Hidden.CustomerDefaultStatus.InList(CustStatus.Active) && settings.Hidden.CompanyCustomerDefaultStatus.InList(CustStatus.Active) ? null :
+            grid.Col(m => m.Status, true, 80)
+            //.SetTemplate(StringTable.BoolTempl)
+            .SetTemplate("#:StatusTxt#")
+            .SetCssClass("k-grid-status"),
+ 
+        !settings.Hidden.CustCompany ? null :
+            grid.Col(m => m.IsCompanyOwner, false, 80)
+            .SetTemplate(StringTable.BoolTempl)
+            .SetCssClass("k-grid-IsCompanyOwner"),
+                                
+        grid.Col(m => m.Orders, "ListOrder", m => m.Id, false, 80)
+            .SetCssClass("td-center"),
+        grid.Col(m => m.CreatedDate.Text, m => m.CreatedDate, true, 130),
+        grid.Col(m => m.CustGroups, false, 400)
+            .SetTemplate("#=renderGroups(CustGroups)#"),
+    }.Where(x => x != null).ToArray())
+    .ColumnCommand(grid => new[]
+    {
+        grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr", false, StringTable.Edit),
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Delete", "Delete", "delete_fr", true, StringTable.Delete) : null,
+    }.Where(x => x != null).ToArray())
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+    
+    function renderCompany(companyName, orgNumber) {
+        if(!companyName || !orgNumber) return '';
+        
+        return '<div class="company">' + companyName + ', ' + orgNumber + '</div>';
+    }
+
+    function renderGroups(groups) {
+        var ret = [];
+
+        if (groups)
+            groups.forEach(function(itm) {
+                var cid = 'custgroup-' + itm.CustomerId + '-' + itm.GroupId;
+                var code = '<div class="cust-group-item"><input class="css-checkbox" id="'
+                    + cid + '" value="' + itm.GroupId + '" type="checkbox" '
+                    + (itm.Selected ? 'checked="checked"' : '') + '><label for="' + cid + '" class="css-labelcheck">'
+                    + kendo.htmlEncode(itm.GroupName) + '</label></div>';
+
+                ret.push(code);
+            });
+
+        return ret.join('');
+    }
+
+    var grid = $('#grid'), permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+    var statusActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "UpdateStatus"))';
+    var companyOwnerActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "UpdateCompanyOwner"))';
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function gridCustom(grid) {
+
+        $('.export-customer .btn_export').unbind('click').click(function() {
+            var args = {
+                groupid: $('#groupid').val(),
+                lang: getFocusLang(),
+                keyword: $('#inputSearch').val()
+            };
+            location.href = '@ModuleUrl.AdminUrl(Html.GetController(), "Export")/?' + $.param(args);
+        });
+
+        if (permEdit)
+            $('.cust-group-item input', grid.element).unbind('change').change(function() {
+                var row = grid.dataItem($(this).closest('tr'));
+                ajaxCmd('@ModuleUrl.AdminUrl(Html.GetController(), "UpdateGroup")',
+                { id: row.Id, groupid: $(this).val(), selected: $(this).prop('checked') }, function() {});
+            });
+        else $('.cust-group-item input', grid.element).prop('disabled', true);
+
+        initGridStatusAction(grid, '.k-grid-status', statusActUrl,
+           function (row) { return row.Status == 1; }, function (row, status) { row.Status = status ? 1 : 2; },
+           function (row) { return { id: row.Id, status: row.Status }; });
+
+        initGridStatusAction(grid, '.k-grid-IsCompanyOwner', companyOwnerActUrl,
+           function (row) { return row.IsCompanyOwner; }, function (row, value) { row.IsCompanyOwner = value; },
+           function (row) { return { id: row.Id, value: row.IsCompanyOwner }; }, 
+           function(){ setTimeout(function(){ grid.dataSource.page(grid.dataSource.page()); }, 2000); });
+    }
+
+    function gridGetParams(grid, e) {
+        return { groupid: $('#groupid').val(), status:  $('#status').val(), companyid: '@companyId' };
+    }
+
+    function onFilterChange() {
+        grid.data('kendoGrid').dataSource.page(1);
+    }
+
+    function initGridStatusAction(grid, selector, actionUrl, getterStatus, setterStatus, getterCmdParams, cmdResult) {
+
+        var titleEnable = '@(StringTable.ItemEnableTitle)';
+        var titleDisable = '@(StringTable.ItemDisableTitle)';
+
+        $(selector, grid.element).each(function () {
+
+            var rdata = grid.dataItem($(this).closest("tr"));
+            var ritmA = $(this).find('a');
+            var status = getterStatus(rdata);
+
+            if(status == null) ritmA.hide();
+            else ritmA.show().addClass(status ? 'enable' : 'disable').attr('title', status ? titleDisable : titleEnable);
+
+            if(actionUrl) {
+                $(this).unbind('click').click(function (e) {
+                    var row = grid.dataItem($(this).closest("tr"));
+                    var itm = $(this).find('a');
+
+                    setterStatus(row, !getterStatus(row));
+
+                    if (row.id > 0) ajaxCmd(actionUrl, getterCmdParams(row), cmdResult);
+                    
+                    if(getterStatus(row) == null) itm.hide();
+                    else if (getterStatus(row)) itm.show().removeClass("disable").addClass("enable").attr('title', titleDisable);
+                    else itm.show().removeClass("enable").addClass("disable").attr('title', titleEnable);
+                });
+            }
+        });
+    }
+
+    $('#special-search .close-2').click(function () {
+        location.href = '@ModuleUrl.AdminUrl(Html.GetController(), "Index")';
+    });
+
+</script>

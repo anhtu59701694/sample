@@ -1,0 +1,103 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model IEnumerable<CompanyModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.OrderEdit;
+    ViewBag.Title = StringTable.ManageCompanies;
+    //ViewBag.AddAction = "Add";
+    ViewBag.UseInlineEdit = true;
+    ViewBag.AutoAddNewHandler = false;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/company";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Companies;
+    
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageCompanies)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageCompanies)
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<CompanyModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", "Input", "Input",
+    "(function(e){gridOnInlineEditCustom(e);gridOnInlineEdit(e, null, gridRefreshRow);})")
+    .DataSource(m => m.Id, "List", null, null, null)
+    .Paging(10, new int[] { 10, 20, 30, 50, 100 })
+    //.ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Name, true)
+            .SetInlineEdit(true)
+            .SetDefaultSort(true)
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+ 
+        grid.Col(m => m.OrgNumber, true),
+                       
+        grid.Col(m => m.UserNum, "ListUser", m => m.Id)
+            .SetTemplate("<a class='grid-row-edit'>#:(UserNum || 0)#</a>")
+            .SetCssClass("td-center"),
+            
+        grid.Col(m => m.CreatedDate, true)
+            .SetTemplate("#:CreatedDate.TextF#"),
+  
+    }.Where(m => m != null).ToArray())
+    .ColumnCommand(grid => new[]
+    {
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "(function(uid){ gridCmdInlineEdit('grid',uid); })", "Edit", "edit_fr", false, null, true) : null,
+        //ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Delete", "Delete", "delete_fr", true) : null
+    }.Where(x => x != null).ToArray(), 120)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid'), permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    grid.data("kendoGrid").bind("save", function(e) {
+        if (!e.model.id && e.model.Default) setTimeout(function () { e.sender.dataSource.read(); }, 1000);
+    });
+
+    function gridOnInlineEditCustom(e) {
+        e.model.InlineEdit = e.model.QuickAdd = true;
+    }
+
+    function gridCustom(grid) {
+
+        if (permEdit)
+            $('tr', grid.element).each(function() {
+                $(this).dblclick(function(e) {
+                    if (!grid.editable) grid.editRow($(this));
+                });
+            });
+    }
+
+    function gridRefreshRow(grid, rowEle) {
+
+        if (permEdit)
+            rowEle.dblclick(function(e) {
+                if (!grid.editable) grid.editRow($(this));
+            });
+    }
+
+    //function gridGetParams(grid, e) {
+    //    return { propertyid: $('#propertyid').val() };
+    //}
+
+    //function onFilterChange() {
+    //    grid.data('kendoGrid').dataSource.page(1);
+    //}
+
+</script>

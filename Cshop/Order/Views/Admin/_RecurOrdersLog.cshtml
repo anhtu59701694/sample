@@ -1,0 +1,64 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model RecurOrderModel
+@{
+    //var langCode = (string)ViewData["LangCode"];
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var logHtml = Html.GetHtmlHelper<RecurOrderLogModel>();
+}
+<style type="text/css">
+    #gridrecurorderlog .content {font-size: small;font-weight: bold;color: #555;}
+    #gridrecurorderlog .audit {font-size: small;}
+</style>
+
+<div class="wr_table_all" id="recurorder-logs" style="float: left; width: 100%; margin-bottom: 5px;">
+    @(logHtml.LocalizeGridFor<RecurOrderLogModel>("gridrecurorderlog", "RecurOrderLog", null, null, null, null,
+        null, null, grid =>
+        {
+            grid.ButtonDelBigClass += "_log";
+            grid.ButtonAddNewClass += "_log";
+            grid.CheckBoxSelAllCss += "_log";
+            grid.CheckBoxRowCssClass += "_log";
+        })
+        .DataSource(m => m.Id, "List", null, null, "gridRecurOrderLogGetParams")
+        .Paging(10, new[] { 10, 20, 30, 50, 100 })
+        .Columns(grid => new[]
+        {
+            grid.Col(m => m.CreatedDate, false, 150)
+                .SetTemplate(@"#:safeProp(CreatedDate,'TextF')#")
+                .SetCssClass("td-center"),
+            grid.Col(m => m.Content)
+                .SetTemplate("<div class='content'>#:Content#</div><div class='audit'>#:AuditInfo||''#</div>"),
+
+        })
+        .Sortable(true)
+        .Config(grid => { grid.CustomScript = "gridRecurOrderLogCustom"; })
+        .ToMvcHtmlString())
+</div>
+
+<script type="text/javascript">
+
+    var gridrecurorderlog = $('#gridrecurorderlog');
+
+    $(function () {
+        gridrecurorderlogInit('#gridrecurorderlog', true);
+    });
+
+    function gridRecurOrderLogCustom(grid) {
+        var holder = $('#recurorder-logs').closest('.wr_box_cube');
+        if (grid.dataSource.total() > 0) holder.show();
+        else holder.hide();
+    }
+
+    function gridRecurOrderLogRefreshRow(grid, rowEle) {
+
+    }
+
+    function gridRecurOrderLogGetParams(grid, e) {
+        return { RecurOrderId: '@Model.Id' };
+    }
+
+</script>

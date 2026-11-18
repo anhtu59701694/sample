@@ -1,0 +1,116 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model IEnumerable<PropertyModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+    ViewBag.Title = StringTable.ManageProperties;
+    ViewBag.AddAction = "Add";
+    ViewBag.UseInlineEdit = true;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/product";
+    ViewBag.ParentBreadcrumbTitle = StringTable.Product;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+
+<style type="text/css">
+
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageProperties)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageProperties)
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<PropertyModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", "Input", null, "(function(e){gridOnInlineEdit(e, '#DisplayOrder', gridRefreshRow);})", @settings.Display.Product.PageSize)
+    .DataSource(m => m.Id, "List", null, null, "")
+    .Paging(10, new int[] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Name, "Edit", m => m.Id, true)
+            .SetDefaultSort(true)    
+            .SetInlineEdit(true)
+            .SetCssClass("name-pro")
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+        //grid.Col(m => m.PropValCount, "ListPropVal", m => m.Id),
+
+        grid.Col(m=>m.PropValListTxt, false)
+            .SetCssClass("name-pro"),
+
+        grid.Col(m => m.DisplayOrder, true, 120)
+            .SetInlineEdit(true)
+            .SetCssClass("td-center")
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+
+        //grid.Col(m => m.Active, "", m => m.Id, false, 80)
+        //    .SetTemplate("<div style='float: left; position: relative;'><div style='display:none;height: 13px; background: url(&quot;/areas/admin/styles/images/icon_btn.png&quot;) no-repeat scroll -5px -180px / 20px auto; position: absolute; width: 10px; left: 11px; top: -1px;'></div><a href='javascript:void(0);' /></div>")
+        //    .SetCssClass("k-grid-status"),
+    })
+    .ColumnCommand(grid => new[]
+    {
+
+        grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr"),
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true) : null,
+        grid.Cmd(m => m.Id, "ListPropVal", "Detail", " detail_fr",false, StringTable.ViewChangeValues )
+
+    }.Where(x => x != null).ToArray(), 170)
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid'), permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+    @*var statusActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "Enable"))';*@
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function gridCustom(grid) {
+
+        //initGridStatusAction(grid, '.k-grid-status', statusActUrl,
+        //   function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+        //   function (row) { return { id: row.Id, active: row.Active }; });
+
+        //gridMarkLangDisabled(grid, '.k-grid-name', function (row) { return !row.LangVisible; });
+
+        //gridHideCell(grid, '.k-grid-Delete', function (row) { return (row.AnyChild); });
+
+        //gridDisableCheckBox(grid, function (row) { return (row.AnyChild); });
+
+        if (permEdit)
+            $('tr', grid.element).each(function() {
+                $(this).dblclick(function(e) {
+                    if (!grid.editable) grid.editRow($(this));
+                });
+            });
+    }
+
+    function gridRefreshRow(grid, rowEle) {
+
+        //initGridStatusAction(grid, rowEle.find('.k-grid-status'), statusActUrl,
+        //    function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+        //    function (row) { return { id: row.Id, active: row.Active }; });
+
+        //gridHideCell(grid, rowEle.find('.k-grid-Delete'), function (row) { return row.AnyChild; });
+
+        //gridDisableCheckBox(grid, function (row) { return row.AnyChild; }, rowEle.find('.row-checkbox'));
+
+        if (permEdit)
+            rowEle.dblclick(function(e) {
+                if (!grid.editable) grid.editRow($(this));
+            });
+    }
+
+</script>

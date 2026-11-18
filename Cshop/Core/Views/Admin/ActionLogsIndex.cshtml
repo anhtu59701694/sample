@@ -1,0 +1,95 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Core
+@model IEnumerable<ActionLogModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.Title = StringTable.ManageActionLogs;
+    //ViewBag.AddAction = "Add";
+    //ViewBag.UseInlineEdit = true;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/Eshop/actionlog";
+    ViewBag.ParentBreadcrumbTitle = StringTable.ActionLogs;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+}
+
+<style type="text/css">
+    #grid .audit-user,#grid .audit-ip,#grid .audit-host{display:inline;}
+    #grid .audit-agent{font-size:smaller;color: #333;}
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageActionLogs)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageActionLogs)
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<ActionLogModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController())
+    .DataSource(m => m.Id, "List")
+    .Paging(10, new [] { 10, 20, 30, 50, 100 })
+    //.ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.CreatedDate, true, 150)
+            .SetDefaultSort(true, true)
+            .SetTemplate("#:safeProp(CreatedDate,'TextF')#"),
+        grid.Col(m => m.Function),
+        grid.Col(m => m.Activity),
+        grid.Col(m => m.AuditInfo)
+            .SetTemplate("<div class='audit-user'>#:UserName#</div>, <div class='audit-ip'>#:UserIp#</div>, <div class='audit-host'>#:UserHost#</div><div class='audit-agent'>#:UserAgent#</div>"),
+    })
+    //.ColumnCommand(grid => new[]
+    //{
+    //    grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr", false, StringTable.Update),
+    //    grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true, StringTable.Delete),
+    //})
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid'); 
+    
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function gridCustom(grid) {
+
+        //initGridStatusAction(grid, '.k-grid-status', statusActUrl,
+        //   function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+        //   function (row) { return { id: row.Id, active: row.Active }; });
+
+        //gridMarkLangDisabled(grid, '.k-grid-name', function (row) { return !row.LangVisible; });
+        //gridHideCell(grid, '.k-grid-Delete', function (row) { return true; });
+        //gridDisableCheckBox(grid, function (row) { return true; });
+
+        //$('tr', grid.element).each(function () {
+        //    $(this).dblclick(function (e) {
+        //        if (!grid.editable) grid.editRow($(this));
+        //    });
+        //});
+    }
+
+    function gridRefreshRow(grid, rowEle) {
+
+        //initGridStatusAction(grid, rowEle.find('.k-grid-status'), statusActUrl,
+        //    function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+        //    function (row) { return { id: row.Id, active: row.Active }; });
+
+        //gridHideCell(grid, rowEle.find('.k-grid-Delete'), function (row) { return true; });
+        //gridDisableCheckBox(grid, function (row) { return true; }, rowEle.find('.row-checkbox'));
+
+        //rowEle.dblclick(function (e) {
+        //    if (!grid.editable) grid.editRow($(this));
+        //});
+    }
+
+</script>

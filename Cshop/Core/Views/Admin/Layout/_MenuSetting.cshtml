@@ -1,0 +1,117 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Core
+@using Claw.Modules.Eshop.Core
+@{
+    var versionSetting = Claw.Modules.Eshop.Helper.VersionHelper.GetVersionSetting();
+    bool multiCurr = false;
+    if (versionSetting != null)
+    {
+        multiCurr = versionSetting.Currencies.Count > 1;
+    }
+
+    var settings = Claw.Modules.Eshop.Helper.SettingsBiz.GetSettings();
+}
+<section class="wr-menu-top-eshop">
+    <section class="wr-menu-icon" style="text-align: center">
+        <ul class="clo-5" style="width: auto">
+            <li>
+                <a href="/admin/modules/eshop/setting/general/" title="">
+                    <img src="@ModuleUrl.IconUrl("icon-general.png")" alt="">
+                    <h2>@StringTable.General</h2>
+                </a>
+            </li>
+            <li>
+                <a href="/admin/modules/eshop/setting/display/" title="">
+                    <img src="@ModuleUrl.IconUrl("icon-display.png")" alt="">
+                    <h2>@StringTable.Display</h2>
+                </a>
+            </li>
+            @if (settings.Hidden.UniMicro)
+            {
+                <li>
+                    <a href="/admin/modules/eshop/setting/accounting/" title="@StringTable.SettingsAccounting">
+                        <img src="@ModuleUrl.IconUrl("icon-display.png")" alt="">
+                        <h2>@StringTable.Accounting</h2>
+                    </a>
+                </li>
+            }            
+            @if (null != Type.GetType("Claw.Modules.Eshop.WePack.StringTable,Claw.Modules.Eshop.WePack", false))
+            {
+                <li>
+                    <a href="/admin/modules/eshop/setting/hiddenother/?prefix=WePack" title="">
+                        <img src="@ModuleUrl.IconUrl("icon-display.png")" alt="">
+                        <h2>@("WePack".ModLocalize())</h2>
+                    </a>
+                </li>
+            }
+            <li>
+                <a href="/admin/modules/eshop/setting/logistics" title="">
+                    <img src="@ModuleUrl.IconUrl("icon-display.png")" alt="">
+                    <h2>@StringTable.Logistics</h2>
+                </a>
+            </li>
+            <li>
+                <a href="/admin/modules/eshop/EmailTempl/" title="">
+                    <img src="@ModuleUrl.IconUrl("icon-notification.png")" alt="">
+                    <h2>@StringTable.Notification</h2>
+                </a>
+            </li>
+            <li style="display:none;">
+                <a href="/admin/modules/eshop/setting/SMS/" title="">
+                    <img src="@ModuleUrl.IconUrl("icon-notification.png")" alt="">
+                    <h2>SMS setting</h2>
+                </a>
+            </li>
+            <li>
+                <a href="/admin/modules/eshop/paymentmethod/" title="">
+                    <img src="@ModuleUrl.IconUrl("icon-walet.png")" alt="">
+                    <h2>@StringTable.Payment</h2>
+                </a>
+            </li>
+            <li>
+                <a href="/admin/modules/eshop/shipping/" title="">
+                    <img src="@ModuleUrl.IconUrl("icon-walet.png")" alt="">
+                    <h2>@StringTable.Shipping</h2>
+                </a>
+            </li>
+            <li>
+                <a href="/admin/modules/eshop/shippingzone/" title="">
+                    <img src="@ModuleUrl.IconUrl("icon-walet.png")" alt="">
+                    <h2>@StringTable.ShippingZone</h2>
+                </a>
+            </li>
+
+            <li>
+                <a href="/admin/modules/eshop/vat/" title="">
+                    <img src="@ModuleUrl.IconUrl("icon-taxes.png")" alt="">
+                    <h2>@StringTable.Taxes</h2>
+                </a>
+            </li>
+            @if (!Claw.Modules.Eshop.Helper.SettingsBiz.GetSettings().Hidden.SingleCurrency && multiCurr)
+            {
+                <li>
+                    <a href="/admin/modules/eshop/currency/" title="">
+                        <img src="@ModuleUrl.IconUrl("icon-taxes.png")" alt="">
+                        <h2>@StringTable.CurrencyText</h2>
+                    </a>
+                </li>
+            }
+            <li style="display:none;">
+                <a href="/admin/modules/eshop/permission/" title="">
+                    <img src="@ModuleUrl.IconUrl("icon-perm.png")" alt="">
+                    <h2>@StringTable.Permission</h2>
+                </a>
+            </li>
+        </ul>
+    </section>
+</section>
+<script type="text/javascript">
+    $(document).ready(function () {
+        var object_a = $(".wr-menu-top-eshop .wr-menu-icon li");
+
+        $(object_a).find('a.active').removeClass("active");
+        $(object_a).find('a[href*="' + location.pathname + '"]').addClass("active");
+
+        $('li a[href="/admin/modules/eshop/setting"]', '.eshop_Left ul.eshop_menu').addClass('set active');
+    });
+</script>

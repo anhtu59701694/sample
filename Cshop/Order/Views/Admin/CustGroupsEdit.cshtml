@@ -1,0 +1,255 @@
+﻿@using System.Linq
+@using System.Web.UI.WebControls
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model CustGroupModel
+
+@{
+    Layout = "Layout/Input.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.OrderEdit;
+    ViewBag.Title = StringTable.AddEditGroupDiscount(Model.Id);
+    //ViewBag.ShowDeleteBtn = (Model != null && Model.Id > 0 && false);
+
+    //ViewBag.UseCKEditor = true;
+    //ViewBag.UseDatePicker = true;
+    //ViewBag.UseDropZone = true;
+
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/custgroup";
+    ViewBag.ParentBreadcrumbTitle = StringTable.CustomerGroups;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var countries = (List<Claw.Modules.Eshop.Domain.Country>)ViewBag.Countries;
+    var langOpt = LanguageMgr.ValidOptLang(Model.Id);
+    var langCode = langOpt.LanguageCode;
+}
+
+@section MainTitleSection {
+    @(StringTable.ManageGroupDiscounts)
+}
+
+@section CurrentTitleSection {
+    <a href="/admin/modules/eshop/groupdiscount/">@(StringTable.ManageGroupDiscounts)</a>
+}
+
+@section TabTitleSection {
+    @StringTable.AddEditGroupDiscount(Model.Id)
+}
+
+<style type="text/css">
+    .cust-group-item {float: left; padding-right: 20px;}    
+    .controls.half-width{width: 45% !important;margin-left: 10px; min-height: 80px;}
+    .clo_right.col-right-eshop{width: 80% !important;}
+    .wr-line-eshop{margin-left: 3px;}
+    .cate-list-box ul{}
+    .cate-list-box li{display: inline-block;margin-left: 10px;margin-bottom: 17px;border: 1px solid #ccc;padding: 0 2px 0 5px;min-width:300px;}
+    .cate-list-box li input{margin: 5px 0px 5px 1px;width: 50px;min-width: 0;}
+    .cate-list-box li .field-valid-msg{position:absolute;}
+    .cate-list-box li .delete{color:red;float:right;padding: 0 5px;height: 1.3em;font-weight: bold;}
+</style>
+@using (@Html.BeginForm("Input", Html.GetController(), FormMethod.Post, new { @id = "editForm", enctype = "multipart/form-data" }))
+{
+    @Html.AntiForgeryToken()
+    @Html.HiddenFor(x => x.Id)
+    @Html.HiddenFor(x => x.Price4Login)
+    @Html.HiddenFor(x => x.Discount)
+
+    <section class="row-content-lang-box validable-form-field">
+        
+        <section class="row_content_box">
+            <section class="clo_left txt_align_r"></section>
+            <section class="clo_right col-right-eshop">
+                <section class="controls" style="">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Name)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.Name, new { @class = "js-required", @style = "", @readonly = "readonly" })
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Name)</section>
+                    </section>
+                </section>
+                <section class="controls" style="">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.DiscountRate)</span>
+                    <section>
+                        <section>
+                            @Html.LocalizeTextBoxFor(m => m.DiscountRate, new { @class = "kendo-numeric", @style = "", placeholder = new OFloat(0).Text }) %
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.DiscountRate)</section>
+                    </section>
+                </section>
+                <section class="controls" style="">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.AnyCategory)</span>
+                    <section>
+                        <section>
+                            <div style="line-height: 1.6em;">
+                                @Html.LocalizeCheckBoxFor(model => model.AnyCategory, new { @class = "css-checkbox", @value = "true", @data_val = "true" })
+                                <label for="@Html.IdFor(model => model.AnyCategory)" class="css-labelcheck">@Html.LocalizeNameFor(m => m.AnyCategory)</label>
+                                <input name="@Html.NameFor(model => model.AnyCategory)" value="false" type="hidden">
+                            </div>                            
+                        </section>
+                    </section>
+                </section>
+                <section class="controls" style="">
+                    <span class="text-eshop">@Html.LocalizeNameFor(x => x.Categories)</span>
+                    <section class="cate-list-box" style="float: left;clear: both;">
+                        <section>
+                            <ul>
+                                @for (var i = 0; i < Model.Categories.Count; i++)
+                                {
+                                    var idx = i;
+                                    <li>
+                                        <section>
+                                            @Html.HiddenFor(m => m.Categories[idx].CategoryId, new { databind = "CategoryId" })
+                                            <a class="name form-link" href="@ModuleUrl.AdminUrl("Category", "Edit", Model.Categories[idx].CategoryId)">@Model.Categories[idx].UpPath</a>
+                                            <a class="delete" title="@StringTable.Delete" onclick="deleteCate(this)" href="javascript:void(0);">X</a>
+                                        </section>
+                                    </li>
+                                }
+                            </ul>
+                            <div><button class="btn" href="javascript:;" onclick="openAssignCates($(this))" style="margin: 3px 0 0 10px;" type="button">@StringTable.Edit</button></div>
+                        </section>
+                        <section class="field-valid-msg">@Html.LocalizeValidationMessageFor(x => x.Categories)</section>
+                    </section>
+                </section>
+            </section>
+        </section>
+
+    </section>
+    <section class="wr-line-eshop"></section>
+}
+
+<script type="text/javascript">
+
+    $(function () {
+        initKendoNumeric('input.kendo-numeric', { format: "n2", min: 0.0, max: 100.0, step: 1.0 });
+    })
+
+    var form = $('#editForm')[0], cateItemList = $('.cate-list-box');
+
+    form.customValidFields = function () {
+        return true;
+    };
+
+    form.CustomLangFormSwitch = function (langcode, node, senderuid) {
+        var ownerbox = node.closest('.row_content_box');
+    };
+
+    $('#@Html.IdFor(model => model.AnyCategory)').change(function () {
+        if ($(this).prop('checked')) cateItemList.hide();
+        else cateItemList.show();
+    }).change();
+
+    function dropdownGetData(node) {
+        return node.data("kendoDropDownList").dataSource.get(node.val());
+    }
+
+
+    function deleteCate(node) {
+        console.log('deleteCate', $(node), $(node).closest('li'));
+        $(node).closest('li').hide().find('input[type=hidden]').val('');
+    }
+
+    function openAssignCates(node) {
+
+        if ('@(ViewBag.PermissionEdit ? 0 : 1)' == '1') return;
+
+        var cateIds = [];
+        $('.cate-list-box li input[databind="CategoryId"]').each(function () {
+            cateIds.push($(this).val());
+        });
+
+        ajaxCmdHtml('@ModuleUrl.AdminUrl("Product", "GetAssignForm")', { id: '@Model.Id', categoryIds: cateIds.join(', ') },
+            function (result, customTag) {
+                openAssignCate('@Model.Id', null, result);
+            });
+    }
+
+    function buildCateList(cates) {
+
+        var cateIds = [];
+
+        $('.cate-list-box li').each(function () {
+
+            var id = $(this).find('input[databind="CategoryId"]').val();
+
+            if (cates.find(function (itm) { return itm.Id == id; }))
+                cateIds.push({Id: id});
+        });
+
+        cates.forEach(function (itm) {
+            if (!cateIds.find(function (x) { return itm.Id == x.Id; }))
+                cateIds.push({ Id: itm.Id });
+        });
+
+        ajaxCmdHtml('@ModuleUrl.AdminUrl(Html.GetController(), "Input")', { id: '@Model.Id', categories: JSON.stringify(cateIds) },
+            function (result) {
+                $('.cate-list-box ul').html($('.cate-list-box ul', result).html());
+                formUpdateValidRules($('.cate-list-box'));
+            }, null, 'GET');
+    }
+
+    function openAssignCate(id, actionurl, formHtml) {
+        var width = Math.max(200, Math.min(600, $(window).width() - 50));
+        var height = Math.max(200, Math.min(300, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popup = new ClawModal("", "modal-mask");
+        var popTemplate = $('<div>').html($("#assign-cate-templ").html());
+        popTemplate.find('#form-html').html(formHtml);
+
+        var formTitle = '@StringTable.CustGroupDiscountSelectCate';
+
+        var windowModal = popup.showCustomModal("#window", formTitle, popTemplate.html(), width, height, [], null,
+            function (modal) {
+                var treeview = modal.find("#catetree");
+
+                modal.find(".btn_save").click(function () {
+                    var selectedList = getSelectedIds(treeview);
+
+                    console.log(selectedList);
+
+                    buildCateList(selectedList.Jsons);
+
+                    popup.close(); $(window).scrollTop(scrollTop);
+                    $('#editform-change-state').val(1).change();
+                });
+
+                modal.find(".btn_cancel").click(function () { popup.close(); $(window).scrollTop(scrollTop); });
+            });
+    }
+
+    $(function () {
+        if (!window.formUpdateValidRulesBak) {
+            window.formUpdateValidRulesBak = window.formUpdateValidRules;
+            window.formUpdateValidRules = function (node) {
+                window.formUpdateValidRulesBak(node);
+                formDisableValidation($('li:not(:visible) input', '.cate-list-box'), true);
+            }
+            formDisableValidation($('li:not(:visible) input', '.cate-list-box'), true);
+        }
+    })
+</script>
+
+<script id="assign-cate-templ" type="text/kendo-template">
+    <div class="popupBody">
+        <section id="err-message-holder"></section>
+        <section class="row_content_box kpopup-content">
+            <section class="wr_clo1" style="margin: 20px 20px 10px 20px;background-color: #f7f7f7;border: 1px solid #ccc;">
+                <div class="wcontent">
+                    <div class="htmlcontent">
+                        <div id="form-html"></div>
+                    </div>
+                </div>
+            </section>
+            <section class="clear"></section>
+            <ul class="wr_submit_top form-action-menu" style="position:relative; padding:5px 0;">
+                <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                <li style="margin-right:20px;"><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+            </ul>
+        </section>
+    </div>
+</script>

@@ -1,0 +1,338 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using System.Text.RegularExpressions
+@using Claw.Modules.Eshop.Product
+@model ProductModel
+@{
+    var langCode = (string)ViewData["LangCode"];
+    var templExtraInfo = new ProductExtraInformationModel();
+}
+<style type="text/css">
+    #product-extra thead.k-grid-header {
+        display: none;
+    }
+
+    #product-extra .k-pager-wrap.k-widget {
+        border-top: 1px solid #CCC !important;
+    }
+</style>
+@{
+    var fieldNameTemplate = "<a href='javascript:void(0)' class='extraFieldName' id='#:Id#' onclick='openExtraInformationForm(#:Id#);'>#:FieldName#</a>";
+}
+<div class="wr_table_all" id="product-extra">
+    @(Html.LocalizeGridFor<ProductExtraInformationModel>("gridextrainfo", "None", null, null, null, null, null, null, grid =>
+        {
+            grid.ButtonDelBigClass += "_extraInfo";
+            grid.ButtonAddNewClass += "_extraInfo";
+            grid.CheckBoxSelAllCss += "_extraInfo";
+            grid.CheckBoxRowCssClass += "_extraInfo";
+        })
+        .DataSource(m => m.Id, Model.ExtraInformation)
+        .Paging(10, new[] { 10, 20, 30, 50, 100 })
+        .Columns(grid => new[]
+        {
+            grid.Col(m => m.FieldName)
+            .SetTemplate(fieldNameTemplate)
+            .SetCssClass("name-pro2")
+        })
+        .ColumnCheckBox("Id", "_extraInfo")
+        .Sortable(true)
+        .Config(grid => { grid.CustomScript = "gridExtraInfoCustom"; })
+        .ToMvcHtmlString())
+</div>
+<div class="controls">
+    <ul class="wr_submit_top set-relative">
+        <li class="mr0 delete_big_extraInfo" style="padding:0">
+            <input class="btn_delete" value="@StringTable.RemoveExtra" type="button">
+        </li>
+    </ul>
+</div>
+<div id="inputInfo" style="display:none;">
+    
+</div>
+<script type="text/javascript">
+    var insId = -1;
+    var gridextrainfo = $('#gridextrainfo');
+    $(function () {
+        $('#inputInfo').attr('id', 'inputInfoPop');
+        gridextrainfoInit('#gridextrainfo', true);
+    });
+    function gridExtraInfoCustom(grid) {
+        $('.delete_big_extraInfo').unbind('click').click(function () {
+            var arrRws = [], rows = grid.tbody.find('input:checked').closest('tr');
+            rows.each(function () { arrRws.push(grid.dataItem($(this))); });
+            arrRws.forEach(function (item) {
+                extraFormRemove(item);
+                grid.dataSource.data().remove(item);
+            });
+        });
+
+        $('#extraInfo-form-list > .extraInfo-form[data-valid=1]').each(function () {
+            var extraForm = $(this), row = extraGridGetRow(grid, $(this).attr('data-id'), $(this).attr('data-key'));
+            if (row) {
+                $(this).attr('data-uid', row.uid);
+                row.ExtraInfoForm = extraForm;
+            } else console.log('databound: row is null', $(this).attr('data-key'), extraForm);
+        });
+
+        if (grid.dataSource.total() == 0) grid.element.closest(".wr_table_all").hide();
+        else grid.element.closest(".wr_table_all").show();
+    }
+    function extraGridGetRow(grid, id, key) {
+
+        if (id != null && id != 0) return grid.dataSource.get(id);
+        else return grid.dataSource.data().find(function (item) { return item.Key == key; });
+    }
+    function extraFormRemove(row) {
+        row.ExtraInfoForm.attr('data-valid', 0);
+        row.ExtraInfoForm.find('input,textarea,select').val('').attr('datavalid', 0);
+    }
+    function openExtraInformationForm(idValue) {
+        var width = Math.max(200, Math.min(770, $(window).width() - 50));
+        var height = Math.max(200, Math.min(2048, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popTemplate = $("<div>").html($("#extra-popup-form-templ").html());
+        popTemplate.find('.htmlcontent .wr_table_all').html($('#inputInfoPop').clone().attr('id', 'inputInfo').wrap('<p>').html());
+        //popTemplate.find('.htmlcontent .wr_table_all').html($('#inputInfo').html());
+        //$('#inputInfo').html('');
+
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+        var popup = new ClawModal("", "modal-mask");
+        var titile = '@StringTable.AddExtraInformation';
+        if(idValue != 0) titile = '@StringTable.EditExtraInformation';
+        var windowModal = popup.showCustomModal("#window", titile, popTemplate.html(),
+            width, height, [], null,
+            function (modal) {
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+                var ckArr = modal.find(".sub_ckeditor_standard,.sub_ckeditor_simple");
+                initEditor(ckArr); $.validator.unobtrusive.parse("#popupForm");
+                @*var lstExtra = @Html.Raw(Newtonsoft.Json.JsonConvert.SerializeObject(this.Model.ExtraInformation))
+                lstExtra.forEach(function (itm) 
+                { 
+                    if(itm.Id == idValue) 
+                    {
+                        modal.find('input[id*=txtName]').val(itm.FieldName);
+                        var obj = CKEDITOR.instances["txtValue"];
+                        if (obj != null)
+                            obj.setData(itm.FieldValue);
+                        modal.find('input[id*=txtValue]').val(itm.FieldValue);
+                    }
+                });*@
+                if (idValue != 0)
+                {
+                    $('#extraInfo-form-list > .extraInfo-form[data-valid=1]').each(function () {
+                        var grid = gridextrainfo.data('kendoGrid');
+                        var extraForm = $(this), row = extraGridGetRow(grid, $(this).attr('data-id'), $(this).attr('data-key'));
+                        if (row.Id < 0 && row.Id < insId) insId = row.id;
+                        if (row.Id == idValue) {
+                            modal.find('input[id*=txtName]').val(row.FieldName);
+                            modal.find($('textarea#txtValue')).val(row.FieldValue);
+                            //var obj = CKEDITOR.instances["txtValue"];
+                            //if (obj != null)
+                            //    obj.setData(itm.FieldValue);
+                        }
+                    });
+                }
+                modal.find(".btn_save").click(function () {
+                    if (!validateSubmit($('.popupBody'))) return;
+                    
+                    var txtValue = getInputVal($('#txtValue'));
+                    var invalidInput = ValidDuplicateName(parseInt(idValue), modal.find('input[id*=txtName]').val());
+                    if (!invalidInput)
+                    {
+                        showFailedValidMsgText(false, '@StringTable.DuplicateExtraInformation'); return;
+                    }
+                    if (idValue != 0)
+                    {
+                        var grid = gridextrainfo.data('kendoGrid');
+                        var rowUpdate = extraGridGetRow(grid, idValue, idValue);
+                        rowUpdate.set("FieldName", modal.find('input[id*=txtName]').val());
+                        rowUpdate.set("FieldValue", txtValue);
+                        extraFormRemove(rowUpdate);
+                        ExtraUpdate(idValue, modal.find('input[id*=txtName]').val(), txtValue);
+                    }
+                    else
+                    {
+                        var grid = gridextrainfo.data('kendoGrid');
+                        insId = -(grid.dataSource.total());
+                        ExtraAdd(insId - 1, modal.find('input[id*=txtName]').val(), txtValue);
+                    }
+					termEditor(ckArr);
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close(); $(window).scrollTop(scrollTop);
+                });
+                modal.find(".btn_cancel").click(function () {
+                    termEditor(ckArr);
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close(); $(window).scrollTop(scrollTop);
+                });
+            });
+        
+    }
+    function ExtraAdd(id, fieldName, fieldValue) {
+        ExtraAddRaw({
+            Id: id,
+            ProductId: '@Model.Id',
+            FieldName: fieldName,
+            FieldValue: fieldValue,
+        });
+    }
+    function ExtraAddRaw(fieldVals) {
+
+        var gridData = gridextrainfo.data('kendoGrid');
+        var newRow = $.extend(true, {}, templExtraInfo);
+        for (var prop in fieldVals) {
+            var pval = fieldVals[prop];
+            newRow[prop] = pval;
+        }
+        var newForm = ExtraFormAdd(fieldVals);
+        newForm.attr('data-key', newRow.Id);
+        gridData.dataSource.data().push(newRow);
+    }
+    function ExtraFormAdd(fieldVals) {
+
+        var lst = $('#extraInfo-form-list'), idx = parseInt(lst.attr('count'));
+
+        lst.attr('count', idx + 1);
+
+        var newForm = $('<div>').html($('#extraInfo-form-template').html()).find('.extraInfo-form');
+
+        newForm.find('input,textarea,select').each(function () {
+            $(this).attr('id', $(this).attr('id').replace('_0_', '_' + idx + '_'));
+            $(this).attr('name', $(this).attr('name').replace('[0]', '[' + idx + ']'));
+
+            if ($(this).attr('binding')) {
+                if ($(this).is('textarea')) $(this).html('');
+                else $(this).val('');
+            }
+        });
+
+        if (fieldVals)
+            for (var field in fieldVals) {
+                var fVal = fieldVals[field];
+
+                var node = newForm.find('.extraInfo-form-field[binding=' + field + ']');
+                if (node.is('textarea')) $(this).html(fVal);
+                else node.val(fVal);
+            }
+
+        newForm.attr({ 'data-id': fieldVals["Id"], 'data-valid': 1 });
+
+        lst.append(newForm);
+
+        return newForm;
+    }
+    function ValidDuplicateName(id,fieldName)
+    {
+        var valid = true;
+        $('#extraInfo-form-list > .extraInfo-form[data-valid=1]').each(function () {
+            var grid = gridextrainfo.data('kendoGrid');
+            var row = extraGridGetRow(grid, $(this).attr('data-id'), $(this).attr('data-key'));
+            
+            if (row.Id != id && row.FieldName.trim().toLowerCase() == fieldName.trim().toLowerCase()) {
+                valid = false;
+            }
+        });
+        return valid;
+    }
+    function ExtraUpdate(id, fieldName, fieldValue) {
+        ExtraUpdateRaw({
+            Id: id,
+            ProductId: '@Model.Id',
+            FieldName: fieldName,
+            FieldValue: fieldValue,
+        });
+    }
+    function ExtraUpdateRaw(fieldVals) {
+
+        var gridData = gridextrainfo.data('kendoGrid');
+        var newRow = $.extend(true, {}, templExtraInfo);
+        for (var prop in fieldVals) {
+            var pval = fieldVals[prop];
+            newRow[prop] = pval;
+        }
+        var newForm = ExtraFormAdd(fieldVals);
+        newForm.attr('data-key', newRow.Id);
+    }
+</script>
+<div id="extraInfo-form-list" count="@Model.ExtraInformation.Count" style="display: none">
+    @for (int i = 0; i < Model.ExtraInformation.Count; i++)
+    {
+        @RenderExtraInfoForm(i)
+    }
+</div>
+<script id="extraInfo-form-template" type="text/extraInfo-form-template">
+    @{ Model.ExtraInformation.Insert(0, templExtraInfo); }
+    @RenderExtraInfoForm(0)
+</script>
+@Html.Raw("<script type='text/javascript'> var templExtraInfo = " + Json.Encode(templExtraInfo) + ";</script>")
+
+@helper RenderExtraInfoForm(int idx)
+{
+    <div class="extraInfo-form" data-id="@Model.ExtraInformation[idx].Id" data-key="@Model.ExtraInformation[idx].Id" data-valid="1">
+        @*@Html.SimpleHiddenFor(m => m.ExtraInformation[idx].Id, new { @class = "extraInfo-form-field" })*@
+        @Html.SimpleHiddenFor(m => m.ExtraInformation[idx].Id, new { @class = "extraInfo-form-field", @binding = "Id" })
+        @Html.SimpleHiddenFor(m => m.ExtraInformation[idx].FieldName, new { @class = "extraInfo-form-field", @binding = "FieldName" })
+        @Html.SimpleHiddenFor(m => m.ExtraInformation[idx].FieldValue, new { @class = "extraInfo-form-field", @binding = "FieldValue" })
+        @Html.SimpleHiddenFor(m => m.ExtraInformation[idx].ProductId, new { @class = "extraInfo-form-field", @binding = "ProductId" })
+    </div>
+}
+<script type="text/x-kendo-template" id="extra-popup-form-templ">
+    <div class="popupBody">
+        <section id="err-message-holder" style="float: left; width: 100%;"></section>
+        <section class="row_content_box kpopup-content">
+            <section class="wr_clo1">
+                <div class="wcontent" style="margin: 0 10px; color: #390F3D;line-height:2em">
+                    <form id="popupForm">
+                        <div class="htmlcontent">
+                            <section class="controls field-row">
+                                <section class="left-sec">
+                                    <span class="text-eshop ck-editor">@StringTable.NameExtraInformation (*)</span>
+                                </section>
+                                <section class="right-sec">
+                                    <section>
+                                        @Html.TextBox("txtName", string.Empty, new { @class = "js-required", @maxlength = "400" })
+                                    </section>
+                                </section>
+                            </section>
+                            <section class="controls field-row">
+                                <section class="left-sec">
+                                    <span class="text-eshop ck-editor">@StringTable.ValueExtraInformation</span>
+                                </section>
+                                <section class="right-sec">
+                                    <section>
+                                        @Html.TextArea("txtValue", new
+                                                {
+                                                    @style = "float:left;",
+                                                    @class = "sub_ckeditor_standard",
+                                                    @id = "txtValue"
+                                                })
+                                    </section>
+                                </section>
+                            </section>
+                            @*<form id="formSearch_accesel" style="margin-bottom:10px">
+                                    <section class="wr-search-eshop" style="margin-left:0;">
+                                        <input type="text" placeholder="@StringTable.SearchProducts" class="text-l" id="inputSearch_accesel">
+                                        <input type="submit" value="" class="button-l" name="button">
+                                    </section>
+                                </form>*@
+                            <section class="clear"></section>
+                            <div class="wr_table_all" style="margin:0"></div>
+                        </div>
+                    </form>
+                </div>
+            </section>
+            <section class="clear"></section>
+            <ul class="wr_submit_top form-action-menu" style="position:relative; padding:5px 0;">
+                <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+            </ul>
+        </section>
+    </div>
+</script>

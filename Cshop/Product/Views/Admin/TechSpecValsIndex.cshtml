@@ -1,0 +1,162 @@
+﻿@using Claw.Modules.Eshop;
+@using Claw.Modules.Eshop.Controllers.Admin
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@model IEnumerable<TechSpecValModel>
+@{
+    Layout = "Layout/List.cshtml";
+
+    ViewBag.PermissionEdit = PermissionMgr.CurrentPerm.CatalogEdit;
+
+    ViewBag.Title = StringTable.ManageTechSpecVals;
+    ViewBag.AddAction = "Add";
+    ViewBag.UseInlineEdit = true;
+    ViewBag.ShowFilterBox = true;
+    ViewBag.AutoAddNewHandler = false;
+    ViewBag.ParentBreadcrumbLink = "/admin/modules/eshop/TechSpec";
+    ViewBag.ParentBreadcrumbTitle = StringTable.TechSpec;
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var techSpecs = (List<TechSpecModel>)ViewBag.TechSpecs;
+}
+
+<style type="text/css">
+
+</style>
+
+@section MainTitleSection {
+    @(StringTable.ManageTechSpecVals)
+}
+
+@section CurrentTitleSection {
+    @(StringTable.ManageTechSpecVals)
+}
+
+@section FilterMenuSection
+{
+    <ul class="filter-box">
+        <li>
+            <span class="filter-title">@Html.LocalizeNameFor(m => m.TechSpecId): </span>
+            @Html.LocalizeDropDownListKendoLang("techSpecId", QParam.GetField<int?>("techSpecId", false), techSpecs.Select(x => new DDListItem()
+            {
+                Value = x.Id.ToString(),
+                Text = x.Name,
+                Active = x.Active,
+                LangVisible = true
+            }), StringTable.SelectTechSpec, new { @class = "filter-dropdown", @onchange = "onFilterChange()" })
+        </li>
+    </ul>
+}
+
+@Html.AntiForgeryToken()
+@{ KendoGrid<TechSpecValModel> kgrid = null; }
+@(Html.LocalizeGridFor("grid", Html.GetController(), "Delete", "Input", "Input", "(function(e){gridOnInlineEditCustom(e);;gridOnInlineEdit(e, '#DisplayOrder', gridRefreshRow);})")
+    .DataSource(m => m.Id, "List", null, null, "gridGetParams")
+    .Paging(10, new [] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id)
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.Value, "Input", m => m.Id, true)
+            .SetDefaultSort(true)    
+            .SetInlineEdit(true)
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+            
+        grid.Col(m => m.DisplayOrder, "Input", m => m.Id, true)
+            .SetDefaultSort(true)    
+            .SetInlineEdit(true)
+            .SetHtmlAttributes(new{ @title = StringTable.InlineEditHint}),
+            
+        grid.Col(m => m.Products, "ListProduct", m => m.Id)
+            .SetTemplate("<a class='grid-row-edit'>#: Products||0 #</a>")
+            .SetCssClass("td-center"),
+
+        grid.Col(m => m.TechSpecName)
+            .SetTemplate("#: TechSpecName || defaultTechSpecName(Id) #"),
+    })
+    .ColumnCommand(grid => new[]
+    {
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Edit","Edit", "edit_fr") : null,
+        ViewBag.PermissionEdit ? grid.Cmd(m => m.Id, "Delete","Delete", "delete_fr", true) : null
+    }.Where(x => x != null).ToArray())
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridCustom"; kgrid = grid; })
+    .ToMvcHtmlString())
+
+<script type='text/javascript'> var gridEagerItems = @Html.Raw(Json.Encode(kgrid.GetEagerData(ViewBag.EagerData))); </script>
+<script type="text/javascript">
+
+    var grid = $('#grid'), permEdit = '@(ViewBag.PermissionEdit ? 1 : 0)' == '1';
+    var statusActUrl = '@(ModuleUrl.AdminUrl(Html.GetController(), "Enable"))';
+    var addBtn = $('.js-add-new-selector').closest('li');
+
+    gridInit('#grid', true, function(params) {return gridEagerLoadConfig(params, gridEagerItems);});
+
+    function defaultTechSpecName(id) {
+        return id ? '' : $('#techSpecId').data('kendoDropDownList').text();
+    }
+
+    function gridOnInlineEditCustom(e) {
+        e.model.InlineEdit = true;
+        e.model.TechSpecId = e.model.TechSpecId || $('#techSpecId').val();
+    }
+
+    function gridCustom(grid) {
+
+        //initGridStatusAction(grid, '.k-grid-status', statusActUrl,
+        //   function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+        //   function (row) { return { id: row.Id, active: row.Active }; });
+
+        //gridMarkLangDisabled(grid, '.k-grid-name', function (row) { return !row.LangVisible; });
+
+        //gridHideCell(grid, '.k-grid-Delete', function (row) { return (row.AnyChild); });
+
+        //gridDisableCheckBox(grid, function (row) { return (row.AnyChild); });
+
+        if (permEdit)
+            $('tr', grid.element).each(function() {
+                $(this).dblclick(function(e) {
+                    if (!grid.editable) grid.editRow($(this));
+                });
+            });
+
+        setTimeout(function() {
+            $('.js-add-new-selector').unbind('click').click(function () {
+                grid.addRow();
+            }).attr('type', 'button');
+            
+            if ($('#techSpecId').val()) addBtn.show();
+            else addBtn.hide();
+        }, 1);
+    }
+
+    function gridRefreshRow(grid, rowEle) {
+
+        //initGridStatusAction(grid, rowEle.find('.k-grid-status'), statusActUrl,
+        //    function (row) { return row.Active; }, function (row, status) { row.Active = status; },
+        //    function (row) { return { id: row.Id, active: row.Active }; });
+
+        //gridHideCell(grid, rowEle.find('.k-grid-Delete'), function (row) { return row.AnyChild; });
+
+        //gridDisableCheckBox(grid, function (row) { return row.AnyChild; }, rowEle.find('.row-checkbox'));
+
+        if (permEdit)
+            rowEle.dblclick(function(e) {
+                if (!grid.editable) grid.editRow($(this));
+            });
+    }
+
+    function gridGetParams(grid, e) {
+        return { TechSpecId: $('#techSpecId').val() };
+    }
+
+    function onFilterChange() {
+
+        if ($('#techSpecId').val()) addBtn.show();
+        else addBtn.hide();
+
+        grid.data('kendoGrid').dataSource.page(1);
+    }
+
+</script>

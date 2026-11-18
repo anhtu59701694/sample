@@ -1,0 +1,108 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Order
+@model OrderModel
+@{
+    var settings = (SettingsBiz)ViewBag.Settings;
+
+    var serialItems = Model.GetRaw().OrderDetails
+        .Where(m => m.Product.IsSerial())
+        .SelectMany(m => m.GetSerialQty())
+        .Select((m, idx) => new
+        {
+            Id = m.Item4, Iseq = idx + 1, ProductName = m.Item1.GetName(m.Item2), Quantity = m.Item3, 
+            ProductId = m.Item1.Id, VariantId = m.Item2.GetId(), SerialNumber = m.Item5
+        }).ToList();
+
+}
+<style type="text/css">
+    .orderdetail-serial {margin: 0 10px 10px 20px;}
+    .orderdetail-serial .od-serial-item {margin-top: 10px;}
+    .orderdetail-serial .od-serial-item .btn {margin:0;vertical-align: top;}
+    .orderdetail-serial .od-serial-item .name {}
+    .orderdetail-serial .od-serial-item .qty {font-weight:bold;color:#6c0b7e;font-size:small;}
+    .orderdetail-serial .od-serial-item .serial {margin-top: 5px;} 
+    .orderdetail-serial .od-serial-item .serial textarea {min-width:50px;width:50%;}
+    .orderdetail-serial .od-serial-item .k-widget.k-dropdown.k-header {min-width:170px;vertical-align: top;}
+    .k-list-container .k-item.used { display:none; }
+</style>
+@{
+}
+<ul class="orderdetail-serial">
+    @foreach (var itm in serialItems)
+    {
+        <li class="od-serial-item" data-id="@itm.Id" data-quantity="@itm.Quantity" data-productid="@itm.ProductId">
+            <span class="name">@itm.ProductName</span> x <span class="qty">@itm.Quantity</span>
+            <div class="serial">
+                @Html.Hidden("ProductId" + itm.Iseq, itm.ProductId, new { Id = "ProductId" + itm.Iseq })
+                @Html.LocalizeDropDownListKendoLang("SerialSel" + itm.Iseq, null, "ListSerial", "Product", "ProductId" + itm.Iseq, StringTable.SelectSerial, new { @class = "SerialSel" }, null, "Id")
+                <button class="btn" onclick="addSerial(this)" type="button">@StringTable.Add</button>
+                <textarea name="SerialNumber" rows="1" onchange="updateSerialSel(this)">@itm.SerialNumber</textarea>
+            </div>
+        </li>
+    }
+</ul>
+<script type="text/javascript">
+  
+    function addSerial(node) {
+        var holder = $(node).closest('.serial');
+        var nodeKd = holder.find('input.SerialSel[id]').data('kendoDropDownList'), serial = holder.find('textarea');
+        var value = nodeKd.value(), serialVal = serial.val();
+
+        if (!value) return;
+        
+        serialVal = (serialVal ? (serialVal + ', ') : '') + value;
+
+        serial.val(serialVal);
+
+        updateSerialSel(node);
+    }
+
+    function updateSerialSel(node) {
+        var holder = $(node).closest('.serial');
+        var nodeKd = holder.find('input.SerialSel[id]').data('kendoDropDownList'), serial = holder.find('textarea');
+        var value = nodeKd.value(), serialVal = serial.val();
+        var items = [], newSel = '';
+
+        serialVal.split(/[,;]/).forEach(function (itm) { itm = $.trim(itm); if (itm) items.push(itm); })
+        nodeKd.list.find('li > div').each(function () {
+            if (items.includes($(this).html())) $(this).closest('li').addClass('used');
+            else { $(this).closest('li').removeClass('used'); if (!newSel) newSel = $(this).html(); }
+        })
+
+        nodeKd.value('');
+    }
+
+    function getSerialData() {
+        var data = [], dic = {};
+
+        $('.orderdetail-serial .od-serial-item').each(function () {
+            var id = parseInt($(this).attr('data-id')), qty = parseInt($(this).attr('data-quantity')), prodId = $(this).attr('data-productid');
+            var itm = dic[id] ;
+            if(!itm) { 
+                data.push(itm = dic[id] = { Id: id, Quantity: 0, Items: [] });
+            }
+            
+            itm.Quantity += qty;
+
+            var serialVal = $(this).find('.serial textarea').val();
+            if (serialVal) {
+                serialVal.split(/[,;]/).forEach(function (x) { x = $.trim(x); if (x) itm.Items.push({ Serial: x, ProductId: prodId }); })
+            }
+        })
+        
+        return data.filter(function (m) { return m.Items.length > 0 || m.Quantity > 0; });
+    }
+
+</script>
+
+@if (Model.Type.InList(OrderType.Pos) && serialItems.Any(m => !m.SerialNumber.IsNullOrEmpty()))
+{
+    <script>
+        $(function () {
+            $('.btn_yes', '#modal').hide();
+        })
+    </script>
+}

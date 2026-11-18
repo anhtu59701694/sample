@@ -1,0 +1,242 @@
+﻿@using System.Text
+@using Claw.Core.Constants
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Core
+@model LogisticsModel
+@{
+    Layout = "Layout/Setting.cshtml";
+    ViewBag.Title = StringTable.Logistics;  
+}
+
+<div class="active">
+    <form action="@ModuleUrl.AdminUrl("Setting", "Logistics")" id="editForm" method="post">
+
+        @Html.ValidationSummary(true)
+
+        <section class="row_content_box">
+            <section class="clo_left txt_align_r">
+                <h2>@Html.LocalizeNameFor(m => m.Shipping)</h2>
+                <label></label>
+            </section>
+            <section class="clo_right col-right-eshop">
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Shipping.WidthInCm)</span>
+                    @Html.LocalizeTextBoxFor(m => m.Shipping.WidthInCm, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Shipping.WidthInCm)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Shipping.HeightInCm)</span>
+                    @Html.LocalizeTextBoxFor(m => m.Shipping.HeightInCm, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Shipping.HeightInCm)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Shipping.LengthInCm)</span>
+                    @Html.LocalizeTextBoxFor(m => m.Shipping.LengthInCm, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Shipping.LengthInCm)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Shipping.DefWeightInGram)</span>
+                    @Html.LocalizeTextBoxFor(m => m.Shipping.DefWeightInGram, new { @class = "" })
+                    <section>@Html.LocalizeValidationMessageFor(x => x.Shipping.DefWeightInGram)</section>
+                </section>
+                <section class="controls">
+                    <span class="text-eshop">@Html.LocalizeNameFor(m => m.Shipping.ShippingBundleBookingProvider)</span>                    
+                    @Html.LocalizeRadioButtonFor(m => m.Shipping.ShippingBundleBookingProvider, "0", new { @id = "ShippingBundleProviderNone", @class = "css-radio" })
+                    <label class="css-labelradio" for="ShippingBundleProviderNone">@("None".ModLocalize())</label>
+                    @Html.LocalizeRadioButtonFor(m => m.Shipping.ShippingBundleBookingProvider, "1", new { @id = "ShippingBundleProviderBring", @class = "css-radio" })
+                    <label class="css-labelradio" for="ShippingBundleProviderBring">@("Bring".ModLocalize())</label>
+                    @Html.LocalizeRadioButtonFor(m => m.Shipping.ShippingBundleBookingProvider, "2", new { @id = "ShippingBundleProviderLogistra", @class = "css-radio" })
+                    <label class="css-labelradio" for="ShippingBundleProviderLogistra">@("Logistra".ModLocalize())</label>
+                </section>
+            </section>
+        </section>
+
+        <section class="wr-line-eshop"></section>
+
+        @if (SettingsBiz.GetSettings().Hidden.LogistraShipping)
+        {
+            <section class="row_content_box">
+                <section class="clo_left txt_align_r">
+                    <h2>@Html.LocalizeNameFor(m => m.Logistra)</h2>
+                    <label></label>
+                </section>
+                <section class="clo_right col-right-eshop">
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Logistra.ApiKey)</span>
+                        @Html.LocalizeTextBoxFor(m => m.Logistra.ApiKey, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Logistra.ApiKey)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Logistra.SenderId)</span>
+                        @Html.LocalizeTextBoxFor(m => m.Logistra.SenderId, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Logistra.SenderId)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Logistra.TestMode)</span>
+                        @Html.LocalizeRadioButtonFor(m => m.Logistra.TestMode, "true", new { @id = "LogistraTestModeTrue", @class = "css-radio" })
+                        <label class="css-labelradio" for="LogistraTestModeTrue">@StringTable.Yes</label>
+                        @Html.LocalizeRadioButtonFor(m => m.Logistra.TestMode, "false", new { @id = "LogistraTestModeFalse", @class = "css-radio" })
+                        <label class="css-labelradio" for="LogistraTestModeFalse">@StringTable.No</label>
+                    </section>
+                </section>
+            </section>
+        }
+        @if (SettingsBiz.GetSettings().Hidden.BringBooking)
+        {
+            <section class="wr-line-eshop"></section>
+            <section class="row_content_box">
+                <section class="clo_left txt_align_r">
+                    <h2>@Html.LocalizeNameFor(m => m.BringShipping)</h2>
+                    <label></label>
+                </section>
+                <section class="clo_right col-right-eshop">
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.BringShipping.Mode)</span>
+                        @Html.LocalizeDropDownListKendoFor(m => m.BringShipping.Mode, new[] { "Test", "Live" }
+                        .Select(x => new SelectListItem() { Value = x, Text = x }), null, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.BringShipping.Mode)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.BringShipping.ApiUid)</span>
+                        @Html.LocalizeTextBoxFor(m => m.BringShipping.ApiUid, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.BringShipping.ApiUid)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.BringShipping.ApiKey)</span>
+                        @Html.LocalizeTextBoxFor(m => m.BringShipping.ApiKey, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.BringShipping.ApiKey)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.BringShipping.MailBoxCustId)</span>
+                        @Html.LocalizeTextBoxFor(m => m.BringShipping.MailBoxCustId, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.BringShipping.MailBoxCustId)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.BringShipping.CodAccountNumber)</span>
+                        @Html.LocalizeTextBoxFor(m => m.BringShipping.CodAccountNumber, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.BringShipping.CodAccountNumber)</section>
+                    </section>
+                </section>
+            </section>
+        }
+
+        @if (SettingsBiz.GetSettings().Hidden.ProteriaShipping)
+        {
+            <section class="wr-line-eshop"></section>
+            <section class="row_content_box">
+                <section class="clo_left txt_align_r">
+                    <h2>@Html.LocalizeNameFor(m => m.Proteria)</h2>
+                    <label></label>
+                </section>
+                <section class="clo_right col-right-eshop">
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Proteria.ApiKey)</span>
+                        @Html.LocalizeTextBoxFor(m => m.Proteria.ApiKey, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Proteria.ApiKey)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Proteria.CodAccountNumber)</span>
+                        @Html.LocalizeTextBoxFor(m => m.Proteria.CodAccountNumber, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Proteria.CodAccountNumber)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Proteria.PrintFormat)</span>
+                        @Html.LocalizeDropDownListKendoFor(m => m.Proteria.PrintFormat, new[] { "A4", "Label" }
+                            .Select(x => new SelectListItem() { Value = x, Text = x }), null, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Proteria.PrintFormat)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Proteria.AutoSend)</span>
+                        @Html.LocalizeRadioButtonFor(m => m.Proteria.AutoSend, "true", new { @id = "ProteriaAutoSendTrue", @class = "css-radio" })
+                        <label class="css-labelradio" for="ProteriaAutoSendTrue">@StringTable.Yes</label>
+                        @Html.LocalizeRadioButtonFor(m => m.Proteria.AutoSend, "false", new { @id = "ProteriaAutoSendFalse", @class = "css-radio" })
+                        <label class="css-labelradio" for="ProteriaAutoSendFalse">@StringTable.No</label>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Proteria.AutoPrint)</span>
+                        @Html.LocalizeRadioButtonFor(m => m.Proteria.AutoPrint, "true", new { @id = "ProteriaAutoPrintTrue", @class = "css-radio" })
+                        <label class="css-labelradio" for="ProteriaAutoPrintTrue">@StringTable.Yes</label>
+                        @Html.LocalizeRadioButtonFor(m => m.Proteria.AutoPrint, "false", new { @id = "ProteriaAutoPrintFalse", @class = "css-radio" })
+                        <label class="css-labelradio" for="ProteriaAutoPrintFalse">@StringTable.No</label>
+                    </section>
+                </section>
+            </section>
+        }
+   
+        @if (SettingsBiz.GetSettings().Hidden.PorterBuddyShipping)
+        {
+            <section class="wr-line-eshop"></section>
+            <section class="row_content_box">
+                <section class="clo_left txt_align_r">
+                    <h2>@("PorterBuddy".ModLocalize())</h2>
+                    <label></label>
+                </section>
+                <section class="clo_right col-right-eshop">
+                    <section class="controls">
+                        <a style="font-size: 1.4em;color: #390f3d;line-height: 1.6em;" href="/admin/modules/eshop/setting/hiddenother/?prefix=PorterBuddy">@StringTable.Edit</a>
+                    </section>
+                </section>
+            </section>
+        }
+         
+        @if (SettingsBiz.GetSettings().Hidden.PostnordShipping)
+        {
+            <section class="wr-line-eshop"></section>
+            <section class="row_content_box">
+                <section class="clo_left txt_align_r">
+                    <h2>@Html.LocalizeNameFor(m => m.Postnord)</h2>
+                    <label></label>
+                </section>
+                <section class="clo_right col-right-eshop">
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Postnord.ApiKey)</span>
+                        @Html.LocalizeTextBoxFor(m => m.Postnord.ApiKey, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Postnord.ApiKey)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Postnord.ApplicationId)</span>
+                        @Html.LocalizeTextBoxFor(m => m.Postnord.ApplicationId, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Postnord.ApplicationId)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Postnord.ApplicationName)</span>
+                        @Html.LocalizeTextBoxFor(m => m.Postnord.ApplicationName, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Postnord.ApplicationName)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Postnord.CustomerId)</span>
+                        @Html.LocalizeTextBoxFor(m => m.Postnord.CustomerId, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Postnord.CustomerId)</section>
+                    </section>
+                    <section class="controls" style="display: none;">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Postnord.CodAccountNumber)</span>
+                        @Html.LocalizeTextBoxFor(m => m.Postnord.CodAccountNumber, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Postnord.CodAccountNumber)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Postnord.TestMode)</span>
+                        @Html.LocalizeRadioButtonFor(m => m.Postnord.TestMode, "true", new { @id = "PostnordTestModeTrue", @class = "css-radio" })
+                        <label class="css-labelradio" for="PostnordTestModeTrue">@StringTable.Yes</label>
+                        @Html.LocalizeRadioButtonFor(m => m.Postnord.TestMode, "false", new { @id = "PostnordTestModeFalse", @class = "css-radio" })
+                        <label class="css-labelradio" for="PostnordTestModeFalse">@StringTable.No</label>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Postnord.LabelType)</span>
+                        @Html.LocalizeDropDownListKendoFor(m => m.Postnord.LabelType, new[] { new { T = "Standard (190*105mm)", V = "standard" }, new { T = "Small (75*105mm)", V = "small" }, new { T = "Ste (75*105mm)", V = "ste" } }.Select(m => new SelectListItem() { Text = m.T, Value = m.V }), null, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Postnord.LabelType)</section>
+                    </section>
+                    <section class="controls">
+                        <span class="text-eshop">@Html.LocalizeNameFor(m => m.Postnord.PaperSize)</span>
+                        @Html.LocalizeDropDownListKendoFor(m => m.Postnord.PaperSize, new[] { new { T = "A4", V = "A4" }, new { T = "A5", V = "A5" }, new { T = "A6", V = "A6" }, new { T = "LETTER", V = "LETTER" }, new { T = "LABEL", V = "LABEL" } }.Select(m => new SelectListItem() { Text = m.T, Value = m.V }), null, new { @class = "" })
+                        <section>@Html.LocalizeValidationMessageFor(x => x.Postnord.PaperSize)</section>
+                    </section>
+                </section>
+            </section>
+        }               
+    </form>
+</div>
+<script type="text/javascript">
+    $('#aroles.current_tab:visible').html("Logistics");
+</script>

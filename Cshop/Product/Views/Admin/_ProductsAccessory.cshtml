@@ -1,0 +1,548 @@
+﻿@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@using System.Text.RegularExpressions
+@model ProductModel
+@{
+    var langCode = (string)ViewData["LangCode"];
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var templAccessory = (ProductAccessoryModel)ViewBag.TemplAccessory;
+    var isBundle = Model.Type.InList(ProductType.Bundle) && settings.Hidden.ProdBundleGroupAccessory;
+}
+<style type="text/css">
+    #gridaccessory thead.k-grid-header { @(isBundle ? "" : "display: none;")}
+    #gridaccessory .variant-prod,#gridaccesel .variant-prod{float: right;color: blueviolet;font-size: smaller;}
+    #gridaccesel .k-pager-sizes.k-label { white-space: nowrap; }
+    #gridaccesel td.image {padding: 3px;}
+    
+    #gridaccesel .k-detail-row { padding: 0 !important; }
+    #gridaccesel .k-detail-cell { padding: 0 !important; }
+    #gridaccesel .price_2{font-size: small; padding: 0px 1px;}
+    #gridaccesel .k-detail-cell .price_2{margin-left: 5px;}
+</style>
+
+@{
+    var imgTemplate = "<a href='#:safePropImg(AccessoryImage,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(AccessoryImage,\"Thumb\")#'/></a>";
+}
+<div class="wr_table_all" id="accessories" style="margin-bottom: 15px;">
+    @(Html.LocalizeGridFor<ProductAccessoryModel>("gridaccessory", "Product", null, null, null, null, null,
+        null, grid =>
+        {
+            grid.ButtonDelBigClass += "_acce";
+            grid.CheckBoxSelAllCss += "_acce";
+            grid.CheckBoxRowCssClass += "_acce";
+            grid.InputSearchId += "_acce";
+            grid.FormSearchId += "_acce";
+        })
+        .DataSource(m => m.Id, Model.Accessories)
+        .Paging(2, new int[] { 10, 20, 30, 50, 100 }, StringTable.Products)
+        .Columns(grid => new[]
+        {
+            grid.Col(m => m.AccessoryImage, false, 100)
+                .SetTemplate(imgTemplate)
+                .SetCssClass("txt_align_c image"),
+            grid.Col(m => m.AccessoryName, "Edit", m => m.AccessoryId)
+                .SetDefaultSort(!isBundle)
+                .SetCssClass("name-pro2")
+                .SetTemplate(StringTable.NewWinEditTempl(Html, "AccessoryName") + (isBundle ? "<div class='variant-prod'>#:AccessoryVariantNum ? '" + StringTable.Variant + "':''#</div>":"")),
+                
+            isBundle ? grid.Col(m => m.AccessoryPrice, false, 60).SetTemplate("#:safeProp(AccessoryPrice, 'Text')#") : null,
+            
+            isBundle ? grid.Col(m => m.BundleGroupName, true, 60).SetDefaultSort(true) : null
+        }.Where(m => m != null).ToArray())
+        .ColumnCheckBox("Key", "_acce")
+        .Sortable(true)
+        .Config(grid => { grid.CustomScript = "gridAccessoryCustom"; })
+        .ToMvcHtmlString())
+</div>
+@if (isBundle)
+{
+    <div style="margin-bottom: 10px;">
+        <div style="display: inline-block;">
+            @Html.LocalizeDropDownListKendoLang("BundleGroupId", null, "ListD2", "ProductBundleGroup", "Id", StringTable.SelectGroup, new { })
+            <section class="field-valid-msg"><span class="error" data-valmsg-for="BundleGroupId" data-valmsg-replace="true"></span></section>
+        </div>
+        <button class="btn_update_bundle_group" onclick="updateBundleGroup(this)" style="display:none;margin-left:7px;vertical-align:top;height:26px;margin-top:1px;" type="button">@StringTable.UpdateSelectItemsToBundleGroup</button>
+    </div>
+    <script>$('#BundleGroupId').attr('data-val', 'true');</script>         
+}
+<div class="controls">
+    <ul class="wr_submit_top set-relative">
+        <li class="mr0 delete_big_acce" style="padding:0;">
+            <input class="btn_delete" value="@StringTable.RemoveFromAccessory" type="button">
+        </li>
+        @if (isBundle)
+        {
+            <li class="mr0" style="margin-left: 7px !important;">
+                <input value="@StringTable.AddAccessories" class="btn_add" onclick="openAccAssignForm();" type="button">
+            </li>
+        }
+    </ul>
+</div>
+@{
+    var salePricetmp = @"
+    <span class='line-through'>#:safeProp(PriceInc,'Text')#</span><br/>
+    <span class='price_2'>#:safeProp(SalePriceInc,'Text')#</span>";
+
+    var priceTempl = @"<span>#:safeProp(PriceInc,'Text')#</span>";
+}
+<div id="accesel-templ" style="display: none">
+    @{
+        var imgTemplateN = "<a href='#:safePropImg(Image,\"FsUrl\")#' class='preview'><img id='thumb_#:Id#' src='#:safePropImg(Image,\"Thumb\")#'/></a>";
+    }
+    @(Html.LocalizeGridFor<ProductModel>("gridaccesel", "Product", null, null, null, null, null,
+        isBundle ? "gridAcceSelInitDetail" : null, grid =>
+          {
+              grid.ButtonDelBigClass += "_accesel";
+              grid.CheckBoxSelAllCss += "_accesel";
+              grid.CheckBoxRowCssClass += "_accesel";
+              grid.InputSearchId += "_accesel";
+              grid.FormSearchId += "_accesel";
+          })
+          .DataSource(m => m.Id, "List", null, null, "gridAcceSelGetParams")
+          .Paging(4, new int[] { 10, 20, 30, 50, 100 }, StringTable.Products)
+          .ColumnCheckBox(m => m.Id, 20, "_accesel")
+          .Columns(grid => new[] {
+
+              grid.Col(m => m.Image, false, 100)
+                  .SetTemplate(imgTemplateN)
+                  .SetCssClass("txt_align_c image"),
+                  
+              grid.Col(m => m.Name, "Edit", m => m.Id, true)
+                  .SetTemplate(StringTable.NewWinEditTempl(Html, "Name") + (isBundle ? ("<div class='variant-prod'>#:VariantCount ? '" + StringTable.Variant + "':''#</div>"):""))
+                  .SetCssClass("name-pro2")
+                  .SetDefaultSort(true),
+                   
+             grid.Col(m => m.PriceInc, true, 120)
+                 .SetCssClass("td-right")
+                 .SetTemplate("# if (SalePriceInc.Value > 0) { # " + salePricetmp + " # }  else{#" + priceTempl + "#} #"),
+              
+              grid.Col(m => m.Quantity, false, 120)
+                  .SetCssClass("td-center"),
+              
+              grid.Col(m => m.SKU, false, 100),
+
+          })
+          .Sortable(true)
+          .Config(grid => { grid.CustomScript = "gridAcceSelCustom"; })
+          .ToMvcHtmlString(false, false))
+</div>
+
+<div id="accvarisel-templ" style="display: none">
+    @(Html.LocalizeGridFor<VariantModel>("gridaccvarisel", "Variant", null, null, null, null, null,
+    null, grid =>
+    {
+        grid.CheckBoxSelAllCss += "_varsel"; grid.CheckBoxRowCssClass += "_varsel"; grid.ButtonDelBigClass += "_varsel";
+    })
+    .DataSource(m => m.Id, "List", null, null, "gridAccVariSelGetParams")
+    .Paging(10, new[] { 10, 20, 30, 50, 100 })
+    .ColumnCheckBox(m => m.Id, 20, "_var")
+    .Columns(grid => new[]
+    {
+        grid.Col(m => m.ImageThumb, false, 100)
+            .SetTemplate("<a href='#:ImageFsUrl#' class='preview'><img id='vari_thumb_#:Id#' src='#:ImageThumb#'/></a>")
+            .SetCssClass("txt_align_c image"),
+        grid.Col(m => m.PropDesc)
+            .SetCssClass("name-pro2"),
+        grid.Col(m => m.PriceInc, true, 120)
+            .SetCssClass("td-right")
+            .SetTemplate("# if (SalePriceInc.Value > 0) { # " + salePricetmp + " # }  else{#" + priceTempl + "#} #"),
+        grid.Col(m => m.Quantity, false, 120)
+            .SetCssClass("td-center"),
+        grid.Col(m => m.SKU, false, 100),
+    })
+    .Sortable(true)
+    .Config(grid => { grid.CustomScript = "gridAccVariSelCustom"; })
+    .ToMvcHtmlString(false, false))
+</div>
+<script type="text/javascript">
+
+    var gridaccessory = $('#gridaccessory');
+
+    $(function () {
+        $('#gridaccesel').attr('id', 'gridaccesel-templ');
+
+        $('#gridaccessory').find('#SelectAll')
+            .attr('id', 'SelectAll_acce')
+            .closest('th').find('label')
+            .attr('for', 'SelectAll_acce');
+
+        gridaccessoryInit('#gridaccessory', true);
+    });
+
+    function gridAcceSelFirstRun() {
+        var grid = $('#gridaccesel'), headerRow = grid.find('thead > tr');
+
+        headerRow.append('<th class="k-hierarchy-cell k-header" style="display:none"></th>');
+
+        gridSwapElements(headerRow, 'th', { 0: 0, 1: 1, 2: 6, 3: 2, 4: 3, 5: 4, 6: 5 },
+            function (i, node) { if (i == 3) $(node).attr('colspan', '2'); });
+        grid.attr('data-deep', '0');
+
+        var gridTempl = grid.clone();
+
+        gridTempl.attr('id', '');
+        gridacceselInit('#gridaccesel', true);
+
+        var gridColGroup = grid.find('colgroup');
+        gridSwapElements(gridColGroup, 'col', { 0: 1, 1: 2, 2: 0 }, function (i, node) { if (i == 0) $(node).css('width', '56px'); });
+
+        var cols = gridColGroup.html(), gridData = grid.data('kendoGrid');
+
+        gridData.rowTemplate = gridGetRowTemplate(gridData, false, { 0: 1, 1: 2, 2: 0 });
+        gridData.altRowTemplate = gridGetRowTemplate(gridData, true, { 0: 1, 1: 2, 2: 0 });
+
+        grid.data({ 'clawGridTempl': gridTempl, 'clawGridCols': cols });
+    }
+
+    function gridAccVariSelCustom(grid) {
+        initImagePreview(false, grid.element);
+
+        var owner = $(grid.element).parent().closest('div.k-grid').data('kendoGrid');
+        var trProd = $(owner.element).find('#gridaccesel_rwcbox_' + $(grid.element).attr('data-id')).closest('tr');
+        var rowProd = owner.dataItem(trProd);
+
+        console.log('gridAccVariSelCustom', owner, rowProd, trProd);
+
+    }
+
+    function gridAccVariSelGetParams(gridOwner, e) {
+        var productid = gridOwner.element.attr('data-id'), exceptids = [];
+        var data = gridaccessory.data('kendoGrid').dataSource.data();
+
+        data.forEach(function (row) {
+            if (row.AcceVariantId) exceptids.push(row.AcceVariantId);
+        });
+
+        return { productid: productid, exceptids: exceptids.join(','), fullMode: 'true', /*minQty: 1,*/ active: true };
+    }
+
+    function gridAcceSelInitDetail(e) {
+        var gridTempl = $('#gridaccvarisel');
+        var gridDiv = gridTempl.clone(), selAll = gridDiv.find('#SelectAll');
+
+        gridDiv.attr('id', 'grid-' + e.data.id);
+        gridDiv.attr('data-id', e.data.id);
+        gridDiv.attr('data-deep', parseInt(e.sender.element.attr('data-deep')) + 1);
+
+        selAll.attr('id', 'SelectAll-' + e.data.id);
+        selAll.closest('div').find('label').attr('for', 'SelectAll-' + e.data.id);
+
+        e.detailCell.append(gridDiv);
+        e.detailRow.find('.k-hierarchy-cell').remove();
+        e.detailRow.find('.k-detail-cell').attr('colspan', '7');
+
+        gridaccvariselInit('#' + gridDiv.attr('id'), false);
+    }
+
+    function updateBundleGroup(node) {
+        var bundleGroup = $('#BundleGroupId').data('kendoDropDownList');
+        var grid = gridaccessory.data('kendoGrid');
+
+        if (!bundleGroup.value()) {
+            formShowErrorMsg('BundleGroupId', '@(StringTable.ErrMsgRequiredField.ModErrLocalize())');
+            return;
+        }
+        else formShowErrorMsg('BundleGroupId', '');
+
+        gridaccessory.find('.row-checkbox_acce:checked').closest('tr').each(function () {
+            var row = grid.dataItem($(this));
+            row.BundleGroupName = bundleGroup.text();
+            acceBindInputField(row.AccessoryForm, row, 'BundleGroupId', bundleGroup.value());
+        });
+
+        grid.dataSource.sort({ field: 'BundleGroupName', dir: 'asc' });
+        $(node).hide();
+    }
+
+    function gridAcceSelCustom(grid) {
+
+        gridHideCell(grid, '.k-hierarchy-cell .k-icon.k-plus', function (row) { return row.VariantCount == 0; });
+
+        initImagePreview(false, grid.element);
+
+        gridAdjustPopup(grid, '.wcontent', '.wr_clo1', null, null, null, 30);
+
+        var bactionargs = urlToJSON(grid.element.attr('bactionargs'));
+        if (Object.keys(bactionargs).length != 0 && bactionargs['type']) {
+            delete bactionargs['type'];
+            grid.element.attr('bactionargs', Object.keys(bactionargs).length != 0 ? '?' + $.param(bactionargs) : '');
+        }
+
+        var acceList = gridaccessory.data('kendoGrid').dataSource.data();
+        gridDisableCheckBox(grid, function (row) { return acceList.find(function (itm) { return row.Id == itm.AccessoryId && itm.AcceVariantId; }); }, '.row-checkbox_accesel');
+
+    }
+
+    function gridAcceSelGetParams() {
+        var data = gridaccessory.data('kendoGrid').dataSource.data(), exceptids = [1, '@Model.Id'], exceptVariantIds = [];
+        data.forEach(function (row) { if (!row.AcceVariantId) exceptids.push(row.AccessoryId); });
+
+        if ('@(isBundle ? 1 : 0)' == '1') {
+            $('#gridbundling').data('kendoGrid').dataSource.data().forEach(function (row) {
+                exceptids.push(row.ProductId);
+                if (row.VariantId) exceptVariantIds.push(row.VariantId);
+            });
+        }
+
+        return { exceptids: exceptids.join(','), exceptVariantids: exceptVariantIds.join(','), countVariant: true, type: '@((int)ProductType.Normal)' };
+    }
+
+    function gridAccessoryCustom(grid) {
+
+        $('.delete_big_acce').unbind('click').click(function () {
+            var arrRws = [], rows = grid.tbody.find('input:checked').closest('tr');
+            rows.each(function () { arrRws.push(grid.dataItem($(this))); });
+
+            arrRws.forEach(function (item) {
+                accFormRemove(item);
+                grid.dataSource.data().remove(item);
+            });
+        });
+
+        $('#accessory-form-list > .accessory-form[data-valid=1]').each(function () {
+            var accForm = $(this), row = acceGridGetRow(grid, $(this).attr('data-id'), $(this).attr('data-key'));
+            if (row) {
+                //$('tr[data-uid=' + row.uid + '] .accessory-cell', grid.element).change(function () {
+                //    if ($(this).is('input,textarea,select')) {
+                //        if ($(this).valid()) {
+                //            var field = $(this).attr('data-bind');
+                //            if (field) acceBindInputField(accForm, row, field, $(this).val());
+                //        } else $(this).focus();
+                //    }
+                //});
+                $(this).attr('data-uid', row.uid);
+                row.AccessoryForm = accForm;
+            } else console.log('databound: row is null', $(this).attr('data-key'), accForm);
+        });
+
+        initImagePreview(false, grid.element);
+
+        //formUpdateValidRules(grid.element);
+
+        if ('@(isBundle ? 1 : 0)' == 1) {
+            var lst = $('input.row-checkbox_acce', grid.element).change(function () {
+                if ($('input.row-checkbox_acce:checked', grid.element).length) $('.btn_update_bundle_group').show();
+                else $('.btn_update_bundle_group').hide();
+            });
+            var AcceHideSubItemsErrs = lst.length > 0 ? 1 : 0;
+
+            window.AcceHideSubItemsErrs = AcceHideSubItemsErrs;
+
+            if ((AcceHideSubItemsErrs && window.BundleHideSubItemsErrs != null) || window.BundleHideSubItemsErrs) {
+                //$('#BundleHideSubItemsFalse').prop('checked', true);
+                //$('#bundle-groups,#accessory-bundle').show();
+                //$('#BundleHideSubItemsTrue').prop('disabled', true);
+            } //else $('#BundleHideSubItemsTrue').prop('disabled', false);
+        }
+
+        if (grid.dataSource.total() == 0) grid.element.closest(".wr_table_all").hide();
+        else grid.element.closest(".wr_table_all").show();
+
+        var bactionargs = urlToJSON(grid.element.attr('bactionargs'));
+        if (Object.keys(bactionargs).length != 0 && bactionargs['type']) {
+            delete bactionargs['type'];
+            grid.element.attr('bactionargs', Object.keys(bactionargs).length != 0 ? '?' + $.param(bactionargs) : '');
+        }
+    }
+
+    function openAccAssignForm() {
+        var width = Math.max(200, Math.min(870, $(window).width() - 50));
+        var height = Math.max(200, Math.min(2048, $(window).height() - 50));
+        var scrollTop = $(window).scrollTop();
+
+        var popTemplate = $("<div>").html($("#accessory-popup-form-templ").html());
+        popTemplate.find('.htmlcontent .wr_table_all').html($('#gridaccesel-templ').clone().attr('id', 'gridaccesel').wrap('<p>').parent().html());
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@StringTable.AddProducts', popTemplate.html(),
+            width, height, [], null,
+            function (modal) {
+
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+
+                $('#gridaccesel #SelectAll', modal).attr('id', 'SelectAll_accesel').closest('div')
+                    .find('label').attr('for', 'SelectAll_accesel');
+
+                if ('@(isBundle ? 1 : 0)' == 1) gridAcceSelFirstRun();
+                else gridacceselInit('#gridaccesel', true);
+
+                var gridAcceSel = $('#gridaccesel').data('kendoGrid'), groupBundle = null;
+
+                if ('@(isBundle ? 1 : 0)' == 1) {
+                    var bundleGroup = $('#BundleGroupId').data('kendoDropDownList');
+                    if (bundleGroup && bundleGroup.value())
+                        groupBundle = { Id: bundleGroup.value(), Name: bundleGroup.text() };
+                }
+
+                modal.find(".btn_save").click(function () {
+
+                    var selCBox = $('.row-checkbox_accesel:checked,.row-checkbox_varsel:checked', gridAcceSel.element);
+
+                    selCBox.each(function () {
+                        var owner = $(this).closest('div.k-grid').data('kendoGrid');
+                        var row = owner.dataItem($(this).closest('tr'));
+                        console.log(row);
+                        if (row.ProductId) accessoryAdd(row.ProductId, row.VariantName, row.CombinedImage, row.Price, row.PriceInc, row.SalePrice, row.SalePriceInc, safeProp(groupBundle, 'Id'), safeProp(groupBundle, 'Name'), 0, row.Id);
+                        else accessoryAdd(row.Id, row.Name, row.Image, row.Price, row.PriceInc, row.SalePrice, row.SalePriceInc, safeProp(groupBundle, 'Id'), safeProp(groupBundle, 'Name'), row.VariantCount);
+                    });
+
+                    if ('@(isBundle ? 1 : 0)' == 1) {
+                        $('#gridaccessory').data('kendoGrid').dataSource.sort({ field: 'BundleGroupName', dir: 'asc' });
+                    }
+
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close(); $(window).scrollTop(scrollTop);
+                });
+                modal.find(".btn_cancel").click(function () {
+
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close(); $(window).scrollTop(scrollTop);
+                });
+            });
+    }
+
+    function accessoryAdd(id, name, image, price, priceInc, salePrice, salePriceInc, bundleGroupId, bundleGroupName, variantCount, variantId) {
+        accessoryAddRaw({
+            AccessoryId: id, Key: id + '-' + (variantId || 0), AcceVariantId: variantId,
+            ProductId: '@Model.Id', AccessoryName: name, AccessoryImage: image,
+            AccessoryPrice: price, AccessoryPriceInc: priceInc,
+            AccessorySalePrice: salePrice, AccessorySalePriceInc: salePriceInc, AccessoryVariantNum: variantCount,
+            BundleGroupId: bundleGroupId, BundleGroupName: bundleGroupName,
+        });
+    }
+
+    function accessoryAddRaw(fieldVals) {
+
+        var gridData = gridaccessory.data('kendoGrid');
+        var newRow = $.extend(true, {}, templAccessory);
+
+        for (var prop in fieldVals) {
+            var pval = fieldVals[prop];
+            newRow[prop] = pval;
+        }
+
+        console.log('accessoryAdd', newRow);
+
+        var newForm = accFormAdd(fieldVals);
+        newForm.attr('data-key', newRow.Key);
+        gridData.dataSource.data().push(newRow);
+    }
+
+    function accFormAdd(fieldVals) {
+
+        var lst = $('#accessory-form-list'), idx = parseInt(lst.attr('count'));
+
+        lst.attr('count', idx + 1);
+
+        var newForm = $('<div>').html($('#accessory-form-template').html()).find('.accessory-form');
+
+        newForm.find('input,textarea,select').each(function () {
+            $(this).attr('id', $(this).attr('id').replace('_0_', '_' + idx + '_'));
+            $(this).attr('name', $(this).attr('name').replace('[0]', '[' + idx + ']'));
+
+            if ($(this).attr('binding')) {
+                if ($(this).is('textarea')) $(this).html('');
+                else $(this).val('');
+            }
+        });
+
+        if (fieldVals)
+            for (var field in fieldVals) {
+                var fVal = fieldVals[field];
+
+                var node = newForm.find('.accessory-form-field[binding=' + field + ']');
+                if (node.is('textarea')) $(this).html(fVal);
+                else node.val(fVal);
+            }
+
+        newForm.attr({ 'data-id': 0, 'data-valid': 1 });
+
+        lst.append(newForm);
+
+        //console.log(newForm.html());
+
+        return newForm;
+    }
+
+    function accFormRemove(row) {
+        console.log('accFormRemove', row, row.AccessoryForm);
+        row.AccessoryForm.attr('data-valid', 0);
+        row.AccessoryForm.find('input,textarea,select').val('').attr('datavalid', 0);
+        $('#editform-change-state').val(1).change();
+    }
+
+    function acceBindInputField(accForm, row, field, newVal) {
+        var inputField;
+
+        row[field] = newVal;
+        inputField = accForm.find('.accessory-form-field[binding=' + field + ']');
+        inputField.val(newVal); console.log(inputField);
+    }
+
+    function acceGridGetRow(grid, id, key) {
+
+        if (id != null && id != 0) return grid.dataSource.get(id);
+        else return grid.dataSource.data().find(function (item) { return item.Key == key; });
+    }
+
+    function safePropImg(obj, propName) {
+        if (obj == null) return '@ImageModel.NoImg';
+        return obj[propName] || '';
+    }
+
+</script>
+
+<div id="accessory-form-list" count="@Model.Accessories.Count" style="display: none">
+    @for (int i = 0; i < Model.Accessories.Count; i++)
+    {@RenderAccessoryForm(i)}
+</div>
+<script id="accessory-form-template" type="text/accessory-form-template">
+    @{ Model.Accessories.Insert(0, templAccessory); }
+    @RenderAccessoryForm(0)
+    @{ Model.Accessories.Remove(templAccessory); }
+</script>
+@Html.Raw("<script type='text/javascript'> var templAccessory = " + Json.Encode(templAccessory) + ";</script>")
+
+@helper RenderAccessoryForm(int idx)
+{
+    <div class="accessory-form" data-id="@Model.Accessories[idx].Id" data-key="@Model.Accessories[idx].Key" data-valid="1">
+        @Html.SimpleHiddenFor(m => m.Accessories[idx].Id, new { @class = "accessory-form-field" })
+        @Html.SimpleHiddenFor(m => m.Accessories[idx].AccessoryId, new { @class = "accessory-form-field", @binding = "AccessoryId" })
+        @Html.SimpleHiddenFor(m => m.Accessories[idx].AcceVariantId, new { @class = "accessory-form-field", @binding = "AcceVariantId" })
+        @Html.SimpleHiddenFor(m => m.Accessories[idx].BundleGroupId, new { @class = "accessory-form-field", @binding = "BundleGroupId" })
+    </div>
+}
+
+<script type="text/x-kendo-template" id="accessory-popup-form-templ">
+    <div class="popupBody">
+        <section id="err-message-holder" style="float: left; width: 100%;"></section>
+        <section class="row_content_box kpopup-content">
+            <section class="wr_clo1">
+                <div class="wcontent" style="margin: 0 10px; color: #390F3D;line-height:2em">
+                    <div class="htmlcontent">
+                        <form id="formSearch_accesel" style="margin-bottom:10px">
+                            <section class="wr-search-eshop" style="margin-left:0;">
+                                <input type="text" placeholder="@StringTable.SearchProducts" class="text-l" id="inputSearch_accesel">
+                                <input type="submit" value="" class="button-l" name="button">
+                            </section>
+                        </form>
+                        <section class="clear"></section>
+                        <div class="wr_table_all" style="margin:0"></div>
+                    </div>
+                </div>
+            </section>
+            <section class="clear"></section>
+            <ul class="wr_submit_top form-action-menu" style="position:relative; padding:5px 0;">
+                <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+            </ul>
+        </section>
+    </div>
+</script>

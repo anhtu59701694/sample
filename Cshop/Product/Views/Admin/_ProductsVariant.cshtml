@@ -1,0 +1,2124 @@
+﻿@using System.Text.RegularExpressions
+@using Claw.Core.Domain
+@using Claw.Modules.Eshop
+@using Claw.Modules.Eshop.DAL
+@using Claw.Modules.Eshop.Helper
+@using Claw.Modules.Eshop.Models
+@using Claw.Modules.Eshop.Product
+@using DM = Claw.Modules.Eshop.Domain
+@model ProductModel
+@{
+    var langCode = (string)ViewData["LangCode"];
+
+    var settings = (SettingsBiz)ViewBag.Settings;
+    var languages = (List<Language>)ViewBag.Languages;
+    var properties = (List<PropertyModel>)ViewBag.Properties;
+    var statuses = (List<StatusModel>)ViewBag.Statuses;
+    var templVariant = (VariantModel)ViewBag.TemplVariant;
+    var defaultStatusName = statuses.Where(x => x.Id == 3).Select(x => x.Name).FirstOrDefault() ?? "";
+}
+@{
+    Model.Variants.Insert(0, templVariant);
+
+    var qtyTempl = "<div class='var-qty-box' data-backqty='#:(BackOrderQty?1:0)#' data-shoppingqty='#:(ShoppingQty?1:0)#'>" + Html.LocalizeTextBoxFor(m => m.Variants[0].Quantity, new
+    {
+        @id = "qty-#:Key#",
+        @class = "var-cell var-quantity",
+        @data_bind = "Quantity",
+        @type = Model.Id == 0 ? "number" : "text",
+        @style = "",
+    }).Replace(new { @name = "_Variants[#:Iseq#].Quantity", @value = "#:Quantity#" })
+    + "<input value='- #:BackOrderQty#' class='var-backqty' type='text' disabled=disabled />"
+    + string.Format("<div class='var-shoppingqty'>#:ShoppingQty# {0}</div>", Html.LocalizeName(templVariant, m => m.ShoppingQty))
+    + (settings.Hidden.Storage2Enabled ? string.Format("<div class='var-qtypos-detail' title='{0}: #:Quantity1#, {1}: #:Quantity2#'>#:Quantity1#/#:Quantity2#</div>", StringTable.GetQtyPosName(DM.QtyPos.Qty1, settings), StringTable.GetQtyPosName(DM.QtyPos.Qty2, settings)) : "")
+    + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].Quantity' data-valmsg-replace='true'></span></div>";
+
+    var skuTempl = Html.LocalizeTextBoxFor(m => m.Variants[0].SKU, new
+    {
+        @id = "sku-#:Key#",
+        @class = "var-cell var-sku #: EmailMUsers > 0 ? 'emuser' : '' #",
+        @data_bind = "SKU",
+        @data_id = "#:Id#",
+    }).Replace(new { @name = "_Variants[#:Iseq#].SKU", @value = "#:ifnull(SKU)#" }) + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].SKU' data-valmsg-replace='true'></span>"
+    /*+ Html.LocalizeTextBoxFor(m => m.Variants[0].NvitCode, new
+    {
+        @id = "nvitcode-#:Key#",
+        @class = "var-cell var-nvitcode",
+        @data_bind = "NvitCode",    
+        @placeholder = Html.LocalizeName(templVariant, m => m.NvitCode),
+        @data_id = "#:Id#",
+    }).Replace(new { @name = "_Variants[#:Iseq#].NvitCode", @value = "#:ifnull(NvitCode)#" }) + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].NvitCode' data-valmsg-replace='true'></span>"*/
+    + (settings.Hidden.PriceCheckEnabled() ? Html.LocalizeTextBoxFor(m => m.Variants[0].PriceCkUrl, new
+    {
+        @id = "priceckurl-#:Key#",
+        @class = "var-cell var-priceckurl",
+        @placeholder = Html.LocalizeName(templVariant, m => m.PriceCkUrl),
+        @data_bind = "PriceCkUrl",
+        @data_id = "#:Id#",
+    }).Replace(new { @name = "_Variants[#:Iseq#].PriceCkUrl", @value = "#:ifnull(PriceCkUrl)#" }) + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].PriceCkUrl' data-valmsg-replace='true'></span>" : "")
+    + "#if (EmailMUsers > 0) { # <div class='emailmusers'><a class='form-link' href='" + ModuleUrl.AdminUrl("EmailMarketUser", "") + "?productId=#:ProductId#&variantId=#:Id#' target='_blank'>#:EmailMUsers#&#128231;</a> | <a class='send' href='javascript:;' onclick='emailMUserSend(#:Id#, this)'>" + StringTable.EmailMUserSend + "</a></div> # }#";
+
+    var barcodeTempl = Html.LocalizeTextBoxFor(m => m.Variants[0].BarCode, new
+    {
+        @id = "barcode-#:Key#",
+        @class = "var-cell var-barcode",
+        @data_bind = "BarCode",
+        @data_id = "#:Id#",
+    }).Replace(new { @name = "_Variants[#:Iseq#].BarCode", @value = "#:ifnull(BarCode)#" })
+    + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].BarCode' data-valmsg-replace='true'></span>"
+    + (string.Format("<div class='barcode-cmd'><a #:(Id ? \"href=javascript:;\" : \"\")# onclick='viewBarCodeImage(this, false, true, \"\\#barcode-#:Key#\", true)'>{0}</a> | <a href='javascript:;' onclick='generateBarCode(\"\\#barcode-#:Key#\", true)'>{1}</a></div>", StringTable.DownLoadA, StringTable.Generate));
+
+    var backDateTempl = Html.LocalizeDateTextBoxFor(m => m.Variants[0].BackDate, Model.Id, new
+    {
+        @id = "backdate-#:Key#",
+        @class = "var-cell var-backdate",
+        @data_bind = "BackDate",
+        @data_id = "#:Id#",
+        @placeholder = Html.LocalizeName(templVariant, m => m.BackDate),
+        @style = "width: 100%;margin-top:px;"
+    }).Replace(new { @name = "_Variants[#:Iseq#].BackDate", @value = "#:safeProp(BackDate,'Text')#" });
+    var wrapBackDate = "<div class='wBackDate' #:displayTimepicker(ProductStatusId)#>";
+    var wrapBackDateEnd = "</div>";
+    var statusTempl = Html.LocalizeTextBoxFor(m => m.Variants[0].ProductStatusId, new
+    {
+        @id = "status-#:Key#",
+        @class = "var-cell var-status",
+        @data_bind = "ProductStatusId",
+        @style = "display:none",
+        @onchange = "varPropOnChange($(this),'.var-status-disp')",
+    }).Replace(new { @name = "_Variants[#:Iseq#].ProductStatusId", @value = "#:ProductStatusId#" })
+    + "<input value='#:ProductStatusName#' class='var-cell-disp var-status-disp' data-bind='ProductStatusName' type='text' />"
+    + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].ProductStatusId' data-valmsg-replace='true'></span>";
+
+    var costpriceTempl = Html.LocalizeTextBoxFor(m => m.Variants[0].CostPrice, new
+    {
+        @id = "costprice-#:Key#",
+        @class = "var-cell var-costprice",
+        @data_bind = "CostPrice_Text",
+        @onchange = "varCalcIncPrice('costprice-#:Key#', 'costpriceinc-#:Key#')",
+    }).Replace(new { @name = "_Variants[#:Iseq#].CostPrice", @value = "#:safeProp(CostPrice,'Text')#" }) + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].CostPrice' data-valmsg-replace='true'></span>";
+
+    var costpriceIncTempl = Html.LocalizeTextBoxFor(m => m.Variants[0].CostPriceInc, new
+    {
+        @id = "costpriceinc-#:Key#",
+        @class = "var-cell var-costpriceinc",
+        @data_bind = "CostPriceInc_Text",
+        @onchange = "varCalcExcPrice('costpriceinc-#:Key#', 'costprice-#:Key#')",
+    }).Replace(new { @name = "_Variants[#:Iseq#].CostPriceInc", @value = "#:safeProp(CostPriceInc,'Text')#" }) + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].CostPriceInc' data-valmsg-replace='true'></span>";
+
+    var priceTempl = Html.LocalizeTextBoxFor(m => m.Variants[0].Price, new
+    {
+        @id = "price-#:Key#",
+        @class = "var-cell var-price",
+        @data_bind = "Price_Text",
+        @onchange = "varCalcIncPrice('price-#:Key#', 'priceinc-#:Key#')",
+    }).Replace(new { @name = "_Variants[#:Iseq#].Price", @value = "#:safeProp(Price,'Text')#" }) + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].Price' data-valmsg-replace='true'></span>";
+
+    var priceIncTempl = Html.LocalizeTextBoxFor(m => m.Variants[0].PriceInc, new
+    {
+        @id = "priceinc-#:Key#",
+        @class = "var-cell var-priceinc",
+        @data_bind = "PriceInc_Text",
+        @onchange = "varCalcExcPrice('priceinc-#:Key#', 'price-#:Key#')",
+    }).Replace(new { @name = "_Variants[#:Iseq#].PriceInc", @value = "#:safeProp(PriceInc,'Text')#" }) + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].PriceInc' data-valmsg-replace='true'></span>"
+    + (settings.Hidden.PriceCheckEnabled() ? Html.LocalizeTextBoxFor(m => m.Variants[0].PriceCkMinVal, new
+    {
+        @id = "priceckminval-#:Key#",
+        @class = "var-cell var-priceckminval",
+        @data_bind = "PriceCkMinVal_Text",
+        @placeholder = Html.LocalizeName(templVariant, m => m.PriceCkMinVal),
+    }).Replace(new { @name = "_Variants[#:Iseq#].PriceCkMinVal", @value = "#:safeProp(PriceCkMinVal,'Text')#" }) + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].PriceCkMinVal' data-valmsg-replace='true'></span>" : "");
+
+    var salepriceTempl = Html.LocalizeTextBoxFor(m => m.Variants[0].SalePrice, new
+    {
+        @id = "saleprice-#:Key#",
+        @class = "var-cell var-saleprice",
+        @data_bind = "SalePrice_Text",
+        @onchange = "varCalcIncPrice('saleprice-#:Key#', 'salepriceinc-#:Key#')",
+    }).Replace(new { @name = "_Variants[#:Iseq#].SalePrice", @value = "#:safeProp(SalePrice,'Text')#" }) + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].SalePrice' data-valmsg-replace='true'></span>";
+
+    var salepriceIncTempl = Html.LocalizeTextBoxFor(m => m.Variants[0].SalePriceInc, new
+    {
+        @id = "salepriceinc-#:Key#",
+        @class = "var-cell var-salepriceinc",
+        @data_bind = "SalePriceInc_Text",
+        @onchange = "varCalcExcPrice('salepriceinc-#:Key#', 'saleprice-#:Key#')",
+    }).Replace(new { @name = "_Variants[#:Iseq#].SalePriceInc", @value = "#:safeProp(SalePriceInc,'Text')#" }) + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].SalePriceInc' data-valmsg-replace='true'></span>";
+
+    var weightTempl = Html.LocalizeTextBoxFor(m => m.Variants[0].Weight, new
+    {
+        @id = "weight-#:Key#",
+        @class = "var-cell var-weight",
+        @data_bind = "Weight_Text",
+        @onchange = "",
+    }).Replace(new { @name = "_Variants[#:Iseq#].Weight", @value = "#:safeProp(Weight,'Text')#" }) + "<span class='error' data-valmsg-for='_Variants[#:Iseq#].Weight' data-valmsg-replace='true'></span>";
+
+    var imageTempl = "<a href='#:ifnull(ImageFsUrl)#' class='preview'><img id='thumb_#:Id#' src='#:ifnull(ImageThumb)#'/></a><span style='display:#= ifnull(ImageFsUrl) == ''?'none':'block'#;' class=\"es-btn-close image-del\"><a href=\"javascript:void(0)\"> close </a>";
+    var templProp = @"<input class='var-cell var-prop var-prop-{0}' style='display:none' onchange='varPropOnChange($(this))'
+value='#:ifnull(Properties[{1}].PropValId)#' id='var-prop-{0}-#:Key#' name='var-prop-{0}-#:Key#' data-propid='{0}'
+data-bind='Properties[{1}].PropValId' data-val='true' type='text'>"
+        + "<span class='var-cell-disp var-prop-disp' data-bind='Properties[{1}].PropValName' />#:ifnull(Properties[{1}].PropValName)#</span>"
+        + "<span class='error' data-valmsg-for='var-prop-{0}-#:Key#' data-valmsg-replace='true'></span>";
+
+    Model.Variants.Remove(templVariant);
+}
+
+<script src="@(Globals.ResolveClientUrl(LanguageMgr.KendoPath))/kendo.tooltip.js"></script>
+
+<div id="variant-list-box">
+    <style type="text/css">
+         #grid td.image {
+            background: transparent url("@ModuleUrl.ContentUrl("Images/admin/es-img-upload.png", true)") no-repeat scroll center;
+            position:relative;
+        }
+        #grid td.image .es-btn-close.image-del{display: @(settings.Hidden.VariantMultiImage?"none":"block") !important;}
+    </style>
+    <style type="text/css">
+        #grid .k-grid-header .k-header {  white-space: normal !important; }
+
+        #re-sel-prop-list input[type=text] {  height: 24px;  clear: left; }
+
+        #re-sel-prop-list .prop-val-form .prop-val-input-form {  width: 300px; }
+
+        #re-sel-prop-list .var-property .var-prop-cbox {  padding: 4px 3px 6px 3px;  min-width: 50px; }
+
+        #re-sel-prop-list .var-property .pval-list {  width: auto;  max-width: 74%;  padding: 0;  margin-right: 6px;  margin-bottom: 3px; }
+
+        #re-sel-prop-list .var-property .pval-list li {  margin: 0;  padding: 5px 6px; }
+
+        #re-sel-prop-list .var-property .pval-list li .name-color {  min-width: 60px; }
+
+        #re-sel-prop-list .var-property > .wr_submit_top {  margin: 4px 0; }
+
+        #re-sel-prop-list .wr_submit_top li {  margin-right: 0;  height: 21px;  padding-right: 4px; }
+
+        #re-sel-prop-list .wr_submit_top li input {  margin-top: -6px;  padding: 0px 0px 0px 18px;  vertical-align: middle;  line-height: 1em;  height: 24px; }
+
+        #re-sel-prop-list .wr_submit_top li input.btn_add {  background-position: -8px -158px; }
+
+        #re-sel-prop-list .wr_submit_top li input.btn_cancel {  background-position: -8px -272px; }
+
+        #re-sel-prop-list .wr_submit_top li input.btn_save {  background-position: -8px -31px; }
+
+        #re-sel-prop-list .k-dropdown-wrap {  height: 21px;  margin-top: -5px; }
+
+        #re-sel-prop-list .k-dropdown-wrap .k-input {  height: 18px;  line-height: 16px; }
+
+        #variant-list-box .wr_submit_top li:last-child {  margin-right: 0; }
+
+        #grid .table_all td {  padding: 2px;  margin: 0px; }
+
+        #grid.k-grid td.claw-action {  text-align: center; }
+
+        #grid.k-grid td.claw-action > div {  display: inline-block; }
+
+        #grid.k-grid td.claw-action .k-button {  margin: 0 !important;  min-width: 35px !important; }
+
+        #grid td.image:hover {  cursor: pointer; }
+
+        #grid .var-cell.k-numerictextbox {  width: auto !important; }
+
+        #grid .var-cell .k-numeric-wrap {  height: 26px; }
+
+        #grid .var-cell .k-numeric-wrap .k-formatted-value.k-input {  padding: 0px 5px !important; }
+
+        #grid .var-cell:not(.var-priceckminval) .k-numeric-wrap .k-formatted-value.k-input {  margin-top: 2px !important; }
+
+        #grid .var-cell .k-numeric-wrap .k-select .k-link:first-child {  margin-top: -3px; }
+
+        .k-widget.k-dropdown.var-status {  width: 100%; }
+
+        .k-widget.k-dropdown.var-prop {  width: 100%; }
+
+        .var-weight {  text-align: right; }
+
+        .var-sku {  min-width: 100% !important;  margin: 0px !important; }
+
+        .var-sku.emuser {  padding: 1px !important;  height: 1.2em; }
+
+        #grid .emailmusers .send {  color: #6c0b7e; }
+
+        #grid .emailmusers {  font-style: italic;  color: #6c0b7e;  padding: 1px 0 0 0;  margin: 0;  font-size: 11px;  line-height: 11px;  text-align: center; }
+
+        .price-check .var-cell.var-sku {  height: 1.4em !important; }
+
+        #grid.price-check .var-cell.var-priceinc, #grid.price-check .var-cell.var-priceinc .k-numeric-wrap {  height: 1.6em !important;  margin: 0 !important;  font-size: 11px !important; }
+
+        #grid .var-cell.var-priceckurl {  padding: 1px 1px 2px 4px !important;  margin: 0 !important;  width: 100%;  height: 1.4em; }
+
+        #grid .var-cell.var-priceckminval {  width: 100% !important;  height: 1.6em !important;  text-align: right;  font-size: 11px !important;  margin: 0 !important; }
+
+        .var-cell.var-priceckminval .k-numeric-wrap {  height: 1.6em !important;  border-top: none !important; }
+
+        #grid.price-check .var-cell.var-priceckminval .k-input, #grid.price-check .var-cell.var-priceckminval .k-formatted-value.k-input, #grid.price-check .var-cell.var-priceinc .k-input {  height: 1.4em !important;  margin: 0 !important;  font-size: 11px !important; }
+
+        #grid .var-qty-box[data-backqty='0'] {  min-width: 0;  width: 68px !important; }
+
+        #grid .var-qty-box[data-backqty='1'] {  min-width: 0;  width: 68px !important; }
+
+        #grid .var-qty-box[data-backqty='0'] .var-backqty {  display: none; }
+
+        #grid .var-qty-box[data-backqty='1'] .var-backqty {  min-width: 0;  width: 35px;  margin: 0;  border-left: none;  height: 26px; }
+
+        #grid .var-qty-box[data-backqty='1'] .var-quantity {  width: 31px !important;  min-width: 0 !important;  padding-right: 0 !important; }
+
+        .var-cell.var-priceckminval .k-select .k-link:last-child, .price-check .var-cell.var-priceinc .k-select .k-link:last-child {  line-height: 0.8em;  height: 0.8em; }
+
+        .var-priceckurl[data-active="0"], .var-priceckminval[data-active="0"] {  display: none; }
+
+        .var-barcode {  min-width: 100% !important;  margin: 0px !important; }
+
+        .var-status-disp {  min-width: 100% !important; }
+
+        .var-prop-disp {  min-width: 100% !important;  padding: 0 5px !important; }
+
+        .var-quantity {  min-width: 60px !important;  height: 26px !important;  margin: 0 !important;  padding: 0 5px 0px 5px !important; }
+
+        .var-saleprice, .var-price, .var-costprice, .var-salepriceinc, .var-priceinc, .var-costpriceinc {  text-align: right !important;  margin: 0 !important;  min-width: 100% !important; }
+
+        .k-grid-barcode {  vertical-align: bottom; }
+
+        .k-grid-barcode .var-barcode {  padding: 0 !important;  height: 1.2em;  text-align: center; }
+
+        .k-grid-barcode .barcode-cmd {  padding: 1px 0 0 0;  margin: 0;  font-size: 11px;  line-height: 11px;  text-align: center;  vertical-align: bottom; }
+
+        .k-grid-barcode .barcode-cmd a {  color: #6c0b7e;  font-style: italic; }
+
+        .k-grid-barcode .barcode-cmd a[href] {  text-decoration: underline; }
+
+        .k-grid-barcode > span.error {  margin-top: 12px; }
+
+        .remove-format {  position: inherit;  float: inherit; }
+
+        .claw-action {  width: 10px !important; }
+
+        .k-widget.k-calendar {  font-size: 13px !important }
+
+        #grid .var-shoppingqty, .var-qtypos-detail {  font-size: smaller;  margin-left: 5px; }
+
+        #grid .var-qty-box[data-shoppingqty='0'] .var-shoppingqty {  display: none; }
+
+        #grid .var-qtypos-detail {  text-align: right;  margin-right: 3px; }
+
+    </style>
+
+    @if (settings.Hidden.Storage2Enabled)
+    {
+        <style type="text/css">
+            #grid .var-qty-box input {
+                max-height: 1.4em !important;
+            }
+        </style>
+    }
+
+    @if (!settings.Hidden.ShoppingProduct)
+    {
+        <style type="text/css">
+            #grid .var-qty-box .var-shoppingqty {
+                display: none !important;
+            }
+        </style>
+    }
+    else
+    {
+        <style type="text/css">
+            #grid .var-qty-box[data-shoppingqty='1'] input {
+                max-height: 1.4em;
+            }
+        </style>
+    }
+
+    <div id="dropdown-template-list" style="display: none">
+        @Html.LocalizeDropDownListKendoLang("temp-status", 0, statuses
+            .Select(x => new DDListItem() { Value = x.Id.ToString(), Text = x.Name, Active = true, LangVisible = true }),
+            StringTable.SelectStatus, new { }, false)
+
+        @foreach (var prop in properties)
+        {
+            <input id="temp_prop_id_@prop.Id" value="@prop.Id" type="hidden" />
+            @Html.LocalizeDropDownListKendoLang("temp-prop-" + prop.Id, 0, "ListPropValDD", "Variant", "temp_prop_id_" + @prop.Id, ("Select " + prop.Name.ToLower()).ModLocalize(), new { }, null, "PropertyId").AutoBind(false)
+        }
+
+        @Html.LocalizeDropDownListKendoLang("temp-prop-0", 0, new DDListItem[0], "none", new { }, false).AutoBind(false)
+    </div>
+    <div class="clo_right col-right-eshop">
+        <div class="variant-upload-img-box">
+            <section style="display: none">
+                @Html.TextBox("variantImageUpload", "",
+                    new
+                    {
+                        @type = "file",
+                        @onchange = "variantUploadImg(this)",
+                        @accept = "image/*",
+                        @datavalextension = StringTable.ErrMsgFileExtension,
+                        @datavalregex = settings.Display.Admin.Image.Extensions.GetFileExtensionValidRegEx(false)
+                    })
+                <div id="variantLoadingImage">
+                    <div style="width: 100%; height: 100%; background: #e0e0e0;">@Html.LocalizeImageLoading(new { @style = "display:block" })</div>
+                </div>
+                @(StringTable.ExtensionAccept) @(settings.Display.Admin.Image.Extensions).
+            </section>
+            <section><span class="error file-ext-error" style="display: none"></span></section>
+        </div>
+        <div class="controls">
+            <span class="text-eshop bold">@StringTable.SelectVariants</span>
+            <div id="re-sel-prop-list"></div>
+            <script id="prop-templ" type="text/prop-template">@RenderProperty(new PropertyModel())</script>
+            <script id="prop-val-templ" type="text/prop-val-template">@RenderPropVal(new PropValModel())</script>
+        </div>
+    </div>
+
+    <div class="row_content_box mt_20">
+        <ul class="wr_submit_top" style="display:none; top:-37px;">
+            <li style="display: none">
+                <input id="btn-propsel-update-variants" class="btn_update" value="@StringTable.Update" type="button">
+            </li>
+            <li>
+                <input id="btn-add-one-variant" class="btn_add" value="@StringTable.AddOneVariant" type="button">
+            </li>
+            <li>
+                <input id="btn-propsel-add-variants" class="btn_add" value="@StringTable.AddNewVariant" type="button">
+            </li>
+        </ul>
+        <div class="wr_table_all validable-form-field">
+            @(Html.LocalizeGridFor<VariantModel>("grid", "Variant", "Delete")
+                  .DataSource(m => m.Id, new List<VariantModel>())
+                  .ColumnCheckBox(m => m.Key)
+                  .Paging(20, new [] { 20, 30, 50, 100 })
+                  .Columns(grid =>
+                  {
+                      var cols = new[]
+                      {
+                          grid.Col(m => m.Image)
+                              .SetTemplate(imageTempl)
+                              .SetCssClass("txt_align_c image"),
+                          grid.Col(m => m.SKU)
+                              .SetTemplate(skuTempl),
+                          grid.Col(m => m.BarCode)
+                              .SetTemplate(barcodeTempl)
+                              .SetCssClass("k-grid-barcode"),
+                          settings.Hidden.ManageVariantWeight ? grid.Col(m => m.Weight, false/*,80*/)
+                              .SetTemplate(weightTempl) : null,
+                          grid.Col(m => m.Quantity,false/*,80*/)
+                              .SetTemplate(qtyTempl),
+                          grid.Col(m => m.CostPrice,false/*,80*/)
+                              .SetTemplate(costpriceTempl),
+                          grid.Col(m => m.CostPriceInc,false/*,80*/)
+                              .SetTemplate(costpriceIncTempl),
+                          grid.Col(m => m.Price,false/*,80*/)
+                              .SetTemplate(priceTempl),
+                          grid.Col(m => m.PriceInc,false/*,80*/)
+                              .SetTemplate(priceIncTempl),
+                          grid.Col(m => m.SalePrice,false/*,80*/)
+                              .SetTemplate(salepriceTempl),
+                          grid.Col(m => m.SalePriceInc,false/*,90*/)
+                              .SetTemplate(salepriceIncTempl),
+                          grid.Col(m => m.ProductStatusId,false/*,95*/)
+                              .SetTemplate(statusTempl + wrapBackDate + backDateTempl + wrapBackDateEnd),
+                          grid.Col(m => m.Active, "", m => m.Id, false/*, 70*/)
+                              .SetTemplate("<a href='javascript:void(0);' />")
+                              .SetCssClass("k-grid-status td-center"),
+                      }.ToList();
+
+                      for (int i = 0; i < properties.Count; i++)
+                      {
+                          var idx = i;
+                          cols.Insert(i + 1, grid.Col(m => m.Properties[idx].PropValId, properties[i].Name, false)
+                              .SetTemplate(string.Format(templProp, properties[i].Id, i)));
+                      }
+
+                      return cols.Where(m => m != null).ToArray();
+                  })
+                  .ColumnCommand(grid => new[]
+                  {
+                      settings.Hidden.VariantMultiImage ? grid.Cmd(m => m.Id, "cmdEditVariant", "Edit", "edit_fr", false, StringTable.Edit, true) : null,
+                      grid.Cmd(m => m.Id, "gridOnDelete", "Delete", "delete_fr", false, null,true)
+                  }.Where(x => x != null).ToArray(), 70)
+                  .Sortable(true)
+                  .Config(grid => { grid.CustomScript = "gridCustom"; })
+                  .ToMvcHtmlString())
+        </div>
+        <ul class="wr_submit_top set-relative">
+            <li class="mr0 delete_big" style="padding:0;"><input class="btn_delete" value="@StringTable.RemoveVariant" type="button"></li>
+        </ul>
+    </div>
+    @{
+        var jsSerializer = new System.Web.Script.Serialization.JavaScriptSerializer() { MaxJsonLength = Int32.MaxValue };
+    }
+    @Html.Raw("<script type='text/javascript'> variants = " + jsSerializer.Serialize(Model.Variants) + "</script>")
+    @Html.Raw("<script type='text/javascript'> varProperties = " + Json.Encode(Model.Variants.GetProperties()) + "</script>")
+    <script type="text/javascript">
+
+    var grid = $('#grid'), varFormDic = {}, quantity = $('#@Html.IdFor(m => m.Quantity)');
+
+    function initVariants() {
+        gridInit('#grid', true);
+
+        //$('#grid thead th.k-header .k-link').each(function () {
+        //    $(this).html($(this).html().replace('(', '<br>('));
+        //});
+
+        var gridData = grid.data('kendoGrid').dataSource;
+        gridData.bind('change', function(e) {
+            if (this.total() == 0) grid.closest(".wr_table_all").hide();
+            else grid.closest('.wr_table_all').show();
+        });
+        gridData.transport.data = variants;
+        if (gridData.total() == 0) grid.closest(".wr_table_all").hide();
+        else grid.closest('.wr_table_all').show();
+
+        gridBindRowForm(grid.data('kendoGrid'));
+
+        buildPropertyForm(varProperties);
+
+        gridData.read();
+
+        window.variantOnChangeTax = function () {
+
+            var qtyTotal = 0, tax = getVatValue(), gridDs = grid.data('kendoGrid').dataSource;
+
+            gridDs.transport.data = [];
+            gridDs.data().forEach(function (row) {
+                vrowCalIncPrice(row, tax, 'CostPrice', 'CostPriceInc');
+                vrowCalIncPrice(row, tax, 'Price', 'PriceInc');
+                vrowCalIncPrice(row, tax, 'SalePrice', 'SalePriceInc');
+
+                bindInputField(row.VariantForm, row, 'CostPrice_Text', row.CostPrice.Text);
+                bindInputField(row.VariantForm, row, 'CostPriceInc_Text', row.CostPriceInc.Text);
+                bindInputField(row.VariantForm, row, 'Price_Text', row.Price.Text);
+                bindInputField(row.VariantForm, row, 'PriceInc_Text', row.PriceInc.Text);
+                bindInputField(row.VariantForm, row, 'SalePrice_Text', row.SalePrice.Text);
+                bindInputField(row.VariantForm, row, 'SalePriceInc_Text', row.SalePriceInc.Text);
+
+                qtyTotal += row.Quantity;
+
+                gridDs.transport.data.push(row);
+            });
+
+            if (gridDs.data().length > 0){
+                quantity.val('0').clawChangeInt(qtyTotal).change();
+
+                gridDs.read();
+            }
+        };
+    }
+
+    function varCalcIncPrice(nodeid, targetid) {
+        var node = $('#' + nodeid), nodeKd = node.data('kendoNumericTextBox');
+        var row = grid.data('kendoGrid').dataItem(node.closest('tr'));
+        var binding = node.attr('data-bind').replace('_Text', '');
+
+        if (!nodeKd) return;//reset
+
+        row[binding].Value = nodeKd.value();
+        row[binding].Text = localizeMoneyToString(nodeKd.value());
+        CalIncPrice(nodeKd.value(), targetid, node);
+    }
+
+    function varCalcExcPrice(nodeid, targetid) {
+        var node = $('#' + nodeid), nodeKd = node.data('kendoNumericTextBox');
+        var row = grid.data('kendoGrid').dataItem(node.closest('tr'));
+        var binding = node.attr('data-bind').replace('_Text', '');
+
+        if (!nodeKd) return;//reset
+
+        row[binding].Value = nodeKd.value();
+        row[binding].Text = localizeMoneyToString(nodeKd.value());
+        CalExcPrice(nodeKd.value(), targetid, node);
+    }
+
+    function validProdRequires() {
+        var price = $('#@Html.IdFor(m => m.Price)'), saleprice = $('#@Html.IdFor(m => m.SalePrice)');
+
+        if (!price.valid()) {
+            price.data('kendoNumericTextBox').focus();
+            return false;
+        }
+        if (!saleprice.valid()) {
+            saleprice.data('kendoNumericTextBox').focus();
+            return false;
+        }
+
+        return true;
+    }
+
+    function gridBindRowForm(grid) {
+        $('#variant-form-list > .variant-form[data-valid=1]').each(function () {
+            var varForm = $(this), row = gridGetRow(grid, varForm.attr('data-id'), varForm.attr('data-key'));
+            if (row) {
+                varForm.attr('data-uid', row.uid);
+                varFormDic[row.Key] = varForm;
+            } else console.log('row is null', varForm);
+        });
+    }
+
+    function qtyViewToggle(show) {
+        if (show) { $('#qty-holder').hide(); $('#qty-view-holder').show(); }
+        else { $('#qty-holder').show(); $('#qty-view-holder').hide(); }
+    }
+
+    function gridCustom(grid) {
+
+        var variantSingleImg = '@(settings.Hidden.VariantMultiImage ? 1 : 0)' == '0';
+
+        if (variantSingleImg) $('td.claw-action .k-button', grid.element).wrap('<div>');
+
+            if (grid.dataSource.total() > 0){
+            $('tr', grid.element).each(function () {
+                var row = grid.dataItem($(this));
+                row.VariantForm = varFormDic[row.Key];
+                varRowSetDic[row.Key] = row;
+                gridRowEditEvent(grid, $(this), row.PropEdit);
+                showValidateErrors(grid, $(this));
+            });
+            qtyViewToggle(true);
+        } else qtyViewToggle(false);
+
+        $('td.image', grid.element).unbind('click').each(function () {
+            var previewEmpty = $(this).find('.preview[href=""]');
+
+            function varOnUploadImg() {
+                var row = grid.dataItem($(this).closest('tr'));
+                $('#variantImageUpload').data({ 'claw-grid-row': row, 'claw-grid-td': $(this).closest('td') }).click();
+            }
+
+            if (previewEmpty.length != 0) {
+                previewEmpty.hide();
+                if (variantSingleImg) $(this).click(varOnUploadImg);
+                else $(this).css({ 'cursor': 'default' });
+            } else
+                if (variantSingleImg) {
+                    $(this).find('.es-btn-close.image-del').unbind('click').click(function (e) {
+                        e.preventDefault();
+                        e.stopPropagation();
+                        var row = grid.dataItem($(this).closest('tr'));
+                        row.Image = row.ImageThumb = row.ImageFsUrl = '';
+                        bindInputField(row.VariantForm, row, 'Image', '');
+                        bindInputField(row.VariantForm, row, 'ImageFsUrl', '');
+                        $(this).closest('td').click(varOnUploadImg).html('');
+                    });
+                }
+        });
+
+        $('.delete_big').unbind('click').click(function () {
+            var arrRws = [], rows = grid.tbody.find('input:checked').closest('tr');
+            rows.each(function () { arrRws.push(grid.dataItem($(this))); });
+            variantRemoveRange(arrRws);
+        });
+
+        var btnAddOneVar = $('#btn-add-one-variant').unbind('click').click(function () {
+            if (validProdRequires()) variantAddOneNew(grid);
+        }).closest('li');
+
+        initGridStatusAction(grid, '.k-grid-status',
+            function (node, row) { bindInputField(row.VariantForm, row, 'Active', row.Active); },
+            function (row) { return row.Active; }, function (row, status) { row.Active = status; });
+
+        gridHideCell(grid, '.k-grid-Delete', function (row) { return row.Deletable == false; });
+
+        gridDisableCheckBox(grid, function (row) { return row.Deletable == false; });
+
+        initImagePreview(true, grid.element);
+        gridHideUnusedColumns(grid);
+
+        if (!grid.clawFirstRun && grid.dataSource.total() > 0) {
+            grid.clawFirstRun = true;
+        }
+
+        if (getAvaiPropValTuples().length == 0) btnAddOneVar.hide();
+        else btnAddOneVar.show();
+
+        $('.check-price.price-ck-variant').attr('data-variants', grid.dataSource.total());
+
+        $('#PriceCkActiveTrue').change();
+
+        if ('@(Model.Id)' == '0' ) {
+            $('.var-quantity[data-bind]', grid.element).change(function (ev) {
+                var status = $(this).closest('tr').find('.var-status[data-bind][id]');
+                if (ev && ev.originalEvent && !$(this).is(':focus')) {
+                    $(this).focus(); setTimeout(function () { status.change(); }, 1500);
+                }
+            });
+        }
+
+        if (grid.dataSource.total() > 0) {
+            $('#ShippingType_w2').closest('.shipping-type-item').hide().find('input').prop('disabled', true);
+            if (!$('input[name=ShippingType]:checked:visible').val())
+                $('input[name=ShippingType][value=@(ShippingType.RequireShipping.Val())]').prop('checked', true).change();
+        }
+        else $('#ShippingType_w2').closest('.shipping-type-item').show().prop('disabled', false);
+    }
+
+    function variantShowTooltip(node, show) {
+        var tooltip = node.data("kendoTooltip") || node.kendoTooltip({
+            showAfter: 1000,
+            show: function () {
+                var me = this;
+                if (grid.clawActiveTooltip) grid.clawActiveTooltip.hide();
+                grid.clawActiveTooltip = this;
+                this.clawTimerId = setTimeout(function () { me.clawTimerId = null; me.hide(); }, 10000);
+            },
+            hide: function () {
+                if (this.clawTimerId) clearTimeout(this.clawTimerId);
+                grid.clawActiveTooltip = this.clawTimerId = null;
+            }
+        }).data("kendoTooltip");
+        //console.log('Tooltip', node, tooltip);
+        var lst = showOtherCurrencies(node.find('.var-cell[id]'), true);
+
+            if (!lst || lst.length == 0)return;
+
+        var msg = '<div style="text-align:left"><div style="white-space:nowrap">@(StringTable.MultiCurrencyVariantPriceTitle)</div>' + lst.join(' ') + '</div>';
+
+        if (show || show == null) tooltip.show();
+
+        if (tooltip.content)
+        {
+            tooltip.content.html(msg);
+            if (tooltip.content.is(':visible')) setTimeout(function() { variantShowTooltip(node, false); }, 1000);
+        }
+    }
+
+    function showValidateErrors(grid, trNode) {
+        $('.var-sku,.var-barcode,.var-quantity,.var-costprice,.var-costpriceinc,.var-price,.var-priceinc,.var-saleprice,.var-salepriceinc,.var-status', trNode).each(function () {
+            var name = ($(this).attr('name') || '').substring(1), msg = modelState[name];
+            if (name && msg) {
+                $(this).closest('td').find('span.error')
+                    .removeClass('field-validation-valid')
+                    .addClass('field-validation-error').append($('<span>').html(msg));
+                delete modelState[name];
+                if (!firstErrorInputElement) {
+                    firstErrorInputElement = $(this);
+                    setTimeout(function () { firstErrorInputElement.focus(); }, 2000);
+                };
+            } else $(this).removeClass('input-validation-error');
+        });
+    }
+
+    function initFormShowErrorMsgEx() {
+
+        if (!window.formShowErrorMsg) setTimeout(initFormShowErrorMsgEx, 500);
+
+		window.formShowErrorMsg = function (fieldName, errMessage, form) {
+			var validObj = $(form || '#editForm').validate();
+
+			if (!validObj.settings.rules[fieldName]) {
+				console.log(fieldName + ' not found!'); return;
+			}
+			else if(errMessage) {
+				var errors = {}; errors[fieldName] = errMessage;
+				validObj.showErrors(errors);
+			}
+			else {
+				var node = $(validObj.currentForm).find('[name][name="' + fieldName + '"]', 'input,select,textarea');
+				if(node.length != 0) node.valid();
+			}
+		}
+    }
+
+	setTimeout(initFormShowErrorMsgEx, 100);
+
+    function gridRowEditEvent(grid, trNode, propEdit) {
+        var cellNodes = $('.var-cell,.var-cell-disp', trNode);
+        $('.var-quantity', trNode).unbind('click').click(function () { openEditQtyForm(this, null, grid.dataItem(trNode), grid); });
+
+        cellNodes.change(function (event) {
+            if ($(this).is('input, textarea, select')) {
+                var row = grid.dataItem(trNode), bCancel = false;
+                if ($(this).valid()) {
+                    var field = $(this).attr('data-bind').replace('_', '.'), fVal = $(this).val();
+                    if ($(this).hasClass('var-prop')) {
+                        var tmpRow = { Properties: row.Properties.map(function (itm) { return $.extend({}, itm); }) };
+                        fVal = parseInt(fVal);
+                        eval('tmpRow.' + field + ' = ' + fVal);
+                        var aRow = varPropValsDic[varpropsToKey(tmpRow.Properties)];
+                        if (aRow && aRow.Key != row.Key && !varpropsTryFix($(this), trNode, row)) {
+                            bCancel = true;
+                            console.log('gridRowEditEvent: change skipped', row, field, fVal, tmpRow);
+                        }
+                    }
+                    if (field && !bCancel) {
+                        var statusNode = $('.var-status[data-bind]', trNode), statusKd = statusNode.data('kendoDropDownList'), statusVal = statusNode.val();
+                        if ($(this).is('.var-quantity') && ((parseInt(fVal) && statusVal == '3') || (!parseInt(fVal) && statusVal == '2'))) {
+                            if (statusKd) statusKd.value(statusVal == '3' ? 2 : 3);
+                            statusNode.val(statusVal == '3' ? 2 : 3).change();
+                        }
+                        if ($(this).is('.var-priceinc,.var-costprice') && event.originalEvent && @(settings.Hidden.ProductVariMainPriceDisabled ? 0 : 1) == 1) {
+                            setTimeout(function () {
+                                var priceIncNode = $('#PriceInc'), priceInc = null, priceIncKd = priceIncNode.data('kendoNumericTextBox');
+                                grid.dataSource.data().forEach(function (rw) {
+                                    priceInc = priceInc == null ? rw.PriceInc.Value : Math.min(priceInc, rw.PriceInc.Value);
+                                });
+                                if (priceIncKd && priceInc) {
+                                    priceIncKd.value(priceInc); priceIncNode.change();
+                                }
+                            }, 1000);
+                        }
+                        bindInputField(row.VariantForm, row, field, fVal);
+                    }
+                } else $(this).focus();
+            }
+        });
+
+        cellNodes.focus(function () {
+            @{ var settingOther = settings.Display.Others;}
+            if (!trNode[0].clawInitKendoInput) {
+                var numNodes = $('.var-costprice,.var-costpriceinc,.var-price,.var-priceinc,.var-saleprice,.var-salepriceinc,.var-weight,.var-priceckminval', trNode);
+                var dateNodes = $('.var-backdate', trNode);
+                trNode[0].clawInitKendoInput = true;
+
+		trNode.find('.var-sku').focus();
+		var node = $(this);
+
+		setTimeout(function () {
+                	initKendoNumeric(numNodes, { format: '@settingOther.GetPriceFormat()', step: '@settingOther.PriceStep' });
+                	if (dateNodes.length != 0) initDatePicker(dateNodes);
+
+                	$('.var-priceckminval:not([data-bind])', trNode).attr('data-active', $('input.var-priceckminval[data-bind]', trNode).attr('data-active'));
+
+                	var costprice = $('input.var-costpriceinc[name]', trNode), price = $('input.var-priceinc[name]', trNode), saleprice = $('input.var-salepriceinc[name]', trNode);
+                	$('input.var-costprice[name],input.var-costpriceinc[name],input.var-price[name],input.var-priceinc[name],input.var-saleprice[name],input.var-salepriceinc[name]', trNode)
+                	    .change(function () { validatePrices(price, saleprice, null, costprice); })
+                	    .focusout(function () { validatePrices(price, saleprice, null, costprice); });
+                	validatePrices(price, saleprice, null, costprice);
+
+
+                	setTimeout(function () { if (node.data('kendoNumericTextBox')) node.data('kendoNumericTextBox').focus(); }, 500);
+		}, 500);
+            }
+
+            if ($(this).is('input, textarea, select')) {
+                var rwNode = $(this).closest('tr');
+                if (!rwNode[0].clawFormUpdateValidRules) {
+                    rwNode[0].clawFormUpdateValidRules = true;
+                    $('.var-cell-disp', trNode).each(function() {
+                        if (!$(this).hasClass('var-prop-disp')) $(this).hide();
+                    });
+                    formUpdateValidRules(rwNode);
+                    gridRowEditControl(grid, trNode);
+                }
+            }
+        });
+
+        if('@(settings.Hidden.SingleCurrency ? "0" : "1")' == '1')
+            $('.var-costpriceinc,.var-priceinc,.var-salepriceinc', trNode)
+                .closest('td').unbind('hover').hover(function() { variantShowTooltip($(this), true); }, function() {
+                    var tooltip = $(this).data("kendoTooltip");
+                    if (tooltip) {
+                        tooltip.hide();
+                        if (tooltip.timeout) clearTimeout(tooltip.timeout);
+                        tooltip.timeout = null;
+                    }
+                });
+
+        if (propEdit) cellNodes.focus();
+    }
+
+    //hide unused items
+    function varPropMaskItems(node, propId) {
+        var nodeD2L = node.data('kendoDropDownList'), propvalDic = {};
+        var prop = varProperties.find(function (itm) { return itm.Id == propId; });
+
+        if (!prop || !nodeD2L) return;
+
+        prop.PropVals.forEach(function (pv) { propvalDic[pv.Name] = pv; });
+
+        $('li.k-item', nodeD2L.ul).each(function () {
+            var valTxt = $(this).find('div').html();
+            if (propvalDic[valTxt]) $(this).show();
+            else $(this).hide();
+        });
+    }
+
+    function gridRowEditControl(grid, trNode) {
+        dropDownClone('input.var-status', '#temp-status', trNode);
+
+        var row = grid.dataItem(trNode);
+        if (row.PropEdit) {
+            @for (int i = 0; i < properties.Count; i++)
+                {
+                    @Html.Raw(string.Format("dropDownClone('input.var-prop-{0}', '#temp-prop-{0}', trNode);", properties[i].Id))
+                }
+            row.PropEdit = false;
+            trNode.find('.var-prop-disp').hide();
+        }
+    }
+
+    $('#btn-add-variants').unbind('click').click(function () {
+        openSelPropForm();
+        return false;
+    });
+
+    $('#btn-propsel-add-variants').unbind('click').click(function () {
+
+        if (!validProdRequires()) return;
+
+        admincommon.showMask();
+        setTimeout(function () { propselAddVariant(); }, 100);
+        return false;
+    });
+
+    function varPropOnChange(node, dispSelector) {
+
+        var row = grid.data('kendoGrid').dataItem(node.closest('tr'));
+        var nodeDisp = node.closest('td').find(dispSelector || '.var-prop-disp');
+        var nodeD2L = node.data('kendoDropDownList'), fieldVal = node.attr('data-bind');
+
+        if (!nodeD2L) return;//reset
+        node.closest('td').find('.wBackDate').css('display', 'none');
+        if (node.val() == 3) node.closest('td').find('.wBackDate').css('display', 'block');
+        var fieldTxt = nodeDisp.attr('data-bind'), valTxt = nodeD2L.text(), nodeName = node.attr('name');
+
+        if (!dispSelector) {
+            var fPropValId = null;
+            eval('fPropValId = row.' + fieldVal);
+            if (fPropValId != nodeD2L.value()) {
+                nodeD2L.value(fPropValId);
+                formShowErrorMsg(nodeName, '@StringTable.ErrMsgDuplicateVariant');
+                setTimeout(function () { formShowErrorMsg(nodeName, ''); }, 5000);
+                return; //cancelled
+            } else formShowErrorMsg(nodeName, '');
+        }
+
+        nodeDisp.val(valTxt);
+        bindInputField(row.VariantForm, row, fieldTxt, valTxt, true, true);
+    }
+
+    function varpropsTryFix(node, trNode, row) {
+
+        var avaiTuples = getAvaiPropValTuples(row), currentPropId = parseInt(node.attr('data-propid'));
+        var nodeD2L = node.data('kendoDropDownList'), valId = nodeD2L.value();
+        var mTuples = avaiTuples.filter(function (tuple) {
+            return tuple.filter(function (itm) { return itm.PropValId == valId; }).length != 0;
+        });
+
+        if (mTuples.length == 0) return false;
+
+        $('.var-prop', trNode).each(function () {
+            var propD2L = $(this).data('kendoDropDownList'), propId = parseInt($(this).attr('data-propid'));
+            if (propD2L && propId != currentPropId) {
+                var nodeDisp = $(this).closest('td').find('.var-prop-disp');
+                var fieldTxt = nodeDisp.attr('data-bind').replace('_', '.');
+                var mItem = mTuples[0].find(function (itm) { return itm.PropId == propId; });
+                var field = $(this).attr('data-bind').replace('_', '.');
+                if (mItem) {
+                    propD2L.value(mItem.PropValId);
+                    bindInputField(row.VariantForm, row, field, mItem.PropValId, true, true);
+                    bindInputField(row.VariantForm, row, fieldTxt, mItem.PropValName, true, true);
+                    //console.log('varpropsTryFix', propId, mItem);
+                }
+            }
+        });
+
+        return true;
+    }
+
+    function openSelPropForm() {
+        ajaxCmdHtml('@ModuleUrl.AdminUrl("Variant", "GetSelPropForm")/?lang=' + getFocusLang(), { id: '@Model.Id' }, function (result) { doOpenSelPropForm(result); });
+    }
+
+    function doOpenSelPropForm(html) {
+        var width = Math.max(200, Math.min(900, $(window).width() - 50));
+        var height = Math.max(200, Math.min(500, $(window).height() - 50));
+        var popTemplate = $("<div>").html($("#selprop-popup-form-templ").html());
+        popTemplate.find('.htmlcontent').html(html);
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = new ClawModal("", "modal-mask");
+        var windowModal = popup.showCustomModal("#window", '@StringTable.AddVariants', popTemplate.html(),
+            width, height, [], null,
+            function (modal) {
+                var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+                var scrollPos = $(window).scrollTop();
+
+                $('#popupForm .wr_clo1', modal).css('height', height - 60 + 'px');
+
+                var propList = $('#sel-prop-list');
+                varProperties.forEach(function (prop) {
+                    var propNode = propList.find('.var-property[data-id=' + prop.Id + ']');
+                    propNode.find('.var-prop-cbox input[type=checkbox]').click();
+                    propNode.find('.pval-list li input[type=checkbox]').each(function () {
+                        var propValId = parseInt($(this).val());
+                        if (prop.PropVals.some(function (pv) { return pv.Id == propValId; })) $(this).prop('checked', true);
+                    });
+                });
+
+                modal.find(".btn_save").click(function () {
+
+                    var props = [];
+                    $('#sel-prop-list .var-property').each(function () {
+                        if ($(this).find('.var-prop-cbox input').prop('checked')) {
+                            var propId = $(this).attr('data-id'), name = $(this).attr('data-name');
+                            var prop = { Id: propId, Name: name, PropVals: [] };
+
+                            $(this).find('.pval-list li').each(function () {
+                                if ($(this).find('input').prop('checked')) {
+                                    prop.PropVals.push({ Id: $(this).attr('data-id'), Name: $(this).attr('data-name') });
+                                }
+                            });
+                            if (prop.PropVals.length) props.push(prop);
+                        }
+                    });
+                    //console.log('model', props);
+                    if (!selpropAddCounter) buildPropertyForm(props);
+                    else variantListBoxReload(props);
+
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close();
+                    $(window).scrollTop(scrollPos);
+                });
+
+                modal.find(".btn_cancel").click(function () {
+                    inputErrBox.append(msgBox);
+                    admincommon.hideMessage();
+                    popup.close();
+                    $(window).scrollTop(scrollPos);
+                });
+            });
+    }
+
+    function buildPropertyForm(properties) {
+
+        var maxProps = parseInt('@VariantModel.MaxProps');
+
+        while (properties.length > maxProps) properties.pop();
+
+        //console.log('buildPropertyForm', properties);
+        var listBox = $('#re-sel-prop-list').html(''), gridData = grid.data('kendoGrid');
+        var propsels = {}, columns = gridData.columns;
+        for (var i = 0; i < properties.length; i++) {
+            var prop = properties[i];
+            var propEle = propertyAdd(prop.Id, prop.Name);
+            listBox.append(propEle);
+            for (var k = 0; k < prop.PropVals.length; k++) {
+                var pval = prop.PropVals[k];
+                var pvalEle = propValAdd(pval.Id, pval.Name);
+                if (pvalEle) propEle.find('.pval-list').append(pvalEle);
+            }
+            propsels[prop.Name] = prop;
+        }
+
+        varProperties = properties;
+
+        propvalInitDeleteEvent(listBox);
+
+        $('#btn-propsel-update-variants').unbind('click').click(function () {
+
+            if (!validProdRequires()) return;
+
+            var propVals = $(this).data('prop-vals') || [];
+            variantRemoveGroup(propVals);
+            $(this).data('prop-vals', null);
+            $('.btn-add-prop-val', listBox).closest('li').show();
+        }).data('prop-vals', null);
+
+        var btnObj = $('#btn-propsel-add-variants,#btn-add-one-variant').closest('li').hide();
+        if ($('#re-sel-prop-list:parent').length != 0) { btnObj.show().closest('ul').show(); }
+
+        formUpdateValidRules(listBox);
+    }
+
+    function propvalInitDeleteEvent(holder) {
+        $('.es-btn-close.pval-del', holder).unbind('click').click(function () {
+            var liNode = $(this).closest('li'), propNode = liNode.closest('.var-property');
+            var propValId = liNode.find('input[type=hidden]').val();
+            var propId = liNode.closest('.var-property').attr('data-id');
+            var updateBtn = $('#btn-propsel-update-variants'), updItems = updateBtn.data('prop-vals') || [];
+
+            liNode.remove();
+            if (propNode.find('ul.pval-list:parent').length == 0) propNode.remove();
+
+            updItems.push({
+                PropId: parseInt(propId), PropValId: parseInt(propValId),
+                PropValName: liNode.find('.prop-val-name').html()
+            });
+            updateBtn.data('prop-vals', updItems);
+
+            updateBtn.closest('li').show();
+            $('#btn-propsel-add-variants,#btn-add-one-variant').closest('li').hide();
+            $('#re-sel-prop-list .btn-add-prop-val').closest('li').hide();
+        });
+    }
+
+    function gridHideUnusedColumns(grid) {
+        var props = {}, items = grid.dataSource.data();
+
+        if (items.length == 0) return;
+
+        for (var i = 0; i < items[0].Properties.length; i++) {
+            var prop = items[0].Properties[i];
+            var tmp = varProperties.filter(function (p) { return p.Id == prop.PropId; });
+            props[i] = tmp.length == 0 ? null : tmp[0];
+        }
+
+        for (var key in props) {
+            if (props[key]) grid.showColumn('Properties[' + key + '].PropValId');
+            else grid.hideColumn('Properties[' + key + '].PropValId');
+        }
+
+        if ('@(settings.Display.Others.PriceFocusInc ? 1 : 0)' == '1') {
+            grid.hideColumn('CostPriceInc'); grid.hideColumn('Price'); grid.hideColumn('SalePrice');
+        }
+        else { grid.hideColumn('CostPriceInc'); grid.hideColumn('PriceInc'); grid.hideColumn('SalePriceInc'); }
+    }
+
+    function variantListBoxReload(props) {
+        //console.log('variantListBoxReload', props);
+        ajaxREST('@ModuleUrl.AdminUrl("Variant", "GetListForm")', 'POST',
+            $('#editForm').serialize() + '&lang=' + getFocusLang(), 'imgLoading',
+            function (result) {
+                var varDoc = $('<div>').html(result);
+                $('#variant-list-box').html(varDoc.find('#variant-list-box').html());
+                buildVariantBox();
+                if (props)
+                    clawSetTimeout(function () { return grid.data('kendoGrid'); },
+                        function () { buildPropertyForm(props); }, 500, 30);
+            }, function (e) { console.log('error:', e); }, null, 'html');
+    }
+
+    function getAvaiPropValTuples(excludedRow) {
+        var props = [];
+
+        varProperties.forEach(function (prop) {
+            if (prop.PropVals.length > 0) {
+                props.push(prop.PropVals.map(function (pval) {
+                    return { PropId: prop.Id, PropValId: pval.Id, PropValName: pval.Name };
+                }));
+            }
+        });
+
+        return varCrossJoin(props).filter(function (tuple) {
+            var row = varPropValsDic[varpropsToKey(tuple)];
+            return !row || (excludedRow && excludedRow.Key == row.Key);
+        });
+    }
+
+    function varpropertiesSync() {
+        var props = []; varProperties = [];
+
+        $('#re-sel-prop-list .var-property').each(function () {
+            var pvals = [], propId = $(this).attr('data-id');
+            $(this).find('.pval-list li input:hidden').each(function () {
+                pvals.push({
+                    PropId: propId,
+                    PropValId: parseInt($(this).val()),
+                    PropValName: $(this).closest('li').find('.prop-val-name').html()
+                });
+            });
+            if (pvals.length > 0) {
+                props.push(pvals);
+                varProperties.push({
+                    Id: propId,
+                    Name: $(this).find('.var-prop-cbox .prop-name').html(),
+                    PropVals: pvals.map(function (pv) { return { Id: pv.PropValId, Name: pv.PropValName }; })
+                });
+            }
+        });
+
+        return props;
+    }
+
+    function propselAddVariant() {
+
+        var dataSource = grid.data('kendoGrid').dataSource, nAdd = 0, prevTotal = dataSource.total();
+        var maxVarCount = parseInt('@VariantModel.MaxTotal'), maxVarPerAdd = parseInt('@VariantModel.MaxPerAdd');
+
+        if (prevTotal >= maxVarCount) {
+            admincommon.hideMask();
+            return;
+        }
+
+        var props = varpropertiesSync();
+        gridSyncProperties();
+
+        var qtyTotal = 0;
+        dataSource.transport.data = [];
+        dataSource.data().forEach(function (itm) {
+            dataSource.transport.data.push(itm);
+            qtyTotal += itm.Quantity;
+        });
+
+        quantity.val('0').clawChangeInt(qtyTotal).change();
+
+        varCrossJoin(props).forEach(function (pargs) {
+            if (dataSource.transport.data.length < maxVarCount && nAdd < maxVarPerAdd) {
+                if (variantAdd(pargs)) nAdd++;
+            }
+        });
+        dataSource.read();
+
+        admincommon.hideMask();
+    }
+
+    function onPropValChange(node) {
+
+        if (node.val() == '-1') {
+            var propFrom = node.closest('.var-property');
+            var pvalForm = propFrom.find('.prop-val-form'), inputForm = propFrom.find('.prop-val-input-form');
+            var ddboxForm = pvalForm.find('.prop-val-ddbox-form');
+            var txtNode = inputForm.find('.prop-val-name');
+            var aliasNode = $('#prop-val-alias'), errNode = inputForm.find('span.error');
+            var ddlist = $('input.propval-cbox', propFrom).data('kendoDropDownList');
+
+            inputForm.show();
+            ddboxForm.hide();
+            console.log('onPropValChange', inputForm, ddboxForm);
+
+            inputForm.find('input.btn_cancel')
+                .unbind('click')
+                .click(function () { inputForm.hide(); ddboxForm.hide(); errNode.html(''); txtNode.val(''); ddlist.value(''); propFrom.find('ul.wr_submit_top').show(); });
+
+            inputForm.show().find('input.btn_save')
+                .unbind('click')
+                .click(function () {
+                    var name = $.trim(txtNode.val());
+
+                    if (!txtNode.val(name).valid()) return;
+                    else { errNode.html(''); AutoGenerateAlias(name, 'prop-val-alias', true); }
+
+                    var propId = propFrom.attr('data-id');
+
+                    ajaxREST('@ModuleUrl.AdminUrl("PropVal", "Input")', 'POST',
+                        { id: 0, code: aliasNode.val(), name: name, displayorder: 1000, propertyId: propId, lang: getFocusLang(), QuickAdd: true, InlineEdit: true }, 'prop-val-loading',
+                        function (result) {
+                            var errMsg = kendoGetResultError(result), row = result.Data[0];
+                            if (!errMsg) {
+                                var pvalEle = propValAdd(row.Id, row.Name);
+                                if (pvalEle) {
+                                    node.closest('.var-property').find('ul.pval-list').append(pvalEle);
+                                    propvalInitDeleteEvent(pvalEle);
+                                }
+                                ddlist.value(''); txtNode.val(''); errNode.html(''); inputForm.hide();
+                                propFrom.find('ul.wr_submit_top').show();
+                                ddlistAddPropVal(propId, row.Id, row.Name);
+                                ddlist.dataSource.read();
+                            } else errNode.html(errMsg);
+                        }, function (e) { errNode.html('@StringTable.AjaxCommandErrorMessage'); });
+
+                    return false;
+                });
+        };
+    }
+
+    function ddlistAddPropVal(propId, propvalId, propvalName) {
+        console.log('ddlistAddPropVal', propId, propvalId, propvalName, $('#temp-prop-' + propId), $('#temp-prop-' + propId).data('kendoDropDownList'));
+        var templDDown = $('#temp-prop-' + propId).data('kendoDropDownList'), ddowns = $('input.var-prop-' + propId);
+
+        if (!templDDown) return;
+
+        templDDown.options.dataSource.push({ Value: propvalId.toString(), Text: propvalName, Active: true, LangVisible: true, CssClass: "", Title: "" });
+        ddowns.each(function () {
+            var nodeDD = $(this).data('kendoDropDownList');
+            if (nodeDD) nodeDD.setDataSource(templDDown.options.dataSource);
+        });
+    }
+
+    function initPropValAddBtn(holder) {
+        $('.btn-add-prop-val', holder).unbind('click').click(function () {
+            var propFrom = $(this).closest('.var-property');
+            var pvalForm = propFrom.find('.prop-val-form'), inputForm = pvalForm.find('.prop-val-input-form');
+            var ddboxForm = pvalForm.find('.prop-val-ddbox-form');
+            var node = $(this).closest('ul'), txtNode = inputForm.find('.prop-val-name');
+            var aliasNode = $('#prop-val-alias'), errNode = inputForm.find('span.error');
+            var ddlist = $('input.propval-cbox', propFrom).data('kendoDropDownList'), selPropVals = [];
+
+            propFrom.find('.pval-list .prop-val-name').each(function () { selPropVals.push($(this).html()); });
+            kendoDropDownHideItems(ddlist.element, selPropVals, 'div');
+
+            formShowErrorMsg(ddlist.element.attr('name'), '');
+
+            ddboxForm.show();
+            node.hide();
+
+            ddboxForm.find('input.btn_add')
+                .unbind('click')
+                .click(function () {
+                    var value = ddlist.value();
+                    if (ddlist.element.valid() && value && value != '-1') {
+                        var pvalEle = propValAdd(value, ddlist.text());
+                        if (pvalEle) {
+                            propFrom.find('.pval-list').append(pvalEle);
+                            propvalInitDeleteEvent(pvalEle);
+                        }
+                        ddlist.value(''); ddboxForm.hide(); inputForm.hide(); node.show();
+                    }
+                    //console.log('click', value, pvalForm);
+                });
+
+            ddboxForm.find('input.btn_cancel')
+                .unbind('click')
+                .click(function () {
+                    ddboxForm.hide();
+                    inputForm.hide();
+                    node.show();
+                    errNode.html('');
+                    ddlist.value('');
+                });
+        });
+    }
+
+    function variantUploadImg(node) {
+
+        var row = $(node).data('claw-grid-row'), tdNode = $(node).data('claw-grid-td');
+        $(node).data({ 'claw-grid-row': null, 'claw-grid-td': null });
+
+        if (!row || !validFileExtension($(node), 'datavalregex', '.variant-upload-img-box', 'datavalextension')) return;
+
+        tdNode.html($('#variantLoadingImage').html()).find('img').attr('id', 'var-loading-' + row.uid);
+
+        doUploadFile('@(ModuleUrl.AdminUrl("Variant", "UploadImageVar"))', 'variantImageUpload', 'var-loading-' + row.uid,
+            { id: row.id },
+            function (result) {
+                if (result.Image) {
+                    row.Image = result.Image.FileName;
+                    row.ImageThumb = result.Image.ThumbUrl;
+                    row.ImageFsUrl = result.Image.FilePath;
+                    bindInputField(row.VariantForm, row, 'Image', row.Image);
+                    bindInputField(row.VariantForm, row, 'ImageFsUrl', row.ImageFsUrl);
+                }
+                //console.log('variantUploadImg', row, result);
+                grid.data('kendoGrid').refresh({ action: 'rebind', items: [row] });
+                $('#variantImageUpload').val('');
+            });
+    }
+
+    function gridOnDelete(uid, gridId) {
+        var gridDs = grid.data('kendoGrid').dataSource, row = gridDs.getByUid(uid);
+        //console.log('delete', row, uid);
+        variantRemoveRange([row]);
+    }
+    function displayTimepicker(statusId) {
+        if (statusId != 3) return "style=display:none;";
+        return "";
+    }
+    </script>
+    <script type="text/javascript">
+    var variantPopup = null, variantModal = null;
+    function cmdEditVariant(uid) {
+        var row = grid.data('kendoGrid').dataSource.getByUid(uid), args = {};
+        //console.log('cmdEditVariant', row);
+        eval('args = ' + JSON.stringify(row));
+
+        ajaxCmdHtml('@ModuleUrl.AdminUrl("Variant", "Input")/?lang=' + getFocusLang(), args, function (result) { doOpenVariantForm(row, result); });
+    }
+
+    function doOpenVariantForm(row, html) {
+        var width = Math.max(200, Math.min(900, $(window).width() - 50));
+        var height = Math.max(200, Math.min(850, $(window).height() - 50));
+        var popTemplate = $("<div>").html($("#variant-popup-form-templ").html());
+        popTemplate.find('.htmlcontent').html(html);
+        popTemplate.find('#err-message-holder').append($('#massage.show_massage'));
+
+        var popup = variantPopup = new ClawModal("", "modal-mask");
+        var windowModal = variantModal = popup.showCustomModal("#window", '@Html.Raw(StringTable.EditVariant)', popTemplate.html(),
+                width, height, [], null,
+                function (modal) {
+                    var msgBox = modal.find('#massage.show_massage'), inputErrBox = $('#input-err-msg-box');
+                    var scrollPos = $(window).scrollTop(), popupForm = $('#popupForm', modal);
+
+                    $('#popupForm .wr_clo1', modal).css('height', height - 60 + 'px');
+
+                    variantInitPopup(row);
+
+                    setTimeout(function () { popupForm.valid(); validateSubmit(popupForm); }, 1000);
+
+                    var dzone = $('#var-dropzone-form', modal)[0].dropzone;
+
+                    modal.find(".btn_save").click(function () {
+
+                        if (!validateSubmit(popupForm) || !validateVariantPrices()) return;
+
+                        var kWnd = popup.getModal().closest('.k-widget.k-window').hide();
+                        $(window).scrollTop(scrollPos);
+
+                        setTimeout(function () {
+                            variantSyncForm(popupForm, row);
+                            inputErrBox.append(msgBox); admincommon.hideMessage();
+                            kWnd.show(); popup.close(); initRemoteValidate();
+                            variantImageFormListData = variantImageJsonListData = null;
+                                variantPopup = variantModal = null;
+
+                            if (dzone) { dzone.destroying = true; dzone.destroy(); }
+
+                            grid.data('kendoGrid').refresh({ action: 'rebind', items: [row] });
+                        }, 500);
+                    });
+
+                    modal.find(".btn_cancel").click(function () {
+                        if (variantImageFormListData) {
+                            variantImageFormListData.find('input').each(function () { $(this).attr('val-bk', $(this).val()); });
+                            $('.variant-image-form-list', row.VariantForm)
+                                .html('')
+                                .append(variantImageFormListData.find('.variant-image-form'));
+                        }
+
+                        if (variantImageJsonListData)
+                            row.Images = JSON.parse(variantImageJsonListData);
+
+                        inputErrBox.append(msgBox); admincommon.hideMessage();
+                        popup.close(); $(window).scrollTop(scrollPos); initRemoteValidate();
+                        variantImageFormListData = variantImageJsonListData = null;
+                            variantPopup = variantModal = null;
+
+                        if (dzone) { dzone.destroying = true; dzone.destroy(); }
+
+                        $('.variant-image-form input', row.VariantForm).each(function () {
+                            var valBK = $(this).attr('val-bk');
+                            if (valBK != null) $(this).val(valBK).attr('val-bk', null);
+                        });
+                    });
+                });
+    }
+
+    function varImageAdd(varForm, fieldVals) {
+
+        var lst = $('.variant-image-form-list', varForm), idx = parseInt(lst.attr('count'));
+        var prefixId = varForm.attr('data-prefix-id');
+        var prefixName = varForm.attr('data-prefix-name');
+
+        lst.attr('count', idx + 1);
+
+        var newForm = $('<div>').html($('#var-image-form-template').html()).find('.variant-image-form');
+
+        newForm.find('input,textarea,select').each(function () {
+            //console.log('varImageAdd', varForm, prefixId, prefixName, $(this).attr('id'), $(this).attr('name'));
+            var idVal = $(this).attr('id').replace('Variants_0_', prefixId).replace('Images_0_', 'Images_' + idx + '_');
+            var nameVal = $(this).attr('name').replace('Variants[0]', prefixName).replace('Images[0]', 'Images[' + idx + ']');
+            $(this).attr('id', idVal);
+            $(this).attr('name', nameVal);
+
+            //console.log('varImageAdd', idVal, nameVal);
+            if ($(this).attr('binding')) {
+                if ($(this).is('textarea')) $(this).html(''); else $(this).val('');
+            }
+        });
+
+        if (fieldVals) {
+            newForm.find('.lang_form_field[binding]').each(function () {
+                var bindField = $(this).attr('binding'), fbVal = '';
+                fbVal = fieldVals[bindField];
+                //console.log('varImageAdd', $(this), fVal);
+                if ($(this).is('textarea')) $(this).html(fbVal); else $(this).val(fbVal);
+            });
+        }
+
+        newForm.attr({ 'data-id': 0, 'data-index': idx, 'data-valid': 1, 'data-img-url': fieldVals['Key'] });
+
+        lst.append(newForm);
+
+        //console.log(newForm.html());
+
+        return newForm;
+    }
+
+    function initRemoteValidate() {
+
+        $.fn.getRemoteValidArgs = function (args) {
+            var otherItems = [], meId = $(this).attr('data_id'), supplierId = $('#@Html.IdFor(m => m.SupplierId)').val();
+
+            if ($(this).is('.var-sku')) {
+                otherItems.push($('#@Html.IdFor(m => m.SKU)').val());
+                $('.var-sku').each(function () { if ($(this).attr('data_id') != meId) otherItems.push($(this).val()); });
+                args.data = { Id: $(this).attr('data_id') || 0, SKU: $(this).val(), OtherSKUs: otherItems, SupplierId: supplierId };
+            }
+            if ($(this).is('.var-barcode')) {
+                otherItems.push($('#@Html.IdFor(m => m.BarCode)').val());
+                $('.var-barcode').each(function () { if ($(this).attr('data_id') != meId) otherItems.push($(this).val()); });
+                args.data = { Id: $(this).attr('data_id') || 0, BarCode: $(this).val(), OtherBarcodes: otherItems, SupplierId: supplierId };
+            }
+
+            return args;
+        };
+
+    }
+
+    initRemoteValidate();
+
+    </script>
+    <script type="text/javascript">
+
+    //auto fill empty properties and remove duplicated rows
+    function gridSyncProperties() {
+        var propsMap = getPropsMap(), varpropDic = {}, removeLst = [], gridData = grid.data('kendoGrid');
+
+        varProperties.forEach(function (itm) { varpropDic[itm.Id] = itm; });
+
+        function updatePropValField(varForm, row, index, newVal) {
+            var inputField = varForm.find('.variant-prop-form-field[binding=Properties_' + index + '__PropValId]');
+            inputField.val(newVal); //console.log(inputField, index, newVal);
+        }
+
+        gridData.dataSource.data().forEach(function (row) {
+            var dirty = false;
+            varProperties.forEach(function (itm) {
+                var idx = propsMap[itm.Id], prop = row.Properties[idx];
+                if (!prop.PropValId && itm.PropVals.length != 0) {
+                    prop.PropValId = itm.PropVals[0].Id;
+                    prop.PropValName = itm.PropVals[0].Name;
+                    updatePropValField(varFormDic[row.Key], row, idx, prop.PropValId);
+                    dirty = true;
+                }
+            });
+
+            row.Properties.forEach(function (itm) {
+                if (!varpropDic[itm.PropId]) {
+                    itm.PropValId = itm.PropValName = null; dirty = true;
+                    updatePropValField(varFormDic[row.Key], row, propsMap[itm.PropId], '');
+                }
+            });
+
+            if (dirty) {
+                delete varPropValsDic[row.PropValsKey];
+                var propvalsKey = varpropsToKey(row.Properties);
+                if (varPropValsDic[propvalsKey]) removeLst.push(row);
+                else varPropValsDic[row.PropValsKey = propvalsKey] = row;
+            }
+        });
+
+        if (removeLst.length != 0) variantRemoveRange(removeLst);
+    }
+
+    //[{PropId, PropValId, PropValName}]
+    function variantRemoveGroup(propVals) {
+
+        varpropertiesSync();
+
+        var propsMap = getPropsMap(), pvalMap = {}, gridData = grid.data('kendoGrid');
+
+        propVals.forEach(function (pv) {
+            var prop = pvalMap[pv.PropId];
+            if (!prop) pvalMap[pv.PropId] = prop = { Map: {} };
+            prop.Map[pv.PropValId] = true;
+        });
+
+        varProperties.forEach(function (itm) {
+            var prop = pvalMap[itm.Id];
+            if (prop) itm.PropVals = itm.PropVals.filter(function (pv) { return !prop.Map[pv.Id]; });
+        });
+        varProperties = varProperties.filter(function (itm) { return itm.PropVals.length != 0; });
+
+        var removeLst = [], removeMap = {};
+        gridData.dataSource.data().forEach(function (row) {
+            propVals.forEach(function (pv) {
+                var propIdx = propsMap[pv.PropId];
+                if (row.Properties[propIdx].PropValId == pv.PropValId && !removeMap[row.Key]) {
+                    row.Properties[propIdx].PropValId = null;
+                    delete varPropValsDic[row.PropValsKey];
+                    row.PropValsKey = varpropsToKey(row.Properties);
+                    var propCount = varpropsCount(row.Properties);
+                    if (propCount < varProperties.length || !row.PropValsKey || varPropValsDic[row.PropValsKey]) {
+                        removeLst.push(row);
+                        removeMap[row.Key] = row;
+                    } else {
+                        varPropValsDic[row.PropValsKey] = row;
+                        var varForm = varFormDic[row.Key], field = 'Properties_' + propIdx + '__PropValId';
+                        varForm.find('.variant-prop-form-field[binding=' + field + ']').val('');
+                    }
+                }
+            });
+        });
+
+        if (removeLst.length == 0) gridData.dataSource.read();
+        else variantRemoveRange(removeLst);
+
+        $('#btn-propsel-update-variants').closest('li').hide();
+        $('#btn-propsel-add-variants,#btn-add-one-variant').closest('li').show();
+    }
+
+    function variantRemoveRange(rows) {
+        var gridData = grid.data('kendoGrid'), transport = gridData.dataSource.transport;
+        var delRowMap = {}, qtyTotal = 0;
+
+        //rows = rows.filter(function (rw) { return rw.Deletable; });
+
+        rows.forEach(function (rw) { delRowMap[rw.Key] = rw; });
+
+        transport.data = gridData.dataSource.data().filter(function (itm) {
+            return !delRowMap[itm.Key];
+        });
+
+        rows.forEach(function (row) {
+            row.VariantForm = varFormDic[row.Key];
+            qtyTotal += row.Quantity;
+            varFormRemove(row);
+        });
+
+        quantity.clawChangeInt(-1 * qtyTotal).change();
+
+        gridData.dataSource.read();
+    }
+
+    function varpropsToKey(properties) {
+        if (!properties) return '';
+        return properties.filter(function (prop) { return prop.PropId && prop.PropValId; })
+            .map(function (prop) { return 'p:' + prop.PropId + '-v:' + prop.PropValId; })
+            .sort().join(',');
+    }
+
+    function varpropsCount(properties) {
+        if (!properties) return 0;
+        return properties.filter(function (prop) { return prop.PropId && prop.PropValId; }).length;
+    }
+
+    function variantAddOneNew(grid) {
+
+        var avaiTuples = getAvaiPropValTuples();
+
+        if (avaiTuples.length == 0) return;
+
+        var qtyTotal = 0;
+        grid.dataSource.transport.data = [];
+        grid.dataSource.data().forEach(function (itm) {
+            grid.dataSource.transport.data.push(itm);
+            qtyTotal += itm.Quantity;
+        });
+
+        quantity.val('0').clawChangeInt(qtyTotal).change();
+
+        variantAdd(avaiTuples[0], true);
+
+        grid.dataSource.transport.data[0].PropEdit = true;
+        grid.dataSource.read();
+    }
+
+    function variantAdd(properties, insertFirst) {
+
+        if (varPropValsDic[varpropsToKey(properties)]) {
+            console.log('variantAdd cancelled', properties);
+            return false;
+        }
+
+        var costprice = $('#CostPrice').data('kendoNumericTextBox').value();
+        var costpriceInc = $('#CostPriceInc').data('kendoNumericTextBox').value();
+        var price = $('#Price').data('kendoNumericTextBox').value();
+        var priceInc = $('#PriceInc').data('kendoNumericTextBox').value();
+        var saleprice = $('#SalePrice').data('kendoNumericTextBox').value();
+        var salepriceInc = $('#SalePriceInc').data('kendoNumericTextBox').value();
+        var weight = $('#Weight').data('kendoNumericTextBox').value();
+        var prodStatus = $('#ProductStatusId').data('kendoDropDownList');
+        var location = $('#Location').val();
+        var fieldVals = {
+            Iseq: null,
+            Key: null,
+            SKU: '',
+            BarCode: '',
+            ProductStatusId: 3,//(prodStatus.value() || 2),
+            BackDate: '',
+            ProductStatusName: '@Html.Raw(defaultStatusName.Replace("'", "\\'"))',//(prodStatus.value() ? prodStatus.text() : '@Html.Raw(defaultStatusName.Replace("'","\\'"))'),
+            Active: true,
+            DisplayOrder: 1000,
+            Quantity: 0,
+            Location: location,
+            Weight: { Value: weight, Text: localizeMoneyToString(weight) },
+            CostPrice: { Value: costprice, Text: localizeMoneyToString(costprice) },
+            CostPriceInc: { Value: costpriceInc, Text: localizeMoneyToString(costpriceInc) },
+            Price: { Value: price, Text: localizeMoneyToString(price) },
+            PriceInc: { Value: priceInc, Text: localizeMoneyToString(priceInc) },
+            SalePrice: { Value: saleprice, Text: localizeMoneyToString(saleprice) },
+            SalePriceInc: { Value: salepriceInc, Text: localizeMoneyToString(salepriceInc) },
+            Properties: properties, //[{ PropId: 1, PropValId: 2,PropValName: '' }]
+        };
+        //console.log('variantAdd', fieldVals);
+        variantAddRaw(fieldVals, insertFirst);
+        return true;
+    }
+
+    //variantAdd({SKU:'ww',BarCode:'tt',ProductStatusId:2,Active:true,DisplayOrder:1000,Quantity:1,Properties:[{PropId:1,PropValId:2},{PropId:2,PropValId:4}]})
+    function variantAddRaw(fieldVals, insertFirst) {
+
+        var gridData = grid.data('kendoGrid');
+        var newRow = $.extend(true, {}, templVariant);
+
+        for (var prop in fieldVals) {
+            var pval = fieldVals[prop];
+            if (typeof (pval) == 'object' && prop == 'Properties') {
+                for (var k = 0; k < pval.length; k++) {
+                    for (var i = 0; i < newRow.Properties.length; i++) {
+                        if (pval[k].PropId == newRow.Properties[i].PropId) {
+                            newRow.Properties[i].PropValId = pval[k].PropValId;
+                            newRow.Properties[i].PropValName = pval[k].PropValName;
+                        }
+                    }
+                }
+            } else newRow[prop] = pval;
+        }
+
+        //console.log('variantAdd', newRow);
+
+        var varForm = varFormAdd(fieldVals);
+        newRow['Key'] = fieldVals['Key'];
+        newRow['Iseq'] = fieldVals['Iseq'];
+        varRowSetDic[newRow.Key] = newRow;
+        varFormDic[newRow.Key] = varForm;
+        newRow.PropValsKey = varpropsToKey(newRow.Properties);
+        varPropValsDic[newRow.PropValsKey] = newRow;
+        if (insertFirst) gridData.dataSource.transport.data.unshift(newRow);
+        else gridData.dataSource.transport.data.push(newRow);
+
+        quantity.clawChangeInt(newRow['Quantity']).change();
+    }
+
+    function varFormAdd(fieldVals) {
+
+        var lst = $('#variant-form-list'), idx = parseInt(lst.attr('count'));
+
+        lst.attr('count', idx + 1); fieldVals['Key'] = 'nil_' + idx; fieldVals['Iseq'] = idx;
+
+        var newForm = $('<div>').html($('#var-form-template').html()).find('.variant-form');
+
+        newForm.find('input,textarea,select').each(function () {
+            $(this).attr('id', $(this).attr('id').replace('_0_', '_' + idx + '_'));
+            $(this).attr('name', $(this).attr('name').replace('[0]', '[' + idx + ']'));
+
+            if ($(this).attr('binding') || $(this).attr('propbind')) {
+                if ($(this).is('textarea')) $(this).html('');
+                else $(this).val('');
+            }
+        });
+
+        if (fieldVals) {
+            for (var field in fieldVals) {
+                var fVal = fieldVals[field];
+                if (typeof (fVal) == 'object' && field == 'Properties') {
+                    fVal.forEach(function (item) {
+                        var propForm = newForm.find('.variant-prop-form[data-id=' + item.PropId + ']');
+                        var propVal = propForm.find('.variant-prop-form-field[propbind=PropValId]');
+                        propVal.val(item.PropValId);
+                    });
+                }
+            }
+
+            newForm.find('.variant-form-field[binding]').each(function () {
+                var bindField = $(this).attr('binding'), fbVal = '';
+                if (bindField.indexOf('Properties_') == -1) {
+                    if (bindField.indexOf('_') != -1) {
+                        eval('fbVal = fieldVals.' + bindField.replace('_', '.'));
+                    } else fbVal = fieldVals[bindField];
+
+                    if ($(this).is('textarea')) $(this).html(fbVal);
+                    else $(this).val(fbVal);
+                    //console.log('prodFormAdd', $(this), fVal);
+                }
+            });
+        }
+
+        newForm.attr({
+            'data-id': 0, 'data-valid': 1, 'iseq': idx, 'data-key': fieldVals['Key'],
+            'data-prefix-id': 'Variants_' + idx + '_', 'data-prefix-name': 'Variants[' + idx + ']'
+        });
+
+        lst.append(newForm);
+
+        //console.log(newForm.html());
+
+        return newForm;
+    }
+
+    function propValAdd(id, name) {
+
+        if ($('#prop-val-' + id).length != 0) return null;
+
+        var newItem = $('<div>').html($('#prop-val-templ').html()).find('li');
+
+        newItem.find('.prop-val-name').html(name);
+        newItem.find('input').attr('id', 'prop-val-' + id).attr('name', 'prop-val-' + id).val(id);
+        newItem.find('label').attr('for', 'prop-val-' + id);
+
+        return newItem;
+    }
+
+    function propertyAdd(id, name) {
+
+        var newItem = $('<div>').html($('#prop-templ').html()).find('div.var-property');
+
+        newItem.attr('data-id', id);
+        newItem.find('.prop-name').html(name);
+        newItem.find('.prop-val-input-form .prop-val-name').attr({ 'id': 'prop-val-name-' + id, 'name': 'prop-val-name-' + id });
+        newItem.find('.prop-val-input-form span.error').attr({ 'data-valmsg-for': 'prop-val-name-' + id });
+
+        var tmp = $('<div>')
+            .append($('#PropValCBox').clone().attr({
+                'id': 'propval-cbox-' + id,
+                'name': 'propval-cbox-' + id,
+                'data-val-required': '@StringTable.ErrMsgRequiredField.ModErrLocalize()',
+                'data-val': true
+            }));
+
+        var ddOpts = $('#PropValCBox').data('kendoDropDownList').options;
+
+        ddOpts.dataSource.transport.read.data = function () { return { propertyid: id, lang: getFocusLang() }; };
+
+        var errNode = '<div style="height:20px;"><span style="position:absolute;" class="error field-validation-error" data-validate="false" data-valmsg-for="propval-cbox-'
+            + id + '" data-valmsg-replace="true"></span></div>';
+        newItem.find('.propval-ddlist').html(tmp.html()).append(errNode);
+        newItem.find('.propval-cbox').kendoDropDownList(ddOpts);
+
+        initPropValAddBtn(newItem);
+        //console.log('propertyAdd', newItem, id, name);
+        return newItem;
+    }
+
+    function varFormRemove(row) {
+        row.VariantForm.attr('data-valid', 0);
+        row.VariantForm.find('input,textarea,select').val('').attr('datavalid', 0);
+
+        delete varRowSetDic[row.Key];
+        delete varPropValsDic[row.PropValsKey];
+        delete varFormDic[row.Key];
+
+        $('#editform-change-state').val(1).change();
+    }
+
+    function bindInputField(varForm, row, field, newVal, noOverride, skipPropvalsKey) {
+        var inputField;
+        if (field.indexOf('.') != -1) {
+            eval('row.' + field + ' = newVal');
+            var bindName = field.replace(/[\[\]\.]/g, '_');
+            inputField = varForm.find('.variant-form-field[binding=' + bindName + '],.variant-prop-form-field[binding=' + bindName + ']');
+            if (!skipPropvalsKey) {
+                var propvalsKey = varpropsToKey(row.Properties);
+                if (row.PropValsKey != propvalsKey) {
+                    var oldRw = varPropValsDic[row.PropValsKey];
+                    if (oldRw && oldRw.Key == row.Key) delete varPropValsDic[row.PropValsKey];
+                    row.PropValsKey = propvalsKey;
+                    if (!varPropValsDic[row.PropValsKey] || !noOverride)
+                        varPropValsDic[row.PropValsKey] = row;
+                    console.log('bindInputField', row.PropValsKey, row);
+                }
+            }
+        } else {
+            if (field == 'Quantity') {
+                newVal = parseInt(newVal) || 0;
+                if (row[field] != newVal) quantity.clawChangeInt(newVal - row[field]).change();
+            }
+            row[field] = newVal;
+            inputField = varForm.find('.variant-form-field[binding=' + field + ']');
+        }
+        inputField.val(newVal); console.log(inputField);
+    }
+
+    function dropDownCreateNewProp(id, value, optionLabel) {
+        var node = $('<input type="text">').attr('id', id), dropdown = $('#temp-prop-0').data('kendoDropDownList');
+        $('#dropdown-template-list').append(node);
+        node.kendoDropDownList($.extend(dropdown.options, { value: value, optionLabel: { Text: optionLabel } }));
+        return node;
+    }
+
+    function dropDownClone(selector, dropdownSelector, trNode) {
+        var dropdown = $(dropdownSelector).data('kendoDropDownList');
+        $(selector, trNode).each(function () {
+            $(this).kendoDropDownList($.extend(dropdown.options, { value: $(this).val() }));
+            if ($(this).hasClass('var-prop'))
+                $(this).data('kendoDropDownList').bind('open', function (e) {
+                    varPropMaskItems(e.sender.element, parseInt(e.sender.element.attr('data-propid')));
+                });
+        });
+    }
+
+    function varCrossJoin(arInAr, arr) {
+        var retInner = [], ret = [];
+
+        if (arInAr && arInAr.length > 0) {
+            var rear = arInAr.pop(); retInner = varCrossJoin(arInAr, rear);
+        }
+
+        if (arr) {
+            if (retInner.length == 0) retInner.push([]);
+            arr.forEach(function (itm) {
+                retInner.forEach(function (itmAr) {
+                    var tmp = $.extend([], itmAr); tmp.push(itm); ret.push(tmp);
+                });
+            });
+        } else ret = retInner;
+
+        return ret;
+    }
+
+    $.fn.getRemoteValidArgs = function (args) {
+        var otherItems = [], meId = $(this).attr('data_id'), supplierId = $('#@Html.IdFor(m => m.SupplierId)').val();
+
+        if ($(this).is('.var-sku')) {
+            otherItems.push($('#@Html.IdFor(m => m.SKU)').val());
+            $('.var-sku').each(function () { if ($(this).attr('data_id') != meId) otherItems.push($(this).val()); });
+            args.data = { Id: $(this).attr('data_id') || 0, SKU: $(this).val(), OtherSKUs: otherItems, SupplierId: supplierId };
+        }
+        if ($(this).is('.var-barcode')) {
+            otherItems.push($('#@Html.IdFor(m => m.BarCode)').val());
+            $('.var-barcode').each(function () { if ($(this).attr('data_id') != meId) otherItems.push($(this).val()); });
+            args.data = { Id: $(this).attr('data_id') || 0, BarCode: $(this).val(), OtherBarcodes: otherItems, SupplierId: supplierId };
+        }
+
+        return args;
+    };
+
+    </script>
+    <div id="variant-form-list" count="@Model.Variants.Count" style="display: none"></div>
+    <script id="variant-form-list-template" type="text/var-form-template">
+    @for (int i = 0; i < Model.Variants.Count; i++)
+    {@RenderVarForm(i, languages, settings.Hidden.VariantMultiImage)}
+    </script>
+    <script id="var-form-template" type="text/var-form-template">
+    @{ Model.Variants.Insert(0, templVariant); }
+    @RenderVarForm(0, languages, settings.Hidden.VariantMultiImage)
+    </script>
+    <script id="var-image-form-template" type="text/var-form-template">
+    @{ templVariant.Images.Add(new VariantImageModel()); }
+    @RenderVariantImage(0, 0)
+    @{ templVariant.Images.Clear(); }
+    </script>
+    @Html.Raw("<script type='text/javascript'> var templVariant = " + Json.Encode(templVariant) + ";</script>")
+</div>
+
+@helper RenderVarForm(int idx, List<Language> languages, bool multiImage)
+{
+    <div class="variant-form" data-id="@Model.Variants[idx].Id" data-key="@Model.Variants[idx].Key"
+         data-prefix-id="Variants_@(idx)_" data-prefix-name="Variants[@(idx)]" data-valid="1">
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Id, new { @class = "variant-form-field" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Image, new { @class = "variant-form-field", @binding = "Image" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].ImageFsUrl, new { @class = "variant-form-field", @binding = "ImageFsUrl" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].CostPrice, new { @class = "variant-form-field", @binding = "CostPrice_Text" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].CostPriceInc, new { @class = "variant-form-field", @binding = "CostPriceInc_Text" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Price, new { @class = "variant-form-field", @binding = "Price_Text" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].PriceInc, new { @class = "variant-form-field", @binding = "PriceInc_Text" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].SalePrice, new { @class = "variant-form-field", @binding = "SalePrice_Text" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].SalePriceInc, new { @class = "variant-form-field", @binding = "SalePriceInc_Text" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].ProductStatusId, new { @class = "variant-form-field", @binding = "ProductStatusId" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].BackDate, new { @class = "variant-form-field", @binding = "BackDate" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Quantity, new { @class = "variant-form-field", @binding = "Quantity" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Quantity1, new { @class = "variant-form-field", @binding = "Quantity1" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Quantity2, new { @class = "variant-form-field", @binding = "Quantity2" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Location, new { @class = "variant-form-field", @binding = "Location" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].SKU, new { @class = "variant-form-field", @binding = "SKU" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].PriceCkUrl, new { @class = "variant-form-field", @binding = "PriceCkUrl" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].PriceCkMinVal, new { @class = "variant-form-field", @binding = "PriceCkMinVal" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].BarCode, new { @class = "variant-form-field", @binding = "BarCode" })   
+        @*@Html.SimpleHiddenFor(m => m.Variants[idx].NvitCode, new { @class = "variant-form-field", @binding = "NvitCode" })*@
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Weight, new { @class = "variant-form-field", @binding = "Weight_Text" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].DisplayOrder, new { @class = "variant-form-field", @binding = "DisplayOrder" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Active, new { @class = "variant-form-field", @binding = "Active" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].ProductId, new { @class = "variant-form-field" })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].ShoppingQty, new { @class = "variant-form-field" })
+
+        @if (multiImage)
+        {
+            for (int k = 0; k < languages.Count; k++)
+            {
+                var kdx = k;
+                var lang = languages[k];
+                var curCLang = Model.Variants[idx].Languages.FirstOrAddNew(x => x.LangCode.EqualsIgCase(lang.LanguageCode),
+                    () => new VariantLangModel() { LangCode = lang.LanguageCode, VariantId = Model.Variants[idx].Id });
+
+                <div class="variant-lang-form" data-key="@Model.Variants[idx].Languages[kdx].LangCode">
+                    @Html.SimpleHiddenFor(m => m.Variants[idx].Languages[kdx].LangCode, new { @class = "variant-lang-form-field" })
+                    @Html.SimpleHiddenFor(m => m.Variants[idx].Languages[kdx].DescriptionV, new { @class = "variant-lang-form-field", @binding = "DescriptionV" })
+                </div>
+            }
+            <div class="variant-image-form-list" count="@Model.Variants[idx].Images.Count">
+                @for (int k = 0; k < Model.Variants[idx].Images.Count; k++)
+                {@RenderVariantImage(idx, k)}
+            </div>
+        }
+
+        @for (int k = 0; k < Model.Variants[idx].Properties.Count; k++)
+        {
+            var kdx = k;
+            <div class="variant-prop-form" data-id="@Model.Variants[idx].Properties[kdx].PropId">
+                @Html.SimpleHiddenFor(m => m.Variants[idx].Properties[kdx].Id, new { @class = "variant-prop-form-field" })
+                @Html.SimpleHiddenFor(m => m.Variants[idx].Properties[kdx].PropId, new { @class = "variant-prop-form-field" })
+                @Html.SimpleHiddenFor(m => m.Variants[idx].Properties[kdx].PropValId, new
+                {
+                    @class = "variant-prop-form-field",
+                    @propbind = "PropValId",
+                    @binding = Regex.Replace(string.Format("Properties[{0}].PropValId", kdx), @"[\[\]\.]", "_")
+                })
+                @Html.SimpleHiddenFor(m => m.Variants[idx].Properties[kdx].VariantId, new { @class = "variant-prop-form-field" })
+            </div>
+        }
+    </div>
+}
+
+@helper RenderVariantImage(int idx, int kdx)
+{
+    <div class="variant-image-form" data-img-url="@Model.Variants[idx].Images[kdx].Key" data-index="@kdx" data-id="@(Model.Variants[idx].Images[kdx].Id)">
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Images[kdx].FileName, new { @class = "image_form_file_name lang_form_field", @binding = "FileName", })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Images[kdx].FsUrl, new { @class = "lang_form_field lang_form_fsurl", @binding = "FsUrl", })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Images[kdx].Thumb, new { @class = "lang_form_field lang_form_thumb", @binding = "Thumb", })
+        @Html.SimpleHiddenFor(m => m.Variants[idx].Images[kdx].DisplayOrder, new { @class = "lang_form_field lang_form_displayorder", @binding = "DisplayOrder", })
+    </div>
+}
+
+@helper RenderProperty(PropertyModel prop)
+{
+    <div class="wr-choose var-property" data-id="@prop.Id">
+        <div class="bold var-prop-cbox">
+            @*tt-name*@
+            <span class="prop-name">@prop.Name</span><br>
+            <input name="prop-@prop.Id" class="css-checkbox" id="prop-@prop.Id" value="@prop.Id" type="hidden">
+        </div>
+        <ul class="wr-color pval-list"></ul>
+        <ul class="wr_submit_top remove-format">
+            <li>
+                <input id="btn-add-prop-val-@prop.Id" class="btn_add btn-add-prop-val" value="@StringTable.AddValue" type="button">
+            </li>
+        </ul>
+        <div class="prop-val-form" style="clear: left">
+            <div class="prop-val-input-form" style="display: none;float:left;margin-left: 62px;">
+                @Html.Raw(Html.LocalizeTextBoxFor(m => m.Opt.PropValNameInput, new
+                {
+                    @id = "prop-val-name-" + prop.Id,
+                    @class = "prop-val-name",
+                    @datavalid = 0,
+                    @style = "min-width: 0px; width: 90px;float:left",
+                    @placeholder = Html.LocalizeNameFor(m => m.Opt.PropValNameInput),
+                }).Replace(new { name = "prop-val-name-" + prop.Id }))
+                @Html.LocalizeImageLoading(new { @id = "prop-val-loading" })
+                <input id="prop-val-alias" type="hidden" />
+                <ul class="wr_submit_top remove-format">
+                    <li><input value="@StringTable.Save" class="btn_save" type="button" /></li>
+                    <li style="margin-left: 4px;"><input value="@StringTable.Cancel" class="btn_cancel" type="button" /></li>
+                </ul>
+                <section style="float: left; clear: left;">
+                    <span class="error field-validation-error" data-validate="false" data-valmsg-for="prop-val-name-@prop.Id" data-valmsg-replace="true"></span>
+                </section>
+            </div>
+            <div class="prop-val-ddbox-form" style="display: none;float: left">
+                <section id="propval-ddlist" class="propval-ddlist" style="float:left;margin-left: 62px;"></section>
+                <section class="left">
+                    <ul class="wr_submit_top remove-format">
+                        <li style="margin-left: 4px;"><input value="@StringTable.Add" class="btn_add " type="button" /></li>
+                        <li style="margin-left: 4px;"><input value="@StringTable.Cancel" class="btn_cancel" type="button" /></li>
+                    </ul>
+                </section>
+            </div>
+        </div>
+    </div>
+}
+
+<section id="propval-ddlist-temp" style="display: none">
+    <input id="propertyid" type="hidden" />
+    @Html.LocalizeDropDownListKendoLang("PropValCBox", null, "ListPropValDD", "Variant", "propertyid", StringTable.SelectProperty, new { @onchange = "$(this).valid();onPropValChange($(this))", @class = "propval-cbox" }).AutoBind(false)
+</section>
+
+@helper RenderPropVal(PropValModel pval)
+{
+    <li class="name-color">
+        <div class="name-color"><span class="prop-val-name">@pval.Name</span><span class="es-btn-close pval-del"><a href="javascript:void(0)"> close </a></span></div><br>
+        <input name="prop-val-@pval.Id" class="css-checkbox" id="prop-val-@pval.Id" value="@pval.Id" type="hidden">
+    </li>
+}
+
+<script type="text/x-kendo-template" id="selprop-popup-form-templ">
+    <style type="text/css">
+        #popupForm .wr_clo1 {
+            max-height: none;
+            height:400px;
+        }
+    </style>
+    <form id="popupForm">
+        <div class="popupBody">
+            <section id="err-message-holder" style="float: left; width: 100%; height: 5px;"></section>
+            <section class="row_content_box kpopup-content poppup-variant" style="overflow:hidden;" >
+                <section class="wr_clo1" style="position:relative;">
+                    <div class="wcontent" style="margin: 10px; color: #390F3D;line-height:2em">
+                        <div class="htmlcontent">
+                            <section class="clear"></section>
+                            <div class="wr_table_all"></div>
+                        </div>
+                    </div>
+                </section>
+                <section class="clear"></section>
+                <ul class="wr_submit_top form-action-menu" style="position:relative; padding:5px 0;">
+                    <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                    <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+                </ul>
+            </section>
+        </div>
+    </form>
+</script>
+
+<script type="text/javascript">
+    var varRowSetDic = {}, varPropValsDic = {};
+
+    function buildVariantBox() {
+
+        if (grid.data('kendoGrid')) return;
+
+        setTimeout(function () {
+            $('#variant-form-list').html($('#variant-form-list-template').html());
+
+            variants.forEach(function (itm) {
+                varRowSetDic[itm.Key] = itm;
+                itm.PropValsKey = varpropsToKey(itm.Properties);
+                varPropValsDic[itm.PropValsKey] = itm;
+            });
+
+            initVariants();
+        }, 100);
+    };
+
+    function gridGetRow(grid, id, key) {
+        return varRowSetDic[key];
+    }
+
+    function getPropsMap() {
+        var propsMap = {}, properties = templVariant.Properties;
+
+        for (var i = 0; i < properties.length; i++) {
+            var prop = properties[i];
+            propsMap[prop.PropId] = i;
+        }
+
+        return propsMap;
+    }
+
+    $(function () { buildVariantBox(); });
+
+</script>
+
+<script type="text/x-kendo-template" id="variant-popup-form-templ">
+    <style type="text/css">
+        #popupForm .wr_clo1 {max-height: none;height: 400px;}
+        #popupForm .kpopup-content .row_content_box .clo_left {width: 352px !important;margin-left: 10px;}
+        #popupForm .kpopup-content .row_content_box .clo_right {width: 450px !important;}
+        #popupForm .dz-image-preview {min-height: 0;}
+    </style>
+    <form id="popupForm">
+        <div class="popupBody">
+            <section id="err-message-holder" style="float: left; width: 100%; min-height: 5px;"></section>
+            <section class="row_content_box kpopup-content poppup-variant">
+                <section class="wr_clo1">
+                    <div class="wcontent" style="margin: 10px; color: #390F3D;line-height:2em">
+                        <div class="htmlcontent"></div>
+                    </div>
+                </section>
+                <section class="clear"></section>
+                <ul class="wr_submit_top form-action-menu" style="position:relative; padding:5px 0;">
+                    <li><input type="button" value="@StringTable.Done" class="btn_save"></li>
+                    <li><input type="button" value="@StringTable.Cancel" class="btn_cancel"></li>
+                </ul>
+            </section>
+        </div>
+    </form>
+</script>
+
+<script id="var-image-templ" type="text/dropzone-template">
+    <li>
+        <div class="dz-preview dz-file-preview wr-img-check">
+            <div class="img-check">
+                <div class="dz-preview-menu">
+                    <div class="center">
+                        <a class="image-edit edit_fr" title="@StringTable.Edit">@StringTable.Edit</a>
+                        <a class="delete_fr" data-dz-remove title="@StringTable.Delete">X</a>
+                    </div>
+                </div>
+                <img data-dz-thumbnail />
+                <div class="dz-details">
+                    <div><span data-dz-size></span></div>
+                    <div><span data-dz-name></span></div>
+                </div>
+                <div class="dz-progress"><span class="dz-upload" data-dz-uploadprogress></span></div>
+            </div>
+        </div>
+    </li>
+</script>
